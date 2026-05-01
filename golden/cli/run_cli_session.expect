@@ -1,0 +1,74 @@
+#!/usr/bin/expect -f
+
+if { $argc != 3 } {
+    puts stderr "usage: run_cli_session.expect <simape> <commands-file> <transcript-file>"
+    exit 64
+}
+
+set timeout 20
+set simape [lindex $argv 0]
+set commands_file [lindex $argv 1]
+set transcript_file [lindex $argv 2]
+
+set command_handle [open $commands_file r]
+set commands [split [string trim [read $command_handle]] "\n"]
+close $command_handle
+
+set saw_eof 0
+
+proc drain_output { wait_seconds } {
+    global timeout saw_eof
+    set old_timeout $timeout
+    set timeout $wait_seconds
+    expect {
+        -re {.+} {
+            exp_continue
+        }
+        timeout {}
+        eof {
+            set saw_eof 1
+        }
+    }
+    set timeout $old_timeout
+}
+
+spawn $simape
+log_file -noappend $transcript_file
+
+expect {
+    -re {For a list of commands type 'help'\r?\n\r?\n} {}
+    timeout {
+        puts stderr "timed out waiting for console banner"
+        exit 1
+    }
+    eof {
+        puts stderr "simape exited before console banner"
+        exit 1
+    }
+}
+
+foreach command $commands {
+    set clean_command [string trim $command]
+    if { $clean_command == "" } {
+        continue
+    }
+    send -- "$clean_command\r"
+    drain_output 1
+    if { $saw_eof } {
+        break
+    }
+}
+
+if { !$saw_eof } {
+    expect {
+        eof {}
+        timeout {
+            puts stderr "timed out waiting for simape to exit"
+            exit 1
+        }
+    }
+}
+
+log_file
+catch wait ignored
+exit 0

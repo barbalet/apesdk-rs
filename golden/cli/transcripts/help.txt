@@ -1,0 +1,43 @@
+
+ *** Simulated Ape 0.708 Console, May  1 2026 ***
+      For a list of commands type 'help'
+
+help
+Commands:
+ help [(command)]            Displays a list of all the commands
+ reset                       Reset the simulation
+ open [file]                 Load a simulation file
+ script [file]               Load an ApeScript simulation file
+ save [file]                 Save a simulation file
+ quit                        Quits the console
+ stop                        Stop the simulation during step or run
+ speak [file]                Create an AIFF file of Ape speech
+ alpha [file]                Create an AIFF file of Ape alphabet
+ file [(component)]          Information on the file format
+ run (time format)|forever   Simulate for a given number of days or forever
+ step                        Run for a single logging interval
+ top                         List the top apes
+ epic                        List the most talked about apes
+ interval (days)             Set the simulation logging interval in days
+ event on|social|off         Episodic events (all) on, social on or all off
+ logging on|off              Turn logging of images and data on or off
+ sim                         Show simulation parameters
+ watch (ape name)|all|off|*  Watch (specific *) for the current ape
+ idea                        Track shared braincode between apes
+ ape                         Name of the currently watched ape
+ pathogen (ape name)         * Show pathogens for a named ape
+ graph (ape name)            * Show social graph for a named ape
+ braincode (ape name)        * Show braincode for a named ape
+ speech (ape name)           * Show speech for a named ape
+ episodic (ape name)         * Show episodic memory for a named ape
+ probes (ape name)           * Show brain probes for a named ape
+ stats (ape name)            * Show parameters for a named ape
+ appearance (ape name)       * Show appearance values for a named ape
+ genome (ape name)           Show genome for a named ape
+ list                        List all ape names
+ next                        Next ape
+ previous                    Previous ape
+ debug                       Run debug check
+ memory                      Memory information for the simulation
+quit
+Simulation stopped

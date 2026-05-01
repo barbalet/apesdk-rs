@@ -1,0 +1,37 @@
+
+ *** Simulated Ape 0.708 Console, May  1 2026 ***
+      For a list of commands type 'help'
+
+sim
+Map dimension: 512
+Land seed: 6443 36036
+Population: 0
+Adults: 0   Juveniles: 0
+Tide level: 0
+00:00 01/01/0 Simulation not running
+memory
+maximum memory 18960829
+allocated memory 0
+maximum apes 256
+ape
+*** ALL APES DEAD ***
+save /private/tmp/simape_cycle02_save.txt
+Simulation stopped
+Simulation file /private/tmp/simape_cycle02_save.txt saved
+
+open /private/tmp/simape_cycle02_save.txt
+Simulation stopped
+String length : 170
+Actual size : 347
+String location : 6
+Failed text {"info
+Failed text 123
+Failed text 34
+Failed text 105
+Failed text 110
+Failed text 102
+Failed text 111
+ERROR: {"info @ ./toolkit/file.c 833
+ERROR: Unknown command @ ./toolkit/file.c 1011
+ERROR: Signature not first in file @ ./universe/transfer.c 286
+ERROR: Failed to read in file @ ./universe/command.c 2394

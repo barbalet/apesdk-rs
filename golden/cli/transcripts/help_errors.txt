@@ -1,0 +1,12 @@
+
+ *** Simulated Ape 0.708 Console, May  1 2026 ***
+      For a list of commands type 'help'
+
+help run
+ run (time format)|forever   Simulate for a given number of days or forever
+help missing
+ERROR: Command not found, type help for more information @ ./sim/console.c 119
+unknown
+ERROR: Command not found, type help for more information @ ./sim/console.c 211
+quit
+Simulation stopped
