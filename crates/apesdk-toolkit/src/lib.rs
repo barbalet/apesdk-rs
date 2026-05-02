@@ -934,6 +934,17 @@ pub fn object_top_object(entries: &[ObjectEntry]) -> NFile {
     unknown_json(&ObjectValue::Object(entries.to_vec())).expect("object serializes")
 }
 
+pub fn object_parse_json(input: &[n_byte]) -> Result<ObjectValue, &'static str> {
+    let mut parser = JsonParser::new(input);
+    let value = parser.parse_value()?;
+    parser.skip_whitespace();
+    if parser.is_finished() {
+        Ok(value)
+    } else {
+        Err("trailing json data")
+    }
+}
+
 fn write_object_value(file: &mut NFile, value: &ObjectValue) -> Result<(), &'static str> {
     match value {
         ObjectValue::Empty => Err("Object kind not found"),
@@ -979,6 +990,174 @@ fn write_object_entries(file: &mut NFile, entries: &[ObjectEntry]) -> Result<(),
         }
     }
     Ok(())
+}
+
+struct JsonParser<'a> {
+    input: &'a [n_byte],
+    location: usize,
+}
+
+impl<'a> JsonParser<'a> {
+    const fn new(input: &'a [n_byte]) -> Self {
+        Self { input, location: 0 }
+    }
+
+    const fn is_finished(&self) -> bool {
+        self.location >= self.input.len()
+    }
+
+    fn skip_whitespace(&mut self) {
+        while matches!(self.peek(), Some(b' ' | b'\n' | b'\r' | b'\t')) {
+            self.location += 1;
+        }
+    }
+
+    fn peek(&self) -> Option<n_byte> {
+        self.input.get(self.location).copied()
+    }
+
+    fn take(&mut self) -> Option<n_byte> {
+        let byte = self.peek()?;
+        self.location += 1;
+        Some(byte)
+    }
+
+    fn expect(&mut self, expected: n_byte) -> Result<(), &'static str> {
+        match self.take() {
+            Some(byte) if byte == expected => Ok(()),
+            _ => Err("unexpected json character"),
+        }
+    }
+
+    fn parse_value(&mut self) -> Result<ObjectValue, &'static str> {
+        self.skip_whitespace();
+        match self.peek() {
+            Some(b'{') => self.parse_object().map(ObjectValue::Object),
+            Some(b'[') => self.parse_array().map(ObjectValue::Array),
+            Some(b'"') => self.parse_string().map(ObjectValue::String),
+            Some(b't') => {
+                self.expect_literal(b"true")?;
+                Ok(ObjectValue::Boolean(true))
+            }
+            Some(b'f') => {
+                self.expect_literal(b"false")?;
+                Ok(ObjectValue::Boolean(false))
+            }
+            Some(b'n') => {
+                self.expect_literal(b"null")?;
+                Ok(ObjectValue::Empty)
+            }
+            Some(b'-' | b'0'..=b'9') => self.parse_number().map(ObjectValue::Number),
+            _ => Err("json value expected"),
+        }
+    }
+
+    fn parse_object(&mut self) -> Result<Vec<ObjectEntry>, &'static str> {
+        self.expect(b'{')?;
+        self.skip_whitespace();
+        let mut entries = Vec::new();
+        if matches!(self.peek(), Some(b'}')) {
+            self.location += 1;
+            return Ok(entries);
+        }
+
+        loop {
+            self.skip_whitespace();
+            let name = self.parse_string()?;
+            self.skip_whitespace();
+            self.expect(b':')?;
+            let value = self.parse_value()?;
+            entries.push(ObjectEntry::new(name, value));
+            self.skip_whitespace();
+            match self.take() {
+                Some(b',') => continue,
+                Some(b'}') => return Ok(entries),
+                _ => return Err("json object delimiter expected"),
+            }
+        }
+    }
+
+    fn parse_array(&mut self) -> Result<Vec<ObjectValue>, &'static str> {
+        self.expect(b'[')?;
+        self.skip_whitespace();
+        let mut values = Vec::new();
+        if matches!(self.peek(), Some(b']')) {
+            self.location += 1;
+            return Ok(values);
+        }
+
+        loop {
+            values.push(self.parse_value()?);
+            self.skip_whitespace();
+            match self.take() {
+                Some(b',') => continue,
+                Some(b']') => return Ok(values),
+                _ => return Err("json array delimiter expected"),
+            }
+        }
+    }
+
+    fn parse_string(&mut self) -> Result<String, &'static str> {
+        self.expect(b'"')?;
+        let mut output = String::new();
+        loop {
+            match self.take() {
+                Some(b'"') => return Ok(output),
+                Some(b'\\') => output.push(self.parse_escape()?),
+                Some(byte) if byte < 0x20 => return Err("json string contains control byte"),
+                Some(byte) => output.push(char::from(byte)),
+                None => return Err("unterminated json string"),
+            }
+        }
+    }
+
+    fn parse_escape(&mut self) -> Result<char, &'static str> {
+        match self.take() {
+            Some(b'"') => Ok('"'),
+            Some(b'\\') => Ok('\\'),
+            Some(b'/') => Ok('/'),
+            Some(b'b') => Ok('\u{0008}'),
+            Some(b'f') => Ok('\u{000c}'),
+            Some(b'n') => Ok('\n'),
+            Some(b'r') => Ok('\r'),
+            Some(b't') => Ok('\t'),
+            Some(b'u') => Err("unicode json escapes not implemented"),
+            _ => Err("unknown json escape"),
+        }
+    }
+
+    fn parse_number(&mut self) -> Result<n_int, &'static str> {
+        let start = self.location;
+        if matches!(self.peek(), Some(b'-')) {
+            self.location += 1;
+        }
+
+        let digits_start = self.location;
+        while matches!(self.peek(), Some(b'0'..=b'9')) {
+            self.location += 1;
+        }
+        if self.location == digits_start {
+            return Err("json number expected");
+        }
+        if matches!(self.peek(), Some(b'.' | b'e' | b'E')) {
+            return Err("decimal json numbers not supported");
+        }
+
+        let number = std::str::from_utf8(&self.input[start..self.location])
+            .map_err(|_| "invalid json number")?;
+        number
+            .parse::<n_int>()
+            .map_err(|_| "json number out of range")
+    }
+
+    fn expect_literal(&mut self, literal: &[n_byte]) -> Result<(), &'static str> {
+        if self.input.get(self.location..self.location + literal.len()) == Some(literal) {
+            self.location += literal.len();
+            Ok(())
+        } else {
+            Err("json literal expected")
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1373,5 +1552,47 @@ mod tests {
 
         let file = unknown_json(&ObjectValue::Object(object)).expect("object serializes");
         assert_eq!(file.written_data(), b"{\"first\":1,\"second\":false}");
+    }
+
+    #[test]
+    fn object_parse_json_reads_compact_transfer_shape() {
+        let parsed = object_parse_json(
+            b"{\"information\":{\"signature\":20033,\"version number\":708},\"land\":{\"date\":0,\"genetics\":[7633,53305],\"time\":0}}",
+        )
+        .unwrap();
+        let ObjectValue::Object(root) = parsed else {
+            panic!("root should parse as object");
+        };
+        assert_eq!(root.len(), 2);
+        assert_eq!(root[0].name, "information");
+        assert_eq!(root[1].name, "land");
+        assert_eq!(root[0].name_hash, math_hash(b"information"));
+    }
+
+    #[test]
+    fn object_parse_json_handles_whitespace_booleans_and_escapes() {
+        let parsed =
+            object_parse_json(br#"{ "text": "ape\none", "ok": true, "values": [1, -2] }"#).unwrap();
+        let ObjectValue::Object(root) = parsed else {
+            panic!("root should parse as object");
+        };
+        assert_eq!(root[0].value, ObjectValue::String("ape\none".to_string()));
+        assert_eq!(root[1].value, ObjectValue::Boolean(true));
+        assert_eq!(
+            root[2].value,
+            ObjectValue::Array(vec![ObjectValue::Number(1), ObjectValue::Number(-2)])
+        );
+    }
+
+    #[test]
+    fn object_parse_json_rejects_trailing_and_decimal_data() {
+        assert_eq!(
+            object_parse_json(b"{\"a\":1}x").unwrap_err(),
+            "trailing json data"
+        );
+        assert_eq!(
+            object_parse_json(b"{\"a\":1.5}").unwrap_err(),
+            "decimal json numbers not supported"
+        );
     }
 }

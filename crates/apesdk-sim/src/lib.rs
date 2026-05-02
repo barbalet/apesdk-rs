@@ -4,8 +4,8 @@
 
 use apesdk_toolkit::{
     array_add, array_number, math_random, math_random3, n_byte, n_byte2, n_byte4, n_uint,
-    object_array, object_number, object_object, object_string, object_top_object, NFile,
-    ObjectEntry, ObjectValue,
+    object_array, object_number, object_object, object_parse_json, object_string,
+    object_top_object, NFile, ObjectEntry, ObjectValue,
 };
 
 pub const SHORT_VERSION_NAME: &str = "Simulated Ape 0.708 ";
@@ -115,6 +115,15 @@ impl LandState {
         }
     }
 
+    pub fn from_snapshot(snapshot: LandSnapshot) -> Self {
+        let mut state = Self::new();
+        state.date = snapshot.date;
+        state.time = snapshot.time;
+        state.tile_genetics[0] = snapshot.genetics;
+        state.genetics = snapshot.genetics;
+        state
+    }
+
     pub const fn date(&self) -> n_byte4 {
         self.date
     }
@@ -146,6 +155,14 @@ impl LandState {
         if kind != KIND_OF_USE::KIND_LOAD_FILE {
             self.time = (5 * TIME_HOUR_MINUTES) as n_byte4;
             self.date = start;
+        }
+    }
+
+    pub fn cycle(&mut self) {
+        self.time += 1;
+        if self.time == TIME_DAY_MINUTES as n_byte4 {
+            self.time = 0;
+            self.date += 1;
         }
     }
 
@@ -198,6 +215,30 @@ impl SimState {
 
     pub fn start_up(randomise: n_uint) -> Self {
         Self::init(KIND_OF_USE::KIND_START_UP, randomise)
+    }
+
+    pub fn from_startup_transfer(startup: &StartupTransfer) -> Self {
+        Self {
+            kind: KIND_OF_USE::KIND_LOAD_FILE,
+            land: LandState::from_snapshot(startup.land),
+            random_seed: [0; 2],
+        }
+    }
+
+    pub fn load_startup_json(input: &[u8]) -> Result<Self, &'static str> {
+        startup_transfer_from_json_bytes(input).map(|startup| Self::from_startup_transfer(&startup))
+    }
+
+    pub fn reset_new_simulation_from_land_seed(&mut self) {
+        let mut seed = self.land.genetics();
+        math_random3(&mut seed);
+        let randomise = (n_uint::from(seed[0]) << 16) | n_uint::from(seed[1]);
+        *self = Self::init(KIND_OF_USE::KIND_NEW_SIMULATION, randomise);
+    }
+
+    pub fn step_empty(&mut self) {
+        self.land.cycle();
+        self.kind = KIND_OF_USE::KIND_NOTHING_TO_RUN;
     }
 
     pub const fn kind(&self) -> KIND_OF_USE {
@@ -312,6 +353,107 @@ pub fn tranfer_startup_out_json(startup: &StartupTransfer) -> NFile {
     object_top_object(&transfer_startup_obj(startup))
 }
 
+pub fn startup_transfer_from_json_bytes(input: &[u8]) -> Result<StartupTransfer, &'static str> {
+    let parsed = object_parse_json(input)?;
+    let root = expect_object(&parsed, "root object expected")?;
+
+    let information = field_object(root, "information")?;
+    let signature = field_number(information, "signature")?;
+    if signature != SIMULATED_APE_SIGNATURE.into() {
+        return Err("not a simulated ape json");
+    }
+    let version = field_number(information, "version number")?;
+    if version > VERSION_NUMBER.into() {
+        return Err("json file newer than simulation");
+    }
+
+    let land = field_object(root, "land")?;
+    let date = field_byte4(land, "date")?;
+    let genetics = field_genetics(land)?;
+    let time = field_byte4(land, "time")?;
+
+    let beings = match optional_field(root, "beings") {
+        Some(ObjectValue::Array(values)) => values
+            .iter()
+            .map(|value| match value {
+                ObjectValue::Object(entries) => Ok(entries.clone()),
+                _ => Err("being object expected"),
+            })
+            .collect::<Result<Vec<_>, _>>()?,
+        Some(_) => return Err("beings array expected"),
+        None => Vec::new(),
+    };
+
+    Ok(StartupTransfer {
+        land: LandSnapshot::new(date, genetics, time),
+        beings,
+    })
+}
+
+fn optional_field<'a>(entries: &'a [ObjectEntry], name: &str) -> Option<&'a ObjectValue> {
+    entries
+        .iter()
+        .find(|entry| entry.name == name)
+        .map(|entry| &entry.value)
+}
+
+fn field<'a>(entries: &'a [ObjectEntry], name: &str) -> Result<&'a ObjectValue, &'static str> {
+    optional_field(entries, name).ok_or("json field missing")
+}
+
+fn expect_object<'a>(
+    value: &'a ObjectValue,
+    error: &'static str,
+) -> Result<&'a [ObjectEntry], &'static str> {
+    match value {
+        ObjectValue::Object(entries) => Ok(entries),
+        _ => Err(error),
+    }
+}
+
+fn field_object<'a>(
+    entries: &'a [ObjectEntry],
+    name: &str,
+) -> Result<&'a [ObjectEntry], &'static str> {
+    expect_object(field(entries, name)?, "json object expected")
+}
+
+fn field_number(entries: &[ObjectEntry], name: &str) -> Result<i64, &'static str> {
+    match field(entries, name)? {
+        ObjectValue::Number(number) => Ok(*number),
+        _ => Err("json number expected"),
+    }
+}
+
+fn field_byte4(entries: &[ObjectEntry], name: &str) -> Result<n_byte4, &'static str> {
+    let number = field_number(entries, name)?;
+    if (0..=n_byte4::MAX.into()).contains(&number) {
+        Ok(number as n_byte4)
+    } else {
+        Err("json number outside n_byte4 range")
+    }
+}
+
+fn field_genetics(entries: &[ObjectEntry]) -> Result<[n_byte2; 2], &'static str> {
+    match field(entries, "genetics")? {
+        ObjectValue::Array(values) if values.len() == 2 => {
+            Ok([array_byte2(&values[0])?, array_byte2(&values[1])?])
+        }
+        ObjectValue::Array(_) => Err("genetics array should have two values"),
+        _ => Err("genetics array expected"),
+    }
+}
+
+fn array_byte2(value: &ObjectValue) -> Result<n_byte2, &'static str> {
+    match value {
+        ObjectValue::Number(number) if (0..=n_byte2::MAX.into()).contains(number) => {
+            Ok(*number as n_byte2)
+        }
+        ObjectValue::Number(_) => Err("json number outside n_byte2 range"),
+        _ => Err("json number expected"),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -420,6 +562,19 @@ mod tests {
     }
 
     #[test]
+    fn land_cycle_advances_time_and_rolls_day() {
+        let mut land = LandState::from_snapshot(LandSnapshot::new(
+            10,
+            [7, 8],
+            (TIME_DAY_MINUTES - 1) as n_byte4,
+        ));
+        land.cycle();
+        assert_eq!(land.date(), 11);
+        assert_eq!(land.time(), 0);
+        assert_eq!(land.genetics(), [7, 8]);
+    }
+
+    #[test]
     fn startup_state_transfer_json_uses_seeded_land_snapshot() {
         let state = SimState::start_up(0x5261_f726);
         let file = state.tranfer_startup_out_json();
@@ -428,6 +583,69 @@ mod tests {
             b"{\"information\":{\"signature\":20033,\"version number\":708,\"copyright\":\"Copyright Tom Barbalet, 1996-2026.\",\"date\":\"May  1 2026\"},\"land\":{\"date\":0,\"genetics\":[7633,53305],\"time\":0}}"
         );
         assert_eq!(file.location(), 177);
+    }
+
+    #[test]
+    fn startup_transfer_loads_from_json_bytes() {
+        let startup = startup_transfer_from_json_bytes(
+            b"{\"information\":{\"signature\":20033,\"version number\":708,\"copyright\":\"Copyright Tom Barbalet, 1996-2026.\",\"date\":\"May  1 2026\"},\"land\":{\"date\":27,\"genetics\":[1,65535],\"time\":300}}",
+        )
+        .unwrap();
+        assert_eq!(startup.land, LandSnapshot::new(27, [1, 65_535], 300));
+        assert!(startup.beings.is_empty());
+    }
+
+    #[test]
+    fn sim_state_load_startup_json_restores_land_snapshot() {
+        let state = SimState::load_startup_json(
+            b"{\"information\":{\"signature\":20033,\"version number\":708},\"land\":{\"date\":9,\"genetics\":[11,12],\"time\":13}}",
+        )
+        .unwrap();
+        assert_eq!(state.kind(), KIND_OF_USE::KIND_LOAD_FILE);
+        assert_eq!(state.random_seed(), [0, 0]);
+        assert_eq!(state.land_snapshot(), LandSnapshot::new(9, [11, 12], 13));
+        assert_eq!(state.land().planet_genetics(), [11, 12]);
+    }
+
+    #[test]
+    fn reset_new_simulation_derives_seed_from_current_land_genetics() {
+        let mut state = SimState::start_up(0x5261_f726);
+        state.reset_new_simulation_from_land_seed();
+        assert_eq!(state.kind(), KIND_OF_USE::KIND_NEW_SIMULATION);
+        assert_eq!(state.land().date(), 0);
+        assert_eq!(state.land().time(), 0);
+        assert_eq!(state.land().genetics(), [23809, 53481]);
+        assert_eq!(state.land().planet_genetics(), [46774, 42340]);
+        assert_eq!(state.random_seed(), [27236, 50571]);
+    }
+
+    #[test]
+    fn step_empty_advances_save_visible_land_time() {
+        let mut state = SimState::start_up(0x5261_f726);
+        state.step_empty();
+        assert_eq!(state.kind(), KIND_OF_USE::KIND_NOTHING_TO_RUN);
+        assert_eq!(
+            state.land_snapshot(),
+            LandSnapshot::new(0, [7633, 53305], 1)
+        );
+    }
+
+    #[test]
+    fn startup_transfer_load_rejects_bad_signature_and_bad_genetics() {
+        assert_eq!(
+            startup_transfer_from_json_bytes(
+                b"{\"information\":{\"signature\":0,\"version number\":708},\"land\":{\"date\":0,\"genetics\":[1,2],\"time\":0}}",
+            )
+            .unwrap_err(),
+            "not a simulated ape json"
+        );
+        assert_eq!(
+            startup_transfer_from_json_bytes(
+                b"{\"information\":{\"signature\":20033,\"version number\":708},\"land\":{\"date\":0,\"genetics\":[1],\"time\":0}}",
+            )
+            .unwrap_err(),
+            "genetics array should have two values"
+        );
     }
 
     #[test]

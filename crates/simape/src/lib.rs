@@ -11,13 +11,16 @@ pub const MAXIMUM_MEMORY: usize = 18_960_829;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum CommandAction {
     Help,
+    Reset,
     Quit,
     Stop,
     Save,
     Open,
+    Step,
     Simulation,
     Memory,
     Ape,
+    List,
     Unsupported,
 }
 
@@ -37,13 +40,13 @@ const COMMANDS: &[CommandEntry] = &[
         help: "Displays a list of all the commands",
     },
     CommandEntry {
-        action: CommandAction::Unsupported,
+        action: CommandAction::Reset,
         command: "reset",
         addition: "",
         help: "Reset the simulation",
     },
     CommandEntry {
-        action: CommandAction::Unsupported,
+        action: CommandAction::Reset,
         command: "clear",
         addition: "",
         help: "",
@@ -121,7 +124,7 @@ const COMMANDS: &[CommandEntry] = &[
         help: "Simulate for a given number of days or forever",
     },
     CommandEntry {
-        action: CommandAction::Unsupported,
+        action: CommandAction::Step,
         command: "step",
         addition: "",
         help: "Run for a single logging interval",
@@ -295,19 +298,19 @@ const COMMANDS: &[CommandEntry] = &[
         help: "",
     },
     CommandEntry {
-        action: CommandAction::Unsupported,
+        action: CommandAction::List,
         command: "list",
         addition: "",
         help: "List all ape names",
     },
     CommandEntry {
-        action: CommandAction::Unsupported,
+        action: CommandAction::List,
         command: "ls",
         addition: "",
         help: "",
     },
     CommandEntry {
-        action: CommandAction::Unsupported,
+        action: CommandAction::List,
         command: "dir",
         addition: "",
         help: "",
@@ -381,6 +384,7 @@ impl Console {
 
         match entry.action {
             CommandAction::Help => (self.help(response), false),
+            CommandAction::Reset => (self.reset(), false),
             CommandAction::Quit => {
                 self.simulation_running = false;
                 ("Simulation stopped\n".to_string(), true)
@@ -391,9 +395,11 @@ impl Console {
             }
             CommandAction::Save => (self.save(response), false),
             CommandAction::Open => (self.open(response), false),
+            CommandAction::Step => (self.step(), false),
             CommandAction::Simulation => (self.simulation(), false),
             CommandAction::Memory => (self.memory(), false),
             CommandAction::Ape => ("*** ALL APES DEAD ***\n".to_string(), false),
+            CommandAction::List => (self.list(), false),
             CommandAction::Unsupported => (
                 "ERROR: Command not implemented in Rust port yet\n".to_string(),
                 false,
@@ -471,6 +477,32 @@ impl Console {
         format!("maximum memory {MAXIMUM_MEMORY}\nallocated memory 0\nmaximum apes {LARGE_SIM}\n")
     }
 
+    fn list(&self) -> String {
+        if self.population == 0 {
+            "No apes present. Trying (re)running the Simulation\n".to_string()
+        } else {
+            "ERROR: Ape listing not implemented in Rust port yet\n".to_string()
+        }
+    }
+
+    fn reset(&mut self) -> String {
+        self.simulation_running = false;
+        self.population = 0;
+        self.state.reset_new_simulation_from_land_seed();
+        "Simulation reset\n".to_string()
+    }
+
+    fn step(&mut self) -> String {
+        self.simulation_running = true;
+        if self.population == 0 {
+            self.state.step_empty();
+            self.simulation_running = false;
+            String::new()
+        } else {
+            "ERROR: Simulated ape cycling not implemented in Rust port yet\n".to_string()
+        }
+    }
+
     fn save(&mut self, response: Option<&str>) -> String {
         let Some(path) = response.filter(|value| !value.is_empty()) else {
             return String::new();
@@ -502,10 +534,17 @@ impl Console {
         self.simulation_running = false;
         let mut output = String::from("Simulation stopped\n");
         match fs::read(path) {
-            Ok(_) => {
-                output.push_str("ERROR: Signature not first in file @ ./universe/transfer.c 286\n");
-                output.push_str("ERROR: Failed to read in file @ ./universe/command.c 2394\n");
-            }
+            Ok(contents) => match SimState::load_startup_json(&contents) {
+                Ok(state) => {
+                    self.state = state;
+                    output.push_str("Simulation file ");
+                    output.push_str(path);
+                    output.push_str(" open\n\n");
+                }
+                Err(_) => {
+                    output.push_str("ERROR: Failed to read in file @ ./universe/command.c 2394\n");
+                }
+            },
             Err(_) => {
                 output.push_str("ERROR: Failed to open file @ ./universe/command.c 2388\n");
             }
@@ -626,6 +665,56 @@ mod tests {
     }
 
     #[test]
+    fn list_aliases_report_empty_population_like_c() {
+        let mut console = Console::default();
+        let actual = console.run_script("list\nls\ndir\nquit\n", true);
+        assert_eq!(
+            actual,
+            "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\nlist\nNo apes present. Trying (re)running the Simulation\nls\nNo apes present. Trying (re)running the Simulation\ndir\nNo apes present. Trying (re)running the Simulation\nquit\nSimulation stopped\n"
+        );
+    }
+
+    #[test]
+    fn reset_and_clear_regenerate_startup_land_seed() {
+        let mut console = Console::default();
+        let actual = console.run_script("reset\nsim\nclear\nsim\nquit\n", true);
+        assert_eq!(
+            actual,
+            "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\nreset\nSimulation reset\nsim\nMap dimension: 512\nLand seed: 23809 53481\nPopulation: 0\nAdults: 0   Juveniles: 0\nTide level: 0\n00:00 01/01/0 Simulation not running\nclear\nSimulation reset\nsim\nMap dimension: 512\nLand seed: 50588 11145\nPopulation: 0\nAdults: 0   Juveniles: 0\nTide level: 0\n00:00 01/01/0 Simulation not running\nquit\nSimulation stopped\n"
+        );
+    }
+
+    #[test]
+    fn step_advances_empty_land_time_and_run_remains_stub() {
+        let mut console = Console::default();
+        let actual = console.run_script("step\nsim\nrun 1 day\nquit\n", true);
+        assert_eq!(
+            actual,
+            "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\nstep\nsim\nMap dimension: 512\nLand seed: 7633 53305\nPopulation: 0\nAdults: 0   Juveniles: 0\nTide level: 0\n00:01 01/01/0 Simulation not running\nrun 1 day\nERROR: Command not implemented in Rust port yet\nquit\nSimulation stopped\n"
+        );
+    }
+
+    #[test]
+    fn save_after_step_persists_advanced_land_time() {
+        let path = temp_save_path("step_save");
+        let path_string = path.to_string_lossy();
+        let mut console = Console::default();
+        let actual = console.run_script(&format!("step\nsave {path_string}\nquit\n"), true);
+
+        assert_eq!(
+            actual,
+            format!(
+                "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\nstep\nsave {path_string}\nSimulation stopped\nSimulation file {path_string} saved\n\nquit\nSimulation stopped\n"
+            )
+        );
+        assert_eq!(
+            fs::read(&path).expect("saved JSON should be readable"),
+            b"{\"information\":{\"signature\":20033,\"version number\":708,\"copyright\":\"Copyright Tom Barbalet, 1996-2026.\",\"date\":\"May  1 2026\"},\"land\":{\"date\":0,\"genetics\":[7633,53305],\"time\":1}}"
+        );
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
     fn save_command_writes_startup_transfer_json() {
         let path = temp_save_path("startup_save");
         let path_string = path.to_string_lossy();
@@ -656,24 +745,51 @@ mod tests {
     }
 
     #[test]
-    fn open_saved_json_reports_current_c_load_failure() {
-        let path = temp_save_path("open_failure");
+    fn open_saved_json_restores_startup_state() {
+        let path = temp_save_path("open_success");
         let path_string = path.to_string_lossy();
         fs::write(
             &path,
-            b"{\"information\":{\"signature\":20033,\"version number\":708}}",
+            b"{\"information\":{\"signature\":20033,\"version number\":708},\"land\":{\"date\":27,\"genetics\":[1,2],\"time\":300}}",
         )
         .expect("fixture JSON should be writable");
 
         let mut console = Console::default();
-        let actual = console.run_script(&format!("open {path_string}\nquit\n"), true);
+        let actual = console.run_script(&format!("open {path_string}\nsim\nquit\n"), true);
 
         assert_eq!(
             actual,
             format!(
-                "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\nopen {path_string}\nSimulation stopped\nERROR: Signature not first in file @ ./universe/transfer.c 286\nERROR: Failed to read in file @ ./universe/command.c 2394\nquit\nSimulation stopped\n"
+                "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\nopen {path_string}\nSimulation stopped\nSimulation file {path_string} open\n\nsim\nMap dimension: 512\nLand seed: 1 2\nPopulation: 0\nAdults: 0   Juveniles: 0\nTide level: 0\n05:00 28/01/0 Simulation not running\nquit\nSimulation stopped\n"
             )
         );
         let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn load_alias_reads_saved_json_and_malformed_json_fails() {
+        let path = temp_save_path("load_alias");
+        let path_string = path.to_string_lossy();
+        let bad_path = temp_save_path("load_bad");
+        let bad_path_string = bad_path.to_string_lossy();
+        fs::write(
+            &path,
+            b"{\"information\":{\"signature\":20033,\"version number\":708},\"land\":{\"date\":0,\"genetics\":[33,44],\"time\":0}}",
+        )
+        .expect("fixture JSON should be writable");
+        fs::write(&bad_path, b"{\"information\":true}")
+            .expect("bad fixture JSON should be writable");
+
+        let mut console = Console::default();
+        let actual = console.run_script(
+            &format!("load {path_string}\nsim\nopen {bad_path_string}\nquit\n"),
+            true,
+        );
+
+        assert!(actual.contains(&format!("Simulation file {path_string} open\n\n")));
+        assert!(actual.contains("Land seed: 33 44\n"));
+        assert!(actual.contains("ERROR: Failed to read in file @ ./universe/command.c 2394\n"));
+        let _ = fs::remove_file(path);
+        let _ = fs::remove_file(bad_path);
     }
 }
