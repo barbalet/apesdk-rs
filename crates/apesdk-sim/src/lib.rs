@@ -166,6 +166,15 @@ impl LandState {
         }
     }
 
+    pub fn advance_minutes(&mut self, minutes: n_uint) {
+        let day_minutes = TIME_DAY_MINUTES as n_uint;
+        let total_minutes = n_uint::from(self.time) + minutes;
+        self.date = self
+            .date
+            .wrapping_add((total_minutes / day_minutes) as n_byte4);
+        self.time = (total_minutes % day_minutes) as n_byte4;
+    }
+
     pub fn seed_genetics(&mut self, random: &mut [n_byte2; 2]) {
         for tile in &mut self.tile_genetics {
             tile[0] = random_byte2(random);
@@ -237,7 +246,11 @@ impl SimState {
     }
 
     pub fn step_empty(&mut self) {
-        self.land.cycle();
+        self.step_empty_by(1);
+    }
+
+    pub fn step_empty_by(&mut self, minutes: n_uint) {
+        self.land.advance_minutes(minutes);
         self.kind = KIND_OF_USE::KIND_NOTHING_TO_RUN;
     }
 
@@ -575,6 +588,15 @@ mod tests {
     }
 
     #[test]
+    fn land_advance_minutes_rolls_multiple_days() {
+        let mut land = LandState::from_snapshot(LandSnapshot::new(2, [7, 8], 30));
+        land.advance_minutes((TIME_DAY_MINUTES * 2 + 15) as n_uint);
+        assert_eq!(land.date(), 4);
+        assert_eq!(land.time(), 45);
+        assert_eq!(land.genetics(), [7, 8]);
+    }
+
+    #[test]
     fn startup_state_transfer_json_uses_seeded_land_snapshot() {
         let state = SimState::start_up(0x5261_f726);
         let file = state.tranfer_startup_out_json();
@@ -627,6 +649,17 @@ mod tests {
         assert_eq!(
             state.land_snapshot(),
             LandSnapshot::new(0, [7633, 53305], 1)
+        );
+    }
+
+    #[test]
+    fn step_empty_by_advances_save_visible_land_time_by_interval() {
+        let mut state = SimState::start_up(0x5261_f726);
+        state.step_empty_by(TIME_DAY_MINUTES as n_uint);
+        assert_eq!(state.kind(), KIND_OF_USE::KIND_NOTHING_TO_RUN);
+        assert_eq!(
+            state.land_snapshot(),
+            LandSnapshot::new(1, [7633, 53305], 0)
         );
     }
 

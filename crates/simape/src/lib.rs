@@ -1,6 +1,6 @@
 use apesdk_sim::{
-    banner, SimState, LARGE_SIM, MAP_DIMENSION, TIME_DAY_MINUTES, TIME_MONTH_MINUTES,
-    TIME_YEAR_DAYS,
+    banner, SimState, LARGE_SIM, MAP_DIMENSION, TIME_DAY_MINUTES, TIME_HOUR_MINUTES,
+    TIME_MONTH_MINUTES, TIME_YEAR_DAYS, TIME_YEAR_MINUTES,
 };
 use apesdk_toolkit::n_uint;
 use std::fs;
@@ -17,10 +17,17 @@ enum CommandAction {
     Save,
     Open,
     Step,
+    Run,
+    Interval,
+    Logging,
+    Event,
     Simulation,
     Memory,
     Ape,
     List,
+    Top,
+    Epic,
+    Navigation,
     Unsupported,
 }
 
@@ -118,7 +125,7 @@ const COMMANDS: &[CommandEntry] = &[
         help: "Information on the file format",
     },
     CommandEntry {
-        action: CommandAction::Unsupported,
+        action: CommandAction::Run,
         command: "run",
         addition: "(time format)|forever",
         help: "Simulate for a given number of days or forever",
@@ -130,37 +137,37 @@ const COMMANDS: &[CommandEntry] = &[
         help: "Run for a single logging interval",
     },
     CommandEntry {
-        action: CommandAction::Unsupported,
+        action: CommandAction::Top,
         command: "top",
         addition: "",
         help: "List the top apes",
     },
     CommandEntry {
-        action: CommandAction::Unsupported,
+        action: CommandAction::Epic,
         command: "epic",
         addition: "",
         help: "List the most talked about apes",
     },
     CommandEntry {
-        action: CommandAction::Unsupported,
+        action: CommandAction::Interval,
         command: "interval",
         addition: "(days)",
         help: "Set the simulation logging interval in days",
     },
     CommandEntry {
-        action: CommandAction::Unsupported,
+        action: CommandAction::Event,
         command: "event",
         addition: "on|social|off",
         help: "Episodic events (all) on, social on or all off",
     },
     CommandEntry {
-        action: CommandAction::Unsupported,
+        action: CommandAction::Logging,
         command: "logging",
         addition: "on|off",
         help: "Turn logging of images and data on or off",
     },
     CommandEntry {
-        action: CommandAction::Unsupported,
+        action: CommandAction::Logging,
         command: "log",
         addition: "",
         help: "",
@@ -316,19 +323,19 @@ const COMMANDS: &[CommandEntry] = &[
         help: "",
     },
     CommandEntry {
-        action: CommandAction::Unsupported,
+        action: CommandAction::Navigation,
         command: "next",
         addition: "",
         help: "Next ape",
     },
     CommandEntry {
-        action: CommandAction::Unsupported,
+        action: CommandAction::Navigation,
         command: "previous",
         addition: "",
         help: "Previous ape",
     },
     CommandEntry {
-        action: CommandAction::Unsupported,
+        action: CommandAction::Navigation,
         command: "prev",
         addition: "",
         help: "",
@@ -352,6 +359,8 @@ pub struct Console {
     state: SimState,
     population: usize,
     simulation_running: bool,
+    save_interval_steps: n_uint,
+    logging_enabled: bool,
 }
 
 impl Console {
@@ -360,11 +369,17 @@ impl Console {
             state: SimState::start_up(randomise),
             population: 0,
             simulation_running: false,
+            save_interval_steps: TIME_HOUR_MINUTES as n_uint,
+            logging_enabled: true,
         }
     }
 
     pub fn startup_text() -> String {
         format!("{}      For a list of commands type 'help'\n\n", banner())
+    }
+
+    pub fn logging_enabled(&self) -> bool {
+        self.logging_enabled
     }
 
     pub fn execute_line(&mut self, line: &str) -> (String, bool) {
@@ -396,10 +411,17 @@ impl Console {
             CommandAction::Save => (self.save(response), false),
             CommandAction::Open => (self.open(response), false),
             CommandAction::Step => (self.step(), false),
+            CommandAction::Run => (self.run(response), false),
+            CommandAction::Interval => (self.interval(response), false),
+            CommandAction::Logging => (self.logging(response), false),
+            CommandAction::Event => ("Episodic not supported in this build\n".to_string(), false),
             CommandAction::Simulation => (self.simulation(), false),
             CommandAction::Memory => (self.memory(), false),
             CommandAction::Ape => ("*** ALL APES DEAD ***\n".to_string(), false),
             CommandAction::List => (self.list(), false),
+            CommandAction::Top => (self.top(), false),
+            CommandAction::Epic => (self.epic(), false),
+            CommandAction::Navigation => (self.navigation(), false),
             CommandAction::Unsupported => (
                 "ERROR: Command not implemented in Rust port yet\n".to_string(),
                 false,
@@ -485,6 +507,31 @@ impl Console {
         }
     }
 
+    fn top(&self) -> String {
+        if self.population == 0 {
+            "Honor Name                     Sex\tAge\n-----------------------------------------------------------------\n"
+                .to_string()
+        } else {
+            "ERROR: Ape ranking not implemented in Rust port yet\n".to_string()
+        }
+    }
+
+    fn epic(&self) -> String {
+        if self.population == 0 {
+            String::new()
+        } else {
+            "ERROR: Ape episodic ranking not implemented in Rust port yet\n".to_string()
+        }
+    }
+
+    fn navigation(&self) -> String {
+        if self.population == 0 {
+            "No apes selected. Trying (re)running the Simulation\n".to_string()
+        } else {
+            "No apes selected.\n".to_string()
+        }
+    }
+
     fn reset(&mut self) -> String {
         self.simulation_running = false;
         self.population = 0;
@@ -500,6 +547,69 @@ impl Console {
             String::new()
         } else {
             "ERROR: Simulated ape cycling not implemented in Rust port yet\n".to_string()
+        }
+    }
+
+    fn run(&mut self, response: Option<&str>) -> String {
+        let interval = match parse_run_interval(response) {
+            Ok(interval) => interval,
+            Err(RunParseError::Forever) => {
+                return "ERROR: Run forever not implemented in Rust port yet\n".to_string();
+            }
+            Err(RunParseError::MissingTime) => {
+                return "ERROR: Time not specified, examples: run 2 days, run 6 hours @ ./universe/command.c 2211\n".to_string();
+            }
+        };
+
+        let mut output = format!("Running for {}{}\n", interval.number, interval.description);
+        self.simulation_running = true;
+        if self.population == 0 {
+            self.state.step_empty_by(interval.minutes);
+            self.simulation_running = false;
+        } else {
+            output.push_str("ERROR: Simulated ape running not implemented in Rust port yet\n");
+        }
+        output
+    }
+
+    fn interval(&mut self, response: Option<&str>) -> String {
+        if let Ok(interval) = parse_run_interval(response) {
+            self.save_interval_steps = interval.minutes;
+            return format!(
+                "Logging interval set to {}{}\n",
+                interval.number, interval.description
+            );
+        }
+
+        if self.save_interval_steps < TIME_HOUR_MINUTES as n_uint {
+            format!(
+                "Current time interval is {} min(s)\n",
+                self.save_interval_steps
+            )
+        } else if self.save_interval_steps < TIME_DAY_MINUTES as n_uint {
+            format!(
+                "Current time interval is {} hour(s)\n",
+                self.save_interval_steps / TIME_HOUR_MINUTES as n_uint
+            )
+        } else {
+            format!(
+                "Current time interval is {} day(s)\n",
+                self.save_interval_steps / TIME_DAY_MINUTES as n_uint
+            )
+        }
+    }
+
+    fn logging(&mut self, response: Option<&str>) -> String {
+        match parse_on_off(response) {
+            Some(false) => {
+                self.logging_enabled = false;
+                "Logging turned off\n".to_string()
+            }
+            Some(true) => {
+                self.logging_enabled = true;
+                "Logging turned on\n".to_string()
+            }
+            None => String::new(),
         }
     }
 
@@ -553,6 +663,31 @@ impl Console {
     }
 }
 
+fn parse_on_off(response: Option<&str>) -> Option<bool> {
+    let response = response?;
+    let length = response.len();
+    if length == 0 {
+        return None;
+    }
+
+    let response = response.to_ascii_lowercase();
+    if response.contains("off")
+        || response.contains('0')
+        || response.contains("false")
+        || response.contains("no")
+    {
+        Some(false)
+    } else if response.contains("on")
+        || response.contains('1')
+        || response.contains("true")
+        || response.contains("yes")
+    {
+        Some(true)
+    } else {
+        None
+    }
+}
+
 impl Default for Console {
     fn default() -> Self {
         Self::new(DEFAULT_RANDOMISE)
@@ -569,6 +704,74 @@ fn split_command(line: &str) -> (&str, Option<&str>) {
 
 fn find_command(command: &str) -> Option<&'static CommandEntry> {
     COMMANDS.iter().find(|entry| entry.command == command)
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct RunInterval {
+    number: n_uint,
+    minutes: n_uint,
+    description: &'static str,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum RunParseError {
+    Forever,
+    MissingTime,
+}
+
+fn parse_run_interval(response: Option<&str>) -> Result<RunInterval, RunParseError> {
+    let response = response.ok_or(RunParseError::MissingTime)?.trim();
+    if response.is_empty() {
+        return Err(RunParseError::MissingTime);
+    }
+    if response.contains("forever") {
+        return Err(RunParseError::Forever);
+    }
+
+    let mut pieces = response.split_whitespace();
+    let number = pieces
+        .next()
+        .and_then(|number| number.parse::<n_uint>().ok())
+        .filter(|number| *number > 0)
+        .ok_or(RunParseError::MissingTime)?;
+    let (steps, description) = interval_steps_and_description(pieces.next());
+
+    Ok(RunInterval {
+        number,
+        minutes: number.saturating_mul(steps),
+        description,
+    })
+}
+
+fn interval_steps_and_description(unit: Option<&str>) -> (n_uint, &'static str) {
+    let Some(unit) = unit else {
+        return (TIME_DAY_MINUTES as n_uint, " days");
+    };
+    if unit.len() == 1 {
+        return match unit.as_bytes()[0] {
+            b'm' => (1, " mins"),
+            b'M' => (TIME_MONTH_MINUTES as n_uint, " months"),
+            b'h' | b'H' => (TIME_HOUR_MINUTES as n_uint, " hours"),
+            b'd' | b'D' => (TIME_DAY_MINUTES as n_uint, " days"),
+            b'y' | b'Y' => (TIME_YEAR_MINUTES as n_uint, " years"),
+            _ => (TIME_DAY_MINUTES as n_uint, " days"),
+        };
+    }
+
+    let unit = unit.to_ascii_lowercase();
+    if unit.contains("min") {
+        (1, " mins")
+    } else if unit.contains("hour") || unit.contains("hr") {
+        (TIME_HOUR_MINUTES as n_uint, " hours")
+    } else if unit.contains("day") {
+        (TIME_DAY_MINUTES as n_uint, " days")
+    } else if unit.contains("mon") {
+        (TIME_MONTH_MINUTES as n_uint, " months")
+    } else if unit.contains("year") {
+        (TIME_YEAR_MINUTES as n_uint, " years")
+    } else {
+        (TIME_DAY_MINUTES as n_uint, " days")
+    }
 }
 
 fn help_line(entry: &CommandEntry) -> String {
@@ -675,6 +878,60 @@ mod tests {
     }
 
     #[test]
+    fn interval_command_reports_and_updates_logging_interval() {
+        let mut console = Console::default();
+        let actual = console.run_script(
+            "interval\ninterval 2 hours\ninterval\ninterval 30 minutes\ninterval\ninterval 1 day\ninterval\ninterval 0 minutes\nquit\n",
+            true,
+        );
+        assert_eq!(
+            actual,
+            "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\ninterval\nCurrent time interval is 1 hour(s)\ninterval 2 hours\nLogging interval set to 2 hours\ninterval\nCurrent time interval is 2 hour(s)\ninterval 30 minutes\nLogging interval set to 30 mins\ninterval\nCurrent time interval is 30 min(s)\ninterval 1 day\nLogging interval set to 1 days\ninterval\nCurrent time interval is 1 day(s)\ninterval 0 minutes\nCurrent time interval is 1 day(s)\nquit\nSimulation stopped\n"
+        );
+    }
+
+    #[test]
+    fn logging_command_toggles_state_and_ignores_missing_values() {
+        let mut console = Console::default();
+        let actual = console.run_script("logging off\nlogging\nlog yes\nquit\n", true);
+        assert_eq!(
+            actual,
+            "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\nlogging off\nLogging turned off\nlogging\nlog yes\nLogging turned on\nquit\nSimulation stopped\n"
+        );
+        assert!(console.logging_enabled());
+    }
+
+    #[test]
+    fn event_command_reports_episodic_unavailable_for_current_build() {
+        let mut console = Console::default();
+        let actual = console.run_script("event\nevent social\nquit\n", true);
+        assert_eq!(
+            actual,
+            "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\nevent\nEpisodic not supported in this build\nevent social\nEpisodic not supported in this build\nquit\nSimulation stopped\n"
+        );
+    }
+
+    #[test]
+    fn top_and_epic_empty_population_output_matches_c() {
+        let mut console = Console::default();
+        let actual = console.run_script("top\nepic\nquit\n", true);
+        assert_eq!(
+            actual,
+            "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\ntop\nHonor Name                     Sex\tAge\n-----------------------------------------------------------------\nepic\nquit\nSimulation stopped\n"
+        );
+    }
+
+    #[test]
+    fn navigation_aliases_report_no_selected_ape_like_c_empty_state() {
+        let mut console = Console::default();
+        let actual = console.run_script("next\nprevious\nprev\nquit\n", true);
+        assert_eq!(
+            actual,
+            "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\nnext\nNo apes selected. Trying (re)running the Simulation\nprevious\nNo apes selected. Trying (re)running the Simulation\nprev\nNo apes selected. Trying (re)running the Simulation\nquit\nSimulation stopped\n"
+        );
+    }
+
+    #[test]
     fn reset_and_clear_regenerate_startup_land_seed() {
         let mut console = Console::default();
         let actual = console.run_script("reset\nsim\nclear\nsim\nquit\n", true);
@@ -685,12 +942,55 @@ mod tests {
     }
 
     #[test]
-    fn step_advances_empty_land_time_and_run_remains_stub() {
+    fn step_and_run_advance_empty_land_time() {
         let mut console = Console::default();
-        let actual = console.run_script("step\nsim\nrun 1 day\nquit\n", true);
+        let actual = console.run_script(
+            "step\nsim\nrun 1 minute\nsim\nrun 1 day\nsim\nrun forever\nrun\nquit\n",
+            true,
+        );
         assert_eq!(
             actual,
-            "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\nstep\nsim\nMap dimension: 512\nLand seed: 7633 53305\nPopulation: 0\nAdults: 0   Juveniles: 0\nTide level: 0\n00:01 01/01/0 Simulation not running\nrun 1 day\nERROR: Command not implemented in Rust port yet\nquit\nSimulation stopped\n"
+            "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\nstep\nsim\nMap dimension: 512\nLand seed: 7633 53305\nPopulation: 0\nAdults: 0   Juveniles: 0\nTide level: 0\n00:01 01/01/0 Simulation not running\nrun 1 minute\nRunning for 1 mins\nsim\nMap dimension: 512\nLand seed: 7633 53305\nPopulation: 0\nAdults: 0   Juveniles: 0\nTide level: 0\n00:02 01/01/0 Simulation not running\nrun 1 day\nRunning for 1 days\nsim\nMap dimension: 512\nLand seed: 7633 53305\nPopulation: 0\nAdults: 0   Juveniles: 0\nTide level: 0\n00:02 02/01/0 Simulation not running\nrun forever\nERROR: Run forever not implemented in Rust port yet\nrun\nERROR: Time not specified, examples: run 2 days, run 6 hours @ ./universe/command.c 2211\nquit\nSimulation stopped\n"
+        );
+    }
+
+    #[test]
+    fn run_interval_parser_matches_c_unit_names() {
+        assert_eq!(
+            parse_run_interval(Some("2 hours")).unwrap(),
+            RunInterval {
+                number: 2,
+                minutes: 120,
+                description: " hours",
+            }
+        );
+        assert_eq!(
+            parse_run_interval(Some("1 M")).unwrap(),
+            RunInterval {
+                number: 1,
+                minutes: TIME_MONTH_MINUTES as n_uint,
+                description: " months",
+            }
+        );
+        assert_eq!(
+            parse_run_interval(Some("1 y")).unwrap(),
+            RunInterval {
+                number: 1,
+                minutes: TIME_YEAR_MINUTES as n_uint,
+                description: " years",
+            }
+        );
+        assert_eq!(
+            parse_run_interval(Some("2")).unwrap(),
+            RunInterval {
+                number: 2,
+                minutes: (TIME_DAY_MINUTES * 2) as n_uint,
+                description: " days",
+            }
+        );
+        assert_eq!(
+            parse_run_interval(Some("forever")).unwrap_err(),
+            RunParseError::Forever
         );
     }
 
