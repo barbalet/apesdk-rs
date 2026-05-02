@@ -712,6 +712,18 @@ impl NFile {
         }
     }
 
+    pub fn from_bytes(bytes: &[n_byte]) -> Self {
+        let size = bytes.len().max(1).saturating_mul(2);
+        let mut data = vec![0; size];
+        data[..bytes.len()].copy_from_slice(bytes);
+
+        Self {
+            size: size as n_uint,
+            location: bytes.len() as n_uint,
+            data,
+        }
+    }
+
     pub const fn size(&self) -> n_uint {
         self.size
     }
@@ -1453,6 +1465,11 @@ mod tests {
         assert_eq!(from_string.size(), 6);
         assert_eq!(from_string.location(), 0);
         assert_eq!(from_string.data(), b"ape\0\0\0");
+
+        let from_bytes = NFile::from_bytes(b"a\0b");
+        assert_eq!(from_bytes.size(), 6);
+        assert_eq!(from_bytes.location(), 3);
+        assert_eq!(from_bytes.written_data(), b"a\0b");
 
         let mut block = [0u8; STRING_BLOCK_SIZE];
         block[..3].copy_from_slice(b"ape");

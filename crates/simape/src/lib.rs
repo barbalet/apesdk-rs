@@ -1088,7 +1088,9 @@ impl Console {
 
         self.simulation_running = false;
         let mut output = String::from("Simulation stopped\n");
-        let file = if path.contains(".native") || path.ends_with(".ape") {
+        let file = if binary_save_path(path) {
+            self.state.tranfer_startup_out_binary()
+        } else if path.contains(".native") || path.ends_with(".ape") {
             self.state.tranfer_startup_out_native()
         } else {
             self.state.tranfer_startup_out_json()
@@ -1133,6 +1135,10 @@ impl Console {
         }
         output
     }
+}
+
+fn binary_save_path(path: &str) -> bool {
+    path.ends_with(".bin") || path.ends_with(".binary") || path.ends_with(".nab")
 }
 
 fn parse_on_off(response: Option<&str>) -> Option<bool> {
@@ -1650,7 +1656,9 @@ fn spacetime_to_string(time: u32, date: u32) -> String {
 mod tests {
     use super::*;
     use apesdk_sim::{
-        LandSnapshot, LandState, APE_TO_MAP_BIT_RATIO, BEING_DEAD, BEING_HUNGRY, TIDE_MAX,
+        LandSnapshot, LandState, APE_TO_MAP_BIT_RATIO, BEING_DEAD, BEING_HUNGRY,
+        NATIVE_BINARY_FIL_LAN, NATIVE_BINARY_FIL_VER, NATIVE_BINARY_MAGIC, SIMULATED_APE_SIGNATURE,
+        TIDE_MAX, VERSION_NUMBER,
     };
     use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -1669,6 +1677,31 @@ mod tests {
             std::process::id(),
             nanos
         ))
+    }
+
+    fn binary_section(kind: u8, payload: Vec<u8>) -> Vec<u8> {
+        let length = u16::try_from(payload.len()).expect("test section fits in u16");
+        let mut output = vec![kind];
+        output.extend(length.to_le_bytes());
+        output.extend(payload);
+        output
+    }
+
+    fn binary_startup_land_fixture(date: u32, time: u16, genetics: [u16; 2]) -> Vec<u8> {
+        let mut version = Vec::new();
+        version.extend(SIMULATED_APE_SIGNATURE.to_le_bytes());
+        version.extend(VERSION_NUMBER.to_le_bytes());
+
+        let mut land = Vec::new();
+        land.extend(date.to_le_bytes());
+        land.extend(time.to_le_bytes());
+        land.extend(genetics[0].to_le_bytes());
+        land.extend(genetics[1].to_le_bytes());
+
+        let mut output = NATIVE_BINARY_MAGIC.to_vec();
+        output.extend(binary_section(NATIVE_BINARY_FIL_VER, version));
+        output.extend(binary_section(NATIVE_BINARY_FIL_LAN, land));
+        output
     }
 
     #[test]
@@ -2292,6 +2325,25 @@ mod tests {
     }
 
     #[test]
+    fn open_framed_binary_transfer_restores_startup_state() {
+        let path = temp_save_path("open_binary_success");
+        let path_string = path.to_string_lossy();
+        fs::write(&path, binary_startup_land_fixture(27, 300, [1, 2]))
+            .expect("fixture binary transfer should be writable");
+
+        let mut console = Console::default();
+        let actual = console.run_script(&format!("open {path_string}\nsim\nquit\n"), true);
+
+        assert_eq!(
+            actual,
+            format!(
+                "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\nopen {path_string}\nSimulation stopped\nSimulation file {path_string} open\n\nsim\nMap dimension: 512\nLand seed: 1 2\nPopulation: 0\nAdults: 0   Juveniles: 0\nTide level: 132\n05:00 28/01/0 Simulation not running\nquit\nSimulation stopped\n"
+            )
+        );
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
     fn save_native_extension_writes_native_transfer_that_open_can_read() {
         let path = temp_save_path("roundtrip.native");
         let path_string = path.to_string_lossy();
@@ -2302,6 +2354,23 @@ mod tests {
         assert!(saved_native.starts_with("simul{signa=20033;verio=708;};"));
         assert!(saved_native.contains("landd{"));
         assert!(saved_native.contains("being{"));
+
+        let mut console = Console::default();
+        let opened = console.run_script(&format!("open {path_string}\nsim\nquit\n"), true);
+        assert!(opened.contains("Simulation file "));
+        assert!(opened.contains("Population: 128\n"));
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn save_binary_extension_writes_framed_transfer_that_open_can_read() {
+        let path = temp_save_path("roundtrip_binary").with_extension("bin");
+        let path_string = path.to_string_lossy();
+        let mut console = Console::default();
+        let saved = console.run_script(&format!("reset\nsave {path_string}\nquit\n"), true);
+        assert!(saved.contains("Simulation file "));
+        let saved_binary = fs::read(&path).expect("binary save should exist");
+        assert!(saved_binary.starts_with(NATIVE_BINARY_MAGIC));
 
         let mut console = Console::default();
         let opened = console.run_script(&format!("open {path_string}\nsim\nquit\n"), true);

@@ -21,6 +21,25 @@ pub const FULL_VERSION_COPYRIGHT: &str = "Copyright Tom Barbalet, 1996-2026.";
 pub const SIMULATED_APE_SIGNATURE: n_byte2 = (('N' as n_byte2) << 8) | ('A' as n_byte2);
 pub const SIMULATED_WAR_SIGNATURE: n_byte2 = (('N' as n_byte2) << 8) | ('W' as n_byte2);
 
+pub const NATIVE_BINARY_MAGIC: &[u8; 4] = b"NAB1";
+pub const NATIVE_BINARY_SECTION_HEADER_BYTES: usize = 3;
+pub const NATIVE_BINARY_FIL_VER: n_byte = 0x10;
+pub const NATIVE_BINARY_FIL_LAN: n_byte = 0x20;
+pub const NATIVE_BINARY_FIL_BEI: n_byte = 0x30;
+pub const NATIVE_BINARY_FIL_SOE: n_byte = 0x40;
+pub const NATIVE_BINARY_FIL_EPI: n_byte = 0x50;
+pub const NATIVE_BINARY_VERSION_BYTES: usize = 4;
+pub const NATIVE_BINARY_LAND_BYTES: usize = 10;
+pub const NATIVE_BINARY_BEING_BYTES: usize = 454 + BRAINPROBE_NATIVE_BYTES;
+pub const NATIVE_BINARY_SOCIAL_BYTES: usize = 26 + BRAINCODE_SIZE;
+pub const NATIVE_BINARY_EPISODIC_BYTES: usize = 24;
+pub const NATIVE_BINARY_TERRITORY_OFFSET: usize = 150;
+pub const NATIVE_BINARY_TERRITORY_BYTES: usize = TERRITORY_AREA;
+pub const NATIVE_BINARY_IMMUNE_OFFSET: usize = 406;
+pub const NATIVE_BINARY_IMMUNE_BYTES: usize = 45;
+pub const NATIVE_BINARY_BRAINCODE_REGISTER_OFFSET: usize = 451;
+pub const NATIVE_BINARY_BRAINPROBE_OFFSET: usize = 454;
+
 pub const BRAINCODE_SIZE: usize = 128;
 pub const BRAINCODE_PROBES: usize = BRAINCODE_SIZE >> 3;
 pub const BRAINCODE_PSPACE_REGISTERS: usize = 3;
@@ -5288,8 +5307,11 @@ impl SimState {
     pub fn load_startup_bytes(input: &[u8]) -> Result<Self, &'static str> {
         match startup_transfer_from_json_bytes(input) {
             Ok(startup) => Ok(Self::from_startup_transfer(&startup)),
-            Err(_) => startup_transfer_from_native_bytes(input)
-                .map(|startup| Self::from_startup_transfer(&startup)),
+            Err(_) => match startup_transfer_from_native_bytes(input) {
+                Ok(startup) => Ok(Self::from_startup_transfer(&startup)),
+                Err(_) => startup_transfer_from_binary_bytes(input)
+                    .map(|startup| Self::from_startup_transfer(&startup)),
+            },
         }
     }
 
@@ -5411,6 +5433,10 @@ impl SimState {
         tranfer_startup_out_native(&self.startup_transfer())
     }
 
+    pub fn tranfer_startup_out_binary(&self) -> NFile {
+        tranfer_startup_out_binary(&self.startup_transfer())
+    }
+
     pub fn prepare_land_for_first_cycle(&mut self) {
         self.land.clear(self.kind, AGE_OF_MATURITY);
     }
@@ -5514,6 +5540,26 @@ pub fn tranfer_startup_out_native(startup: &StartupTransfer) -> NFile {
     let mut file = NFile::new();
     let _ = file.write(output.as_bytes(), 0);
     file
+}
+
+pub fn tranfer_startup_out_binary(startup: &StartupTransfer) -> NFile {
+    let mut output = NATIVE_BINARY_MAGIC.to_vec();
+    binary_write_section(
+        &mut output,
+        NATIVE_BINARY_FIL_VER,
+        &binary_version_payload(SIMULATED_APE_SIGNATURE, VERSION_NUMBER),
+    );
+    binary_write_section(
+        &mut output,
+        NATIVE_BINARY_FIL_LAN,
+        &binary_land_payload(startup.land),
+    );
+    for entries in &startup.beings {
+        if let Ok(being) = BeingSummary::from_transfer_object(entries) {
+            binary_write_being(&mut output, &being);
+        }
+    }
+    NFile::from_bytes(&output)
 }
 
 fn native_write_version(output: &mut String) {
@@ -5692,6 +5738,209 @@ fn native_write_territory(output: &mut String, index: usize, entry: &simulated_i
     native_write_field(output, "trnam=", &[n_uint::from(entry.name)]);
     native_write_field(output, "trfam=", &[n_uint::from(entry.familiarity)]);
     output.push_str("};\n");
+}
+
+fn binary_write_section(output: &mut Vec<u8>, kind: n_byte, payload: &[u8]) {
+    let length = n_byte2::try_from(payload.len()).expect("binary section payload fits in u16");
+    output.push(kind);
+    output.extend(length.to_le_bytes());
+    output.extend(payload);
+}
+
+fn binary_version_payload(signature: n_byte2, version: n_byte2) -> Vec<u8> {
+    let mut payload = Vec::with_capacity(NATIVE_BINARY_VERSION_BYTES);
+    payload.extend(signature.to_le_bytes());
+    payload.extend(version.to_le_bytes());
+    payload
+}
+
+fn binary_land_payload(land: LandSnapshot) -> Vec<u8> {
+    let mut payload = vec![0; NATIVE_BINARY_LAND_BYTES];
+    binary_put_u32(&mut payload, 0, land.date);
+    binary_put_u16(&mut payload, 4, land.time as n_byte2);
+    binary_put_u16(&mut payload, 6, land.genetics[0]);
+    binary_put_u16(&mut payload, 8, land.genetics[1]);
+    payload
+}
+
+fn binary_write_being(output: &mut Vec<u8>, being: &BeingSummary) {
+    let native = being.to_simulated_being();
+    binary_write_section(
+        output,
+        NATIVE_BINARY_FIL_BEI,
+        &binary_being_payload(&native),
+    );
+    for social in native
+        .events
+        .social
+        .iter()
+        .filter(|entry| !social_entry_empty(entry))
+    {
+        binary_write_section(
+            output,
+            NATIVE_BINARY_FIL_SOE,
+            &binary_social_payload(social),
+        );
+    }
+    for episodic in native
+        .events
+        .episodic
+        .iter()
+        .filter(|entry| entry.event != 0)
+    {
+        binary_write_section(
+            output,
+            NATIVE_BINARY_FIL_EPI,
+            &binary_episodic_payload(episodic),
+        );
+    }
+}
+
+fn binary_being_payload(native: &simulated_being) -> Vec<u8> {
+    let delta = native.delta;
+    let constant = native.constant;
+    let changes = native.changes;
+    let brain = native.braindata;
+    let immune = native.immune_system;
+    let mut payload = vec![0; NATIVE_BINARY_BEING_BYTES];
+
+    binary_put_u16_array(&mut payload, 0, &delta.location);
+    payload[4] = delta.direction_facing;
+    payload[5] = delta.velocity[0];
+    binary_put_u16(&mut payload, 6, delta.stored_energy);
+    binary_put_u32(&mut payload, 8, constant.date_of_birth);
+    binary_put_u16_array(&mut payload, 12, &delta.random_seed);
+    binary_put_u16(&mut payload, 16, delta.macro_state);
+    binary_put_u16_array(&mut payload, 18, &brain.brain_state);
+    binary_put_u16(&mut payload, 30, delta.height);
+    binary_put_u16(&mut payload, 32, delta.mass);
+    binary_put_u16(&mut payload, 34, brain.script_overrides);
+    payload[36..36 + SHOUT_BYTES].copy_from_slice(&changes.shout);
+    payload[42] = delta.crowding;
+    payload[43] = delta.posture;
+    binary_put_u16_array(&mut payload, 44, &changes.inventory);
+    payload[60] = delta.parasites;
+    payload[61] = delta.honor;
+    binary_put_u32(&mut payload, 62, changes.date_of_conception);
+    payload[66..66 + ATTENTION_SIZE].copy_from_slice(&brain.attention);
+    binary_put_genetics_words(&mut payload, 72, &constant.genetics);
+    binary_put_genetics_words(&mut payload, 88, &changes.fetal_genetics);
+    payload[104] = (changes.father_name[0] & 255) as n_byte;
+    payload[105] = (changes.father_name[1] & 255) as n_byte;
+    binary_put_u16_array(
+        &mut payload,
+        108,
+        &[
+            delta.social_coord_x,
+            delta.social_coord_y,
+            delta.social_coord_nx,
+            delta.social_coord_ny,
+        ],
+    );
+    payload[116..116 + DRIVES].copy_from_slice(&changes.drives);
+    binary_put_u16_array(&mut payload, 120, &delta.goal);
+    payload[128..128 + PREFERENCES].copy_from_slice(&changes.learned_preference);
+    binary_put_u16(&mut payload, 142, constant.generation_max);
+    binary_put_u16(&mut payload, 144, constant.generation_min);
+    binary_put_u16(&mut payload, 146, changes.child_generation_max);
+    binary_put_u16(&mut payload, 148, changes.child_generation_min);
+    for (index, territory) in native.events.territory.iter().enumerate() {
+        payload[NATIVE_BINARY_TERRITORY_OFFSET + index] =
+            territory.familiarity.min(n_byte2::from(n_byte::MAX)) as n_byte;
+    }
+    let immune_bytes = binary_immune_payload(&immune);
+    payload[NATIVE_BINARY_IMMUNE_OFFSET..NATIVE_BINARY_IMMUNE_OFFSET + NATIVE_BINARY_IMMUNE_BYTES]
+        .copy_from_slice(&immune_bytes);
+    payload[NATIVE_BINARY_BRAINCODE_REGISTER_OFFSET
+        ..NATIVE_BINARY_BRAINCODE_REGISTER_OFFSET + BRAINCODE_PSPACE_REGISTERS]
+        .copy_from_slice(&brain.braincode_register);
+    let brainprobe_bytes = binary_brainprobe_payload(&brain.brainprobe);
+    payload[NATIVE_BINARY_BRAINPROBE_OFFSET
+        ..NATIVE_BINARY_BRAINPROBE_OFFSET + BRAINPROBE_NATIVE_BYTES]
+        .copy_from_slice(&brainprobe_bytes);
+    payload
+}
+
+fn binary_social_payload(entry: &simulated_isocial) -> Vec<u8> {
+    let mut payload = vec![0; NATIVE_BINARY_SOCIAL_BYTES];
+    binary_put_u16_array(&mut payload, 0, &entry.space_time.location);
+    binary_put_u16(&mut payload, 4, entry.space_time.time as n_byte2);
+    binary_put_u32(&mut payload, 6, entry.space_time.date);
+    binary_put_u16(&mut payload, 10, entry.first_name[BEING_MET]);
+    binary_put_u16(&mut payload, 14, entry.family_name[BEING_MET]);
+    payload[18] = entry.attraction;
+    payload[19] = entry.friend_foe;
+    binary_put_u16(&mut payload, 20, entry.belief);
+    binary_put_u16(&mut payload, 22, entry.familiarity);
+    payload[24] = entry.relationship;
+    payload[25] = entry.entity_type;
+    payload[26..26 + BRAINCODE_SIZE].copy_from_slice(&entry.braincode);
+    payload
+}
+
+fn binary_episodic_payload(entry: &simulated_iepisodic) -> Vec<u8> {
+    let mut payload = vec![0; NATIVE_BINARY_EPISODIC_BYTES];
+    binary_put_u16_array(&mut payload, 0, &entry.space_time.location);
+    binary_put_u16(&mut payload, 4, entry.space_time.time as n_byte2);
+    binary_put_u32(&mut payload, 6, entry.space_time.date);
+    binary_put_u16_array(&mut payload, 10, &entry.first_name);
+    binary_put_u16_array(&mut payload, 14, &entry.family_name);
+    payload[18] = entry.event;
+    payload[19] = entry.food;
+    binary_put_u16(&mut payload, 20, entry.affect);
+    binary_put_u16(&mut payload, 22, entry.arg);
+    payload
+}
+
+fn binary_immune_payload(immune: &simulated_immune_system) -> [n_byte; NATIVE_BINARY_IMMUNE_BYTES] {
+    let mut output = [0; NATIVE_BINARY_IMMUNE_BYTES];
+    let mut offset = 0;
+    output[offset..offset + IMMUNE_ANTIGENS].copy_from_slice(&immune.antigens);
+    offset += IMMUNE_ANTIGENS;
+    output[offset..offset + IMMUNE_ANTIGENS].copy_from_slice(&immune.shape_antigen);
+    offset += IMMUNE_ANTIGENS;
+    output[offset..offset + IMMUNE_POPULATION].copy_from_slice(&immune.antibodies);
+    offset += IMMUNE_POPULATION;
+    let shape_len = (NATIVE_BINARY_IMMUNE_BYTES - offset).min(IMMUNE_POPULATION);
+    output[offset..offset + shape_len].copy_from_slice(&immune.shape_antibody[..shape_len]);
+    output
+}
+
+fn binary_brainprobe_payload(
+    probes: &[simulated_ibrain_probe; BRAINCODE_PROBES],
+) -> [n_byte; BRAINPROBE_NATIVE_BYTES] {
+    let mut output = [0; BRAINPROBE_NATIVE_BYTES];
+    for (index, probe) in probes.iter().enumerate() {
+        let offset = index * 6;
+        output[offset] = probe.probe_type;
+        output[offset + 1] = probe.position;
+        output[offset + 2] = probe.address;
+        output[offset + 3] = probe.frequency;
+        output[offset + 4] = probe.offset;
+        output[offset + 5] = probe.state;
+    }
+    output
+}
+
+fn binary_put_u16(output: &mut [u8], offset: usize, value: n_byte2) {
+    output[offset..offset + 2].copy_from_slice(&value.to_le_bytes());
+}
+
+fn binary_put_u32(output: &mut [u8], offset: usize, value: n_byte4) {
+    output[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
+}
+
+fn binary_put_u16_array(output: &mut [u8], offset: usize, values: &[n_byte2]) {
+    for (index, value) in values.iter().copied().enumerate() {
+        binary_put_u16(output, offset + (index * 2), value);
+    }
+}
+
+fn binary_put_genetics_words(output: &mut [u8], offset: usize, values: &[n_genetics; CHROMOSOMES]) {
+    for (index, value) in values.iter().copied().enumerate() {
+        binary_put_u16(output, offset + (index * 4), (value & 0xffff) as n_byte2);
+        binary_put_u16(output, offset + (index * 4) + 2, (value >> 16) as n_byte2);
+    }
 }
 
 fn native_write_field(output: &mut String, token: &str, values: &[n_uint]) {
@@ -5888,6 +6137,462 @@ pub fn startup_transfer_from_native_bytes(input: &[u8]) -> Result<StartupTransfe
         return Err("native land section missing");
     }
     Ok(StartupTransfer { land, beings })
+}
+
+pub fn startup_transfer_from_binary_bytes(input: &[u8]) -> Result<StartupTransfer, &'static str> {
+    let mut reader = NativeBinaryReader::new(input)?;
+    let Some(version_section) = reader.next_section()? else {
+        return Err("binary signature not first");
+    };
+    if version_section.kind != NATIVE_BINARY_FIL_VER {
+        return Err("binary signature not first");
+    }
+    let (signature, version) = binary_version_from_payload(version_section.payload)?;
+    if signature != SIMULATED_APE_SIGNATURE {
+        return Err("not a simulated ape binary file");
+    }
+    if version > VERSION_NUMBER {
+        return Err("binary file newer than simulation");
+    }
+
+    let mut land = LandSnapshot::new(0, [0; 2], 0);
+    let mut land_seen = false;
+    let mut beings = Vec::new();
+    let mut current_being = None;
+    while let Some(section) = reader.next_section()? {
+        match section.kind {
+            NATIVE_BINARY_FIL_LAN => {
+                land = binary_land_from_payload(section.payload)?;
+                land_seen = true;
+            }
+            NATIVE_BINARY_FIL_BEI => {
+                if beings.len() >= LARGE_SIM as usize {
+                    return Err("binary file contains too many beings");
+                }
+                beings.push(binary_being_from_payload(beings.len(), section.payload)?);
+                current_being = Some(beings.len() - 1);
+            }
+            NATIVE_BINARY_FIL_SOE => {
+                let Some(index) = current_being else {
+                    return Err("binary social section before being");
+                };
+                native_add_social_event(
+                    &mut beings[index],
+                    binary_social_from_payload(section.payload)?,
+                );
+            }
+            NATIVE_BINARY_FIL_EPI => {
+                let Some(index) = current_being else {
+                    return Err("binary episodic section before being");
+                };
+                native_add_episodic_event(
+                    &mut beings[index],
+                    binary_episodic_from_payload(section.payload)?,
+                );
+            }
+            _ => return Err("unknown binary file section"),
+        }
+    }
+
+    if !land_seen {
+        return Err("binary land section missing");
+    }
+    Ok(StartupTransfer { land, beings })
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct NativeBinarySection<'a> {
+    kind: n_byte,
+    payload: &'a [u8],
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct NativeBinaryReader<'a> {
+    input: &'a [u8],
+    position: usize,
+}
+
+impl<'a> NativeBinaryReader<'a> {
+    fn new(input: &'a [u8]) -> Result<Self, &'static str> {
+        if !input.starts_with(NATIVE_BINARY_MAGIC) {
+            return Err("binary magic missing");
+        }
+        Ok(Self {
+            input,
+            position: NATIVE_BINARY_MAGIC.len(),
+        })
+    }
+
+    fn remaining(&self) -> usize {
+        self.input.len().saturating_sub(self.position)
+    }
+
+    fn next_section(&mut self) -> Result<Option<NativeBinarySection<'a>>, &'static str> {
+        if self.remaining() == 0 {
+            return Ok(None);
+        }
+        if self.remaining() < NATIVE_BINARY_SECTION_HEADER_BYTES {
+            return Err("binary section header truncated");
+        }
+        let kind = self.read_u8()?;
+        let length = usize::from(self.read_u16_le()?);
+        let payload = self.read_exact(length)?;
+        Ok(Some(NativeBinarySection { kind, payload }))
+    }
+
+    fn read_u8(&mut self) -> Result<n_byte, &'static str> {
+        let Some(byte) = self.input.get(self.position).copied() else {
+            return Err("binary byte truncated");
+        };
+        self.position += 1;
+        Ok(byte)
+    }
+
+    fn read_u16_le(&mut self) -> Result<n_byte2, &'static str> {
+        let bytes = self.read_exact(2)?;
+        Ok(n_byte2::from_le_bytes([bytes[0], bytes[1]]))
+    }
+
+    fn read_exact(&mut self, length: usize) -> Result<&'a [u8], &'static str> {
+        let end = self
+            .position
+            .checked_add(length)
+            .ok_or("binary section length overflow")?;
+        if end > self.input.len() {
+            return Err("binary section payload truncated");
+        }
+        let output = &self.input[self.position..end];
+        self.position = end;
+        Ok(output)
+    }
+}
+
+fn binary_version_from_payload(payload: &[u8]) -> Result<(n_byte2, n_byte2), &'static str> {
+    if payload.len() != NATIVE_BINARY_VERSION_BYTES {
+        return Err("binary version section length mismatch");
+    }
+    Ok((binary_u16_at(payload, 0)?, binary_u16_at(payload, 2)?))
+}
+
+fn binary_land_from_payload(payload: &[u8]) -> Result<LandSnapshot, &'static str> {
+    if payload.len() != NATIVE_BINARY_LAND_BYTES {
+        return Err("binary land section length mismatch");
+    }
+    Ok(LandSnapshot::new(
+        binary_u32_at(payload, 0)?,
+        [binary_u16_at(payload, 6)?, binary_u16_at(payload, 8)?],
+        n_byte4::from(binary_u16_at(payload, 4)?),
+    ))
+}
+
+fn binary_being_from_payload(
+    index: usize,
+    payload: &[u8],
+) -> Result<Vec<ObjectEntry>, &'static str> {
+    if payload.len() < NATIVE_BINARY_BEING_BYTES {
+        return Err("binary being section truncated");
+    }
+    let mut fields = Vec::new();
+    binary_push_field(&mut fields, *b"locat=", binary_byte2_values(payload, 0, 2)?);
+    binary_push_field(&mut fields, *b"facin=", binary_byte_values(payload, 4, 1)?);
+    binary_push_field(&mut fields, *b"speed=", binary_byte_values(payload, 5, 1)?);
+    binary_push_field(&mut fields, *b"energ=", binary_byte2_values(payload, 6, 1)?);
+    binary_push_field(&mut fields, *b"datob=", binary_byte4_values(payload, 8, 1)?);
+    binary_push_field(
+        &mut fields,
+        *b"rando=",
+        binary_byte2_values(payload, 12, 2)?,
+    );
+    binary_push_field(
+        &mut fields,
+        *b"state=",
+        binary_byte2_values(payload, 16, 1)?,
+    );
+    binary_push_field(
+        &mut fields,
+        *b"brast=",
+        binary_byte2_values(payload, 18, 6)?,
+    );
+    binary_push_field(
+        &mut fields,
+        *b"heigt=",
+        binary_byte2_values(payload, 30, 1)?,
+    );
+    binary_push_field(
+        &mut fields,
+        *b"masss=",
+        binary_byte2_values(payload, 32, 1)?,
+    );
+    binary_push_field(
+        &mut fields,
+        *b"overr=",
+        binary_byte2_values(payload, 34, 1)?,
+    );
+    binary_push_field(
+        &mut fields,
+        *b"shout=",
+        binary_byte_values(payload, 36, SHOUT_BYTES)?,
+    );
+    binary_push_field(&mut fields, *b"crowd=", binary_byte_values(payload, 42, 1)?);
+    binary_push_field(&mut fields, *b"postu=", binary_byte_values(payload, 43, 1)?);
+    binary_push_field(
+        &mut fields,
+        *b"inven=",
+        binary_byte2_values(payload, 44, INVENTORY_SIZE)?,
+    );
+    binary_push_field(&mut fields, *b"paras=", binary_byte_values(payload, 60, 1)?);
+    binary_push_field(&mut fields, *b"honor=", binary_byte_values(payload, 61, 1)?);
+    binary_push_field(
+        &mut fields,
+        *b"conce=",
+        binary_byte4_values(payload, 62, 1)?,
+    );
+    binary_push_field(
+        &mut fields,
+        *b"atten=",
+        binary_byte_values(payload, 66, ATTENTION_SIZE)?,
+    );
+    binary_push_field(
+        &mut fields,
+        *b"genet=",
+        binary_byte2_values(payload, 72, CHROMOSOMES * 2)?,
+    );
+    binary_push_field(
+        &mut fields,
+        *b"fetag=",
+        binary_byte2_values(payload, 88, CHROMOSOMES * 2)?,
+    );
+    binary_push_field(
+        &mut fields,
+        *b"fathn=",
+        binary_byte_values(payload, 104, 2)?,
+    );
+    binary_push_field(
+        &mut fields,
+        *b"sosim=",
+        binary_byte2_values(payload, 108, 4)?,
+    );
+    binary_push_field(
+        &mut fields,
+        *b"drive=",
+        binary_byte_values(payload, 116, DRIVES)?,
+    );
+    binary_push_field(
+        &mut fields,
+        *b"goals=",
+        binary_byte2_values(payload, 120, 4)?,
+    );
+    binary_push_field(
+        &mut fields,
+        *b"prefe=",
+        binary_byte_values(payload, 128, PREFERENCES)?,
+    );
+    binary_push_field(
+        &mut fields,
+        *b"genex=",
+        binary_byte2_values(payload, 142, 1)?,
+    );
+    binary_push_field(
+        &mut fields,
+        *b"genen=",
+        binary_byte2_values(payload, 144, 1)?,
+    );
+    binary_push_field(
+        &mut fields,
+        *b"chigx=",
+        binary_byte2_values(payload, 146, 1)?,
+    );
+    binary_push_field(
+        &mut fields,
+        *b"chign=",
+        binary_byte2_values(payload, 148, 1)?,
+    );
+    binary_push_field(
+        &mut fields,
+        *b"brreg=",
+        binary_byte_values(
+            payload,
+            NATIVE_BINARY_BRAINCODE_REGISTER_OFFSET,
+            BRAINCODE_PSPACE_REGISTERS,
+        )?,
+    );
+    binary_push_field(
+        &mut fields,
+        *b"brpro=",
+        binary_byte_values(
+            payload,
+            NATIVE_BINARY_BRAINPROBE_OFFSET,
+            BRAINPROBE_NATIVE_BYTES,
+        )?,
+    );
+
+    let section = NativeFileSection {
+        token: *b"being{",
+        fields,
+    };
+    let mut object = native_being_from_section(index, &section)?;
+    replace_transfer_object(
+        &mut object,
+        "immune_system",
+        native_immune_object(&binary_immune_from_payload(payload)?),
+    );
+    let territory = binary_territory_from_payload(payload)?;
+    for (territory_index, entry) in territory.iter().copied().enumerate() {
+        if entry.name != TERRITORY_NAME_UNKNOWN || entry.familiarity != 0 {
+            native_add_territory_event(&mut object, territory_index, entry);
+        }
+    }
+    Ok(object)
+}
+
+fn binary_social_from_payload(payload: &[u8]) -> Result<simulated_isocial, &'static str> {
+    if payload.len() < NATIVE_BINARY_SOCIAL_BYTES {
+        return Err("binary social section truncated");
+    }
+    let mut entry = simulated_isocial::default();
+    entry.space_time.location = [binary_u16_at(payload, 0)?, binary_u16_at(payload, 2)?];
+    entry.space_time.time = n_byte4::from(binary_u16_at(payload, 4)?);
+    entry.space_time.date = binary_u32_at(payload, 6)?;
+    entry.first_name[BEING_MET] = binary_u16_at(payload, 10)?;
+    entry.family_name[BEING_MET] = binary_u16_at(payload, 14)?;
+    entry.attraction = binary_u8_at(payload, 18)?;
+    entry.friend_foe = binary_u8_at(payload, 19)?;
+    entry.belief = binary_u16_at(payload, 20)?;
+    entry.familiarity = binary_u16_at(payload, 22)?;
+    entry.relationship = binary_u8_at(payload, 24)?;
+    entry.entity_type = binary_u8_at(payload, 25)?;
+    entry
+        .braincode
+        .copy_from_slice(binary_slice(payload, 26, BRAINCODE_SIZE)?);
+    Ok(entry)
+}
+
+fn binary_episodic_from_payload(payload: &[u8]) -> Result<simulated_iepisodic, &'static str> {
+    if payload.len() < NATIVE_BINARY_EPISODIC_BYTES {
+        return Err("binary episodic section truncated");
+    }
+    Ok(simulated_iepisodic {
+        space_time: n_spacetime {
+            location: [binary_u16_at(payload, 0)?, binary_u16_at(payload, 2)?],
+            time: n_byte4::from(binary_u16_at(payload, 4)?),
+            date: binary_u32_at(payload, 6)?,
+        },
+        first_name: [binary_u16_at(payload, 10)?, binary_u16_at(payload, 12)?],
+        family_name: [binary_u16_at(payload, 14)?, binary_u16_at(payload, 16)?],
+        event: binary_u8_at(payload, 18)?,
+        food: binary_u8_at(payload, 19)?,
+        affect: binary_u16_at(payload, 20)?,
+        arg: binary_u16_at(payload, 22)?,
+    })
+}
+
+fn binary_territory_from_payload(
+    payload: &[u8],
+) -> Result<[simulated_iplace; TERRITORY_AREA], &'static str> {
+    let bytes = binary_slice(
+        payload,
+        NATIVE_BINARY_TERRITORY_OFFSET,
+        NATIVE_BINARY_TERRITORY_BYTES,
+    )?;
+    Ok(std::array::from_fn(|index| simulated_iplace {
+        name: TERRITORY_NAME_UNKNOWN,
+        familiarity: n_byte2::from(bytes[index]),
+    }))
+}
+
+fn binary_immune_from_payload(payload: &[u8]) -> Result<simulated_immune_system, &'static str> {
+    let bytes = binary_slice(
+        payload,
+        NATIVE_BINARY_IMMUNE_OFFSET,
+        NATIVE_BINARY_IMMUNE_BYTES,
+    )?;
+    let mut immune = simulated_immune_system::default();
+    let mut offset = 0;
+    immune
+        .antigens
+        .copy_from_slice(&bytes[offset..offset + IMMUNE_ANTIGENS]);
+    offset += IMMUNE_ANTIGENS;
+    immune
+        .shape_antigen
+        .copy_from_slice(&bytes[offset..offset + IMMUNE_ANTIGENS]);
+    offset += IMMUNE_ANTIGENS;
+    immune
+        .antibodies
+        .copy_from_slice(&bytes[offset..offset + IMMUNE_POPULATION]);
+    offset += IMMUNE_POPULATION;
+    let shape_len = (NATIVE_BINARY_IMMUNE_BYTES - offset).min(IMMUNE_POPULATION);
+    immune.shape_antibody[..shape_len].copy_from_slice(&bytes[offset..offset + shape_len]);
+    Ok(immune)
+}
+
+fn binary_push_field(fields: &mut Vec<NativeFileField>, token: [u8; 6], values: Vec<n_uint>) {
+    fields.push(NativeFileField { token, values });
+}
+
+fn binary_byte_values(
+    payload: &[u8],
+    offset: usize,
+    count: usize,
+) -> Result<Vec<n_uint>, &'static str> {
+    Ok(binary_slice(payload, offset, count)?
+        .iter()
+        .copied()
+        .map(n_uint::from)
+        .collect())
+}
+
+fn binary_byte2_values(
+    payload: &[u8],
+    offset: usize,
+    count: usize,
+) -> Result<Vec<n_uint>, &'static str> {
+    (0..count)
+        .map(|index| binary_u16_at(payload, offset + (index * 2)).map(n_uint::from))
+        .collect()
+}
+
+fn binary_byte4_values(
+    payload: &[u8],
+    offset: usize,
+    count: usize,
+) -> Result<Vec<n_uint>, &'static str> {
+    (0..count)
+        .map(|index| binary_u32_at(payload, offset + (index * 4)).map(n_uint::from))
+        .collect()
+}
+
+fn binary_u8_at(payload: &[u8], offset: usize) -> Result<n_byte, &'static str> {
+    payload
+        .get(offset)
+        .copied()
+        .ok_or("binary byte field truncated")
+}
+
+fn binary_u16_at(payload: &[u8], offset: usize) -> Result<n_byte2, &'static str> {
+    let bytes = binary_slice(payload, offset, 2)?;
+    Ok(n_byte2::from_le_bytes([bytes[0], bytes[1]]))
+}
+
+fn binary_u32_at(payload: &[u8], offset: usize) -> Result<n_byte4, &'static str> {
+    let bytes = binary_slice(payload, offset, 4)?;
+    Ok(n_byte4::from_le_bytes([
+        bytes[0], bytes[1], bytes[2], bytes[3],
+    ]))
+}
+
+fn binary_slice(payload: &[u8], offset: usize, length: usize) -> Result<&[u8], &'static str> {
+    let end = offset
+        .checked_add(length)
+        .ok_or("binary field offset overflow")?;
+    payload.get(offset..end).ok_or("binary field truncated")
+}
+
+fn replace_transfer_object(being: &mut Vec<ObjectEntry>, name: &str, value: Vec<ObjectEntry>) {
+    if let Some(entry) = being.iter_mut().find(|entry| entry.name == name) {
+        entry.value = ObjectValue::Object(value);
+    } else {
+        object_object(being, name, value);
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -7665,6 +8370,467 @@ mod tests {
             b"simul{signa=20033;verio=708;};sgcia{sgfin=1;};"
         )
         .is_err());
+    }
+
+    fn binary_section(kind: n_byte, payload: Vec<u8>) -> Vec<u8> {
+        let length = n_byte2::try_from(payload.len()).expect("test section fits in u16");
+        let mut output = vec![kind];
+        output.extend(length.to_le_bytes());
+        output.extend(payload);
+        output
+    }
+
+    fn binary_fixture(sections: Vec<Vec<u8>>) -> Vec<u8> {
+        let mut output = NATIVE_BINARY_MAGIC.to_vec();
+        for section in sections {
+            output.extend(section);
+        }
+        output
+    }
+
+    fn put_u16_at(bytes: &mut [u8], offset: usize, value: n_byte2) {
+        bytes[offset..offset + 2].copy_from_slice(&value.to_le_bytes());
+    }
+
+    fn put_u32_at(bytes: &mut [u8], offset: usize, value: n_byte4) {
+        bytes[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
+    }
+
+    fn binary_version_payload(signature: n_byte2, version: n_byte2) -> Vec<u8> {
+        let mut payload = Vec::new();
+        payload.extend(signature.to_le_bytes());
+        payload.extend(version.to_le_bytes());
+        payload
+    }
+
+    fn binary_land_payload(date: n_byte4, time: n_byte2, genetics: [n_byte2; 2]) -> Vec<u8> {
+        let mut payload = vec![0; NATIVE_BINARY_LAND_BYTES];
+        put_u32_at(&mut payload, 0, date);
+        put_u16_at(&mut payload, 4, time);
+        put_u16_at(&mut payload, 6, genetics[0]);
+        put_u16_at(&mut payload, 8, genetics[1]);
+        payload
+    }
+
+    fn sample_binary_being_payload() -> Vec<u8> {
+        let mut payload = vec![0; NATIVE_BINARY_BEING_BYTES];
+        put_u16_at(&mut payload, 0, 100);
+        put_u16_at(&mut payload, 2, 200);
+        payload[4] = 64;
+        payload[5] = 3;
+        put_u16_at(&mut payload, 6, 1234);
+        put_u32_at(&mut payload, 8, 8);
+        put_u16_at(&mut payload, 12, 5);
+        put_u16_at(&mut payload, 14, 6);
+        put_u16_at(&mut payload, 16, 1);
+        for (index, value) in [1, 2, 3, 4, 5, 6].iter().copied().enumerate() {
+            put_u16_at(&mut payload, 18 + (index * 2), value);
+        }
+        put_u16_at(&mut payload, 30, 2100);
+        put_u16_at(&mut payload, 32, 120);
+        put_u16_at(&mut payload, 34, 12);
+        payload[36..42].copy_from_slice(&[1, 2, 3, 4, 5, 6]);
+        payload[42] = 1;
+        payload[43] = 4;
+        for (index, value) in [0, INVENTORY_FISH, 0, 0, 0, 0, 0, 0]
+            .iter()
+            .copied()
+            .enumerate()
+        {
+            put_u16_at(&mut payload, 44 + (index * 2), value);
+        }
+        payload[60] = 2;
+        payload[61] = 77;
+        put_u32_at(&mut payload, 62, 99);
+        payload[66..72].copy_from_slice(&[0, 1, 2, 3, 4, 5]);
+        for (index, value) in [3, 0, 10, 0, 11, 0, 12, 0].iter().copied().enumerate() {
+            put_u16_at(&mut payload, 72 + (index * 2), value);
+        }
+        for (index, value) in [9, 0, 8, 0, 7, 0, 6, 0].iter().copied().enumerate() {
+            put_u16_at(&mut payload, 88 + (index * 2), value);
+        }
+        payload[104..106].copy_from_slice(&[5, 6]);
+        for (index, value) in [10, 11, 12, 13].iter().copied().enumerate() {
+            put_u16_at(&mut payload, 108 + (index * 2), value);
+        }
+        payload[116..120].copy_from_slice(&[1, 2, 3, 4]);
+        for (index, value) in [0, 1, 2, 3].iter().copied().enumerate() {
+            put_u16_at(&mut payload, 120 + (index * 2), value);
+        }
+        payload[128..142].copy_from_slice(&[1, 1, 1, 1, 1, 1, 1, 1, 2, 3, 4, 5, 6, 7]);
+        put_u16_at(&mut payload, 142, 2);
+        put_u16_at(&mut payload, 144, 1);
+        put_u16_at(&mut payload, 146, 4);
+        put_u16_at(&mut payload, 148, 3);
+        payload[NATIVE_BINARY_TERRITORY_OFFSET] = 9;
+        let immune_offset = NATIVE_BINARY_IMMUNE_OFFSET;
+        payload[immune_offset..immune_offset + 8].copy_from_slice(&[1, 2, 3, 4, 5, 6, 7, 8]);
+        payload[immune_offset + 8..immune_offset + 16].copy_from_slice(&[8, 7, 6, 5, 4, 3, 2, 1]);
+        payload[immune_offset + 16..immune_offset + 32].copy_from_slice(&[1; IMMUNE_POPULATION]);
+        payload[immune_offset + 32..immune_offset + 45]
+            .copy_from_slice(&[16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4]);
+        payload[NATIVE_BINARY_BRAINCODE_REGISTER_OFFSET
+            ..NATIVE_BINARY_BRAINCODE_REGISTER_OFFSET + BRAINCODE_PSPACE_REGISTERS]
+            .copy_from_slice(&[65, 66, 67]);
+        payload[NATIVE_BINARY_BRAINPROBE_OFFSET..NATIVE_BINARY_BRAINPROBE_OFFSET + 6]
+            .copy_from_slice(&[1, 2, 3, 4, 5, 6]);
+        payload
+    }
+
+    fn sample_binary_social_payload() -> Vec<u8> {
+        let mut payload = vec![0; NATIVE_BINARY_SOCIAL_BYTES];
+        put_u16_at(&mut payload, 0, 10);
+        put_u16_at(&mut payload, 2, 20);
+        put_u16_at(&mut payload, 4, 30);
+        put_u32_at(&mut payload, 6, 40);
+        put_u16_at(&mut payload, 10, 111);
+        put_u16_at(&mut payload, 14, 222);
+        payload[18] = 3;
+        payload[19] = 127;
+        put_u16_at(&mut payload, 20, 9);
+        put_u16_at(&mut payload, 22, 42);
+        payload[24] = RELATIONSHIP_MOTHER;
+        payload[25] = ENTITY_BEING;
+        payload[26] = 91;
+        payload[27] = 92;
+        payload
+    }
+
+    fn sample_binary_episodic_payload() -> Vec<u8> {
+        let mut payload = vec![0; NATIVE_BINARY_EPISODIC_BYTES];
+        put_u16_at(&mut payload, 0, 2);
+        put_u16_at(&mut payload, 2, 3);
+        put_u16_at(&mut payload, 4, 4);
+        put_u32_at(&mut payload, 6, 1);
+        put_u16_at(&mut payload, 10, 512);
+        put_u16_at(&mut payload, 12, 0);
+        put_u16_at(&mut payload, 14, 258);
+        put_u16_at(&mut payload, 16, 0);
+        payload[18] = EVENT_EAT;
+        payload[19] = FOOD_FRUIT;
+        put_u16_at(&mut payload, 20, EPISODIC_AFFECT_ZERO + 50);
+        put_u16_at(&mut payload, 22, 50);
+        payload
+    }
+
+    #[test]
+    fn binary_reader_reads_sections_and_rejects_truncation() {
+        let fixture = binary_fixture(vec![binary_section(
+            NATIVE_BINARY_FIL_VER,
+            binary_version_payload(SIMULATED_APE_SIGNATURE, VERSION_NUMBER),
+        )]);
+        let mut reader = NativeBinaryReader::new(&fixture).unwrap();
+        let section = reader.next_section().unwrap().unwrap();
+
+        assert_eq!(section.kind, NATIVE_BINARY_FIL_VER);
+        assert_eq!(
+            section.payload,
+            binary_version_payload(SIMULATED_APE_SIGNATURE, VERSION_NUMBER)
+        );
+        assert_eq!(reader.next_section().unwrap(), None);
+        assert!(NativeBinaryReader::new(b"simul{").is_err());
+
+        let mut truncated = NATIVE_BINARY_MAGIC.to_vec();
+        truncated.extend([NATIVE_BINARY_FIL_VER, 5, 0, 1]);
+        let mut reader = NativeBinaryReader::new(&truncated).unwrap();
+        assert!(reader.next_section().is_err());
+    }
+
+    #[test]
+    fn binary_transfer_loads_version_land_and_full_being_payload() {
+        let fixture = binary_fixture(vec![
+            binary_section(
+                NATIVE_BINARY_FIL_VER,
+                binary_version_payload(SIMULATED_APE_SIGNATURE, VERSION_NUMBER),
+            ),
+            binary_section(NATIVE_BINARY_FIL_LAN, binary_land_payload(9, 13, [11, 12])),
+            binary_section(NATIVE_BINARY_FIL_BEI, sample_binary_being_payload()),
+        ]);
+        let state = SimState::load_startup_bytes(&fixture).unwrap();
+        let being = &state.beings()[0];
+
+        assert_eq!(state.kind(), KIND_OF_USE::KIND_LOAD_FILE);
+        assert_eq!(state.land_snapshot(), LandSnapshot::new(9, [11, 12], 13));
+        assert_eq!(state.population(), 1);
+        assert_eq!(being.location(), [100, 200]);
+        assert_eq!(being.facing(), 64);
+        assert_eq!(being.speed(), 3);
+        assert_eq!(being.energy(), 1234);
+        assert_eq!(being.brain_state(), [1, 2, 3, 4, 5, 6]);
+        assert_eq!(being.inventory()[1], INVENTORY_FISH);
+        assert_eq!(being.genetics(), [3, 10, 11, 12]);
+        assert_eq!(being.social_coord(), [10, 11, 12, 13]);
+        assert_eq!(being.drives(), [1, 2, 3, 4]);
+        assert_eq!(being.braincode_register(), [65, 66, 67]);
+        assert_eq!(being.brainprobe()[0].probe_type, 1);
+        assert_eq!(being.brainprobe()[0].state, 6);
+        assert_eq!(being.immune_antigens(), [1, 2, 3, 4, 5, 6, 7, 8]);
+        assert_eq!(being.immune_shape_antigen(), [8, 7, 6, 5, 4, 3, 2, 1]);
+        assert_eq!(being.immune_antibodies(), [1; IMMUNE_POPULATION]);
+        assert_eq!(being.territory_memory()[0].familiarity, 9);
+    }
+
+    #[test]
+    fn binary_transfer_loads_social_and_episodic_sections() {
+        let fixture = binary_fixture(vec![
+            binary_section(
+                NATIVE_BINARY_FIL_VER,
+                binary_version_payload(SIMULATED_APE_SIGNATURE, VERSION_NUMBER),
+            ),
+            binary_section(NATIVE_BINARY_FIL_LAN, binary_land_payload(0, 0, [1, 2])),
+            binary_section(NATIVE_BINARY_FIL_BEI, sample_binary_being_payload()),
+            binary_section(NATIVE_BINARY_FIL_SOE, sample_binary_social_payload()),
+            binary_section(NATIVE_BINARY_FIL_EPI, sample_binary_episodic_payload()),
+        ]);
+        let state = SimState::load_startup_bytes(&fixture).unwrap();
+        let being = &state.beings()[0];
+        let social = being.social_memory()[0];
+        let episodic = being.episodic_memory()[0];
+
+        assert_eq!(social.space_time.location, [10, 20]);
+        assert_eq!(social.space_time.time, 30);
+        assert_eq!(social.first_name[BEING_MET], 111);
+        assert_eq!(social.family_name[BEING_MET], 222);
+        assert_eq!(social.relationship, RELATIONSHIP_MOTHER);
+        assert_eq!(social.braincode[0], 91);
+        assert_eq!(episodic.space_time.location, [2, 3]);
+        assert_eq!(episodic.first_name, [512, 0]);
+        assert_eq!(episodic.event, EVENT_EAT);
+        assert_eq!(episodic.food, FOOD_FRUIT);
+        assert_eq!(episodic.arg, 50);
+    }
+
+    #[test]
+    fn binary_transfer_rejects_edge_cases() {
+        assert!(startup_transfer_from_binary_bytes(NATIVE_BINARY_MAGIC).is_err());
+        assert!(
+            startup_transfer_from_binary_bytes(&binary_fixture(vec![binary_section(
+                NATIVE_BINARY_FIL_LAN,
+                binary_land_payload(0, 0, [1, 2]),
+            )]))
+            .is_err()
+        );
+        assert!(
+            startup_transfer_from_binary_bytes(&binary_fixture(vec![binary_section(
+                NATIVE_BINARY_FIL_VER,
+                binary_version_payload(SIMULATED_WAR_SIGNATURE, VERSION_NUMBER),
+            )]))
+            .is_err()
+        );
+        assert!(
+            startup_transfer_from_binary_bytes(&binary_fixture(vec![binary_section(
+                NATIVE_BINARY_FIL_VER,
+                binary_version_payload(SIMULATED_APE_SIGNATURE, VERSION_NUMBER + 1),
+            )]))
+            .is_err()
+        );
+        assert!(
+            startup_transfer_from_binary_bytes(&binary_fixture(vec![binary_section(
+                NATIVE_BINARY_FIL_VER,
+                binary_version_payload(SIMULATED_APE_SIGNATURE, VERSION_NUMBER),
+            )]))
+            .is_err()
+        );
+        assert!(startup_transfer_from_binary_bytes(&binary_fixture(vec![
+            binary_section(
+                NATIVE_BINARY_FIL_VER,
+                binary_version_payload(SIMULATED_APE_SIGNATURE, VERSION_NUMBER),
+            ),
+            binary_section(NATIVE_BINARY_FIL_LAN, binary_land_payload(0, 0, [1, 2])),
+            binary_section(0x99, Vec::new()),
+        ]))
+        .is_err());
+        assert!(startup_transfer_from_binary_bytes(&binary_fixture(vec![
+            binary_section(
+                NATIVE_BINARY_FIL_VER,
+                binary_version_payload(SIMULATED_APE_SIGNATURE, VERSION_NUMBER),
+            ),
+            binary_section(NATIVE_BINARY_FIL_LAN, binary_land_payload(0, 0, [1, 2])),
+            binary_section(NATIVE_BINARY_FIL_SOE, sample_binary_social_payload()),
+        ]))
+        .is_err());
+
+        let mut sections = vec![
+            binary_section(
+                NATIVE_BINARY_FIL_VER,
+                binary_version_payload(SIMULATED_APE_SIGNATURE, VERSION_NUMBER),
+            ),
+            binary_section(NATIVE_BINARY_FIL_LAN, binary_land_payload(0, 0, [1, 2])),
+        ];
+        for _ in 0..=LARGE_SIM {
+            sections.push(binary_section(
+                NATIVE_BINARY_FIL_BEI,
+                sample_binary_being_payload(),
+            ));
+        }
+        assert!(startup_transfer_from_binary_bytes(&binary_fixture(sections)).is_err());
+    }
+
+    #[test]
+    fn binary_writer_emits_stable_version_and_land_fixture() {
+        let file =
+            tranfer_startup_out_binary(&StartupTransfer::empty(LandSnapshot::new(27, [1, 2], 300)));
+
+        assert_eq!(
+            file.written_data(),
+            &[
+                b'N', b'A', b'B', b'1', 0x10, 4, 0, 0x41, 0x4e, 0xc4, 0x02, 0x20, 10, 0, 27, 0, 0,
+                0, 0x2c, 0x01, 1, 0, 2, 0,
+            ]
+        );
+        let loaded = SimState::load_startup_bytes(file.written_data()).unwrap();
+        assert_eq!(loaded.land_snapshot(), LandSnapshot::new(27, [1, 2], 300));
+        assert_eq!(loaded.population(), 0);
+    }
+
+    #[test]
+    fn binary_writer_roundtrips_full_being_fixture() {
+        let mut being = BeingSummary::new("Binary Ape".to_string(), 512, 258, 0, [3, 10, 11, 12]);
+        being.location = [100, 200];
+        being.facing = 64;
+        being.velocity = speed_history(3);
+        being.energy = 1234;
+        being.random_seed = [5, 6];
+        being.macro_state = 1;
+        being.brain_state = [1, 2, 3, 4, 5, 6];
+        being.height = 2100;
+        being.mass = 120;
+        being.script_overrides = 12;
+        being.shout = [1, 2, 3, 4, 5, 6];
+        being.crowding = 1;
+        being.posture = 4;
+        being.inventory[1] = INVENTORY_FISH;
+        being.parasites = 2;
+        being.honor = 77;
+        being.date_of_conception = 99;
+        being.attention = [0, 1, 2, 3, 4, 5];
+        being.fetal_genetics = [9, 8, 7, 6];
+        being.father_name = [5, 6];
+        being.social_coord = [10, 11, 12, 13];
+        being.drives = [1, 2, 3, 4];
+        being.goal = [0, 1, 2, 3];
+        being.learned_preference = [1, 1, 1, 1, 1, 1, 1, 1, 2, 3, 4, 5, 6, 7];
+        being.generation_min = 1;
+        being.generation_max = 2;
+        being.child_generation_min = 3;
+        being.child_generation_max = 4;
+        being.braincode_register = [65, 66, 67];
+        being.brainprobe[0] = simulated_ibrain_probe {
+            probe_type: 1,
+            position: 2,
+            address: 3,
+            frequency: 4,
+            offset: 5,
+            state: 6,
+        };
+        being.immune_antigens = [1, 2, 3, 4, 5, 6, 7, 8];
+        being.immune_shape_antigen = [8, 7, 6, 5, 4, 3, 2, 1];
+        being.immune_antibodies = [1; IMMUNE_POPULATION];
+        being.immune_shape_antibody = [16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1];
+        being.territory_memory[0].familiarity = 9;
+        being.social_memory[0].space_time.location = [10, 20];
+        being.social_memory[0].space_time.time = 30;
+        being.social_memory[0].space_time.date = 40;
+        being.social_memory[0].first_name[BEING_MET] = 111;
+        being.social_memory[0].family_name[BEING_MET] = 222;
+        being.social_memory[0].attraction = 3;
+        being.social_memory[0].friend_foe = 127;
+        being.social_memory[0].belief = 9;
+        being.social_memory[0].familiarity = 42;
+        being.social_memory[0].relationship = RELATIONSHIP_MOTHER;
+        being.social_memory[0].entity_type = ENTITY_BEING;
+        being.social_memory[0].braincode[0] = 91;
+        being.episodic_memory[0].space_time.location = [2, 3];
+        being.episodic_memory[0].space_time.time = 4;
+        being.episodic_memory[0].space_time.date = 1;
+        being.episodic_memory[0].first_name = [512, 0];
+        being.episodic_memory[0].family_name = [258, 0];
+        being.episodic_memory[0].event = EVENT_EAT;
+        being.episodic_memory[0].food = FOOD_FRUIT;
+        being.episodic_memory[0].affect = EPISODIC_AFFECT_ZERO + 50;
+        being.episodic_memory[0].arg = 50;
+
+        let startup = StartupTransfer {
+            land: LandSnapshot::new(9, [11, 12], 13),
+            beings: vec![being.transfer_object()],
+        };
+        let file = tranfer_startup_out_binary(&startup);
+        let loaded = SimState::load_startup_bytes(file.written_data()).unwrap();
+        let loaded_being = &loaded.beings()[0];
+
+        assert_eq!(loaded.land_snapshot(), LandSnapshot::new(9, [11, 12], 13));
+        assert_eq!(loaded_being.location(), [100, 200]);
+        assert_eq!(loaded_being.speed(), 3);
+        assert_eq!(loaded_being.energy(), 1234);
+        assert_eq!(loaded_being.braincode_register(), [65, 66, 67]);
+        assert_eq!(loaded_being.brainprobe()[0].state, 6);
+        assert_eq!(loaded_being.immune_antigens(), [1, 2, 3, 4, 5, 6, 7, 8]);
+        assert_eq!(loaded_being.immune_antibodies(), [1; IMMUNE_POPULATION]);
+        assert_eq!(loaded_being.territory_memory()[0].familiarity, 9);
+        assert_eq!(
+            loaded_being.social_memory()[0].relationship,
+            RELATIONSHIP_MOTHER
+        );
+        assert_eq!(loaded_being.social_memory()[0].braincode[0], 91);
+        assert_eq!(loaded_being.episodic_memory()[0].event, EVENT_EAT);
+        assert_eq!(loaded_being.episodic_memory()[0].arg, 50);
+    }
+
+    #[test]
+    fn binary_writer_handles_empty_single_and_maximum_populations() {
+        let land = LandSnapshot::new(1, [2, 3], 4);
+        let empty = tranfer_startup_out_binary(&StartupTransfer::empty(land));
+        assert_eq!(
+            SimState::load_startup_bytes(empty.written_data())
+                .unwrap()
+                .population(),
+            0
+        );
+
+        let being = BeingSummary::new("Binary Ape".to_string(), 512, 258, 0, [2, 3, 4, 5]);
+        let single = tranfer_startup_out_binary(&StartupTransfer {
+            land,
+            beings: vec![being.transfer_object()],
+        });
+        assert_eq!(
+            SimState::load_startup_bytes(single.written_data())
+                .unwrap()
+                .population(),
+            1
+        );
+
+        let max = tranfer_startup_out_binary(&StartupTransfer {
+            land,
+            beings: vec![being.transfer_object(); LARGE_SIM as usize],
+        });
+        assert_eq!(
+            SimState::load_startup_bytes(max.written_data())
+                .unwrap()
+                .population(),
+            LARGE_SIM as usize
+        );
+    }
+
+    #[test]
+    fn binary_writer_cross_loads_native_text_state_through_binary() {
+        let native = b"simul{signa=20033;verio=708;};\
+            landd{dated=9;timed=13;landg=11,12;};\
+            being{locat=100,200;facin=64;speed=3;energ=1234;datob=8;rando=5,6;state=1;\
+            brast=1,2,3,4,5,6;heigt=2100;masss=120;overr=12;\
+            shout=1,2,3,4,5,6;crowd=1;postu=4;inven=0,4096,0,0,0,0,0,0;\
+            paras=2;honor=77;conce=99;atten=0,1,2,3,4,5;\
+            genet=3,0,10,0,11,0,12,0;fetag=9,0,8,0,7,0,6,0;fathn=5,6;\
+            sosim=10,11,12,13;drive=1,2,3,4;goals=0,1,2,3;\
+            prefe=1,1,1,1,1,1,1,1,2,3,4,5,6,7;\
+            genex=2;genen=1;chigx=4;chign=3;};";
+        let loaded_native = SimState::load_startup_bytes(native).unwrap();
+        let binary = loaded_native.tranfer_startup_out_binary();
+        let loaded_binary = SimState::load_startup_bytes(binary.written_data()).unwrap();
+
+        assert_eq!(loaded_binary.land_snapshot(), loaded_native.land_snapshot());
+        assert_eq!(loaded_binary.population(), loaded_native.population());
+        assert_eq!(loaded_binary.beings()[0].location(), [100, 200]);
+        assert_eq!(loaded_binary.beings()[0].learned_preference()[13], 7);
     }
 
     #[test]

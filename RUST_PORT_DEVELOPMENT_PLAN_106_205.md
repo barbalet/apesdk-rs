@@ -722,7 +722,7 @@ save/load support, reproducible C fixture generation, long trace comparison,
 and final gate hardening. These 60 cycles cover that remaining proof-and-parity
 work.
 
-### Cycle 206: Raw Binary Format Audit
+### Cycle 206: Raw Binary Format Audit - Complete
 
 Map the exact native C raw/binary save layout, including signatures, version
 blocks, section order, struct padding, endian behavior, and array counts.
@@ -730,129 +730,129 @@ blocks, section order, struct padding, endian behavior, and array counts.
 Validation: binary layout audit with offsets tied to C `sizeof` and
 `offsetof` checks.
 
-### Cycle 207: Binary Reader Framework
+### Cycle 207: Binary Reader Framework - Complete
 
 Add a byte-reader layer for little-endian native primitives and fixed-size
 C-shaped structures without changing existing JSON/native-text loading.
 
 Validation: primitive reader fixtures and malformed-length tests.
 
-### Cycle 208: Binary Version And Land Load
+### Cycle 208: Binary Version And Land Load - Complete
 
 Load raw binary signature, version, land date/time/genetics, terrain metadata,
 and any stable land blocks.
 
 Validation: C-generated land-only binary fixture loads into Rust.
 
-### Cycle 209: Binary Being Delta Load
+### Cycle 209: Binary Being Delta Load - Complete
 
 Load being delta fields from raw binary saves, including location, facing,
 velocity, energy, state, body, goal, and social coordinates.
 
 Validation: delta fixture comparison against C offsets.
 
-### Cycle 210: Binary Being Constant Load
+### Cycle 210: Binary Being Constant Load - Complete
 
 Load being constant fields, identity, birth date, generation range, and
 genetics from raw binary saves.
 
 Validation: constant fixture comparison.
 
-### Cycle 211: Binary Events Load
+### Cycle 211: Binary Events Load - Complete
 
 Load raw binary social, episodic, and territory arrays into Rust C-shaped
 state.
 
 Validation: event array binary fixture round-trip into Rust state.
 
-### Cycle 212: Binary Brain/Volatile Load
+### Cycle 212: Binary Brain/Volatile Load - Complete
 
 Load brain registers, probes, state, script overrides, attention, drives,
 shout, inventory, preferences, pregnancy, and child-generation fields.
 
 Validation: full-being binary fixture.
 
-### Cycle 213: Binary Immune Load
+### Cycle 213: Binary Immune Load - Complete
 
 Load immune antigens, antibodies, shapes, and random seeds exactly from raw
 binary saves.
 
 Validation: immune-heavy fixture comparison.
 
-### Cycle 214: Binary Reader Edge Cases
+### Cycle 214: Binary Reader Edge Cases - Complete
 
 Handle empty populations, maximum populations, truncated files, unknown
 sections, and version mismatch failures with C-compatible behavior.
 
 Validation: negative binary fixture suite.
 
-### Cycle 215: Legacy Save Corpus Setup
+### Cycle 215: Legacy Save Corpus Setup - Complete
 
 Collect or generate representative older/native saves and classify which
 versions must be supported or explicitly rejected.
 
 Validation: corpus manifest and load expectation table.
 
-### Cycle 216: Binary Writer Framework
+### Cycle 216: Binary Writer Framework - Complete
 
 Add a byte-writer layer for raw native structures while preserving JSON and
 native-text transfer output.
 
 Validation: writer primitive and section-header tests.
 
-### Cycle 217: Binary Land Write
+### Cycle 217: Binary Land Write - Complete
 
 Write raw binary version and land blocks in native C order.
 
 Validation: Rust-written land fixture loads in C.
 
-### Cycle 218: Binary Being Write
+### Cycle 218: Binary Being Write - Complete
 
 Write being delta, constant, events, brain, volatile, and immune state in raw
 C-compatible order.
 
 Validation: C loader accepts simple Rust-written populated fixture.
 
-### Cycle 219: Binary Empty/Maximum Write
+### Cycle 219: Binary Empty/Maximum Write - Complete
 
 Write empty, single-being, normal, and maximum-population raw binary fixtures.
 
 Validation: C load behavior matches expected population counts and state.
 
-### Cycle 220: Binary Cross-Load Round Trip
+### Cycle 220: Binary Cross-Load Round Trip - Complete
 
 Round-trip C saves through Rust load/write and Rust saves through C load/write.
 
 Validation: cross-load state comparison after one cycle.
 
-### Cycle 221: Binary Byte Diff Gate
+### Cycle 221: Binary Byte Diff Gate - Complete
 
 Compare stable Rust-written fixtures against C-written fixtures byte for byte
 where no timestamps/randomized headers differ.
 
 Validation: byte diff tests with documented normalizers if needed.
 
-### Cycle 222: Binary CLI Integration
+### Cycle 222: Binary CLI Integration - Complete
 
 Wire raw binary save/open behavior into `simape` behind the expected file
 extensions while keeping JSON/native-text compatibility.
 
 Validation: CLI open/save binary transcript fixtures.
 
-### Cycle 223: Binary Regression Lock
+### Cycle 223: Binary Regression Lock - Complete
 
 Add regression tests for every binary parsing/writing edge fixed so far.
 
 Validation: repeated binary fixture suite.
 
-### Cycle 224: Binary Compatibility Report
+### Cycle 224: Binary Compatibility Report - Complete
 
 Document supported raw binary versions, unsupported versions, and exact drift
 status.
 
 Validation: binary compatibility report reviewed against fixture corpus.
 
-### Cycle 225: C Build Harness
+### Cycle 225: C Build Harness - Complete
 
 Create a reproducible local script that builds the native C command-line
 `simape` and records compiler/version details.
