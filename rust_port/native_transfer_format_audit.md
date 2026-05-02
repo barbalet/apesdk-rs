@@ -43,9 +43,17 @@ It can write native transfer text through `tranfer_startup_out_native`, and
 the CLI writes native transfer files when saving to filenames containing
 `.native` or ending in `.ape`.
 
+## Cycle 145-160 Update
+
+Rust now carries territory memory in the C-shaped being state and round-trips
+non-empty territory entries through native transfer text as `terri` sections.
+JSON transfer also includes the complete territory array under
+`events.territory`, preserving the existing structured transfer path.
+
 ## Remaining Work
 
-Next binary/native cycles should port territory bytes, weather sections, older
-version migration behavior, and deeper C-vs-Rust fixture generation. Raw
-byte-structured compatibility remains unsupported because the C command-line
-writer currently emits the native text format, not a raw `NA` byte stream.
+Next binary/native cycles should port weather sections, older version migration
+behavior, raw byte-structured compatibility if required by external save
+corpora, and deeper C-vs-Rust fixture generation. Raw byte-structured
+compatibility remains unsupported because the C command-line writer currently
+emits the native text format, not a raw `NA` byte stream.

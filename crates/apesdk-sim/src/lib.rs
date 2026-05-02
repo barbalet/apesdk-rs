@@ -321,9 +321,59 @@ pub const BRAINCODE_ACT2: n_byte = 27;
 pub const BRAINCODE_ACT3: n_byte = 28;
 pub const BRAINCODE_ANE: n_byte = 29;
 pub const BRAINCODE_INSTRUCTIONS: n_byte = 30;
+pub const BRAINPROBE_INPUT_SENSOR: n_byte = 0;
+pub const BRAINPROBE_OUTPUT_ACTUATOR: n_byte = 1;
 
 pub const LARGE_SIM: n_uint = 256;
 pub const INITIAL_POPULATION: usize = (LARGE_SIM as usize) >> 1;
+pub const GESTATION_DAYS: n_byte4 = 1;
+pub const SUCKLING_ENERGY: n_byte2 = 2;
+pub const WEANING_DAYS: n_byte4 = 14;
+pub const CARRYING_DAYS: n_byte4 = 3;
+pub const CONCEPTION_INHIBITION_DAYS: n_byte4 = 5;
+pub const RELATIONSHIP_ASSOCIATE: n_byte = 0;
+pub const RELATIONSHIP_MOTHER: n_byte = 2;
+pub const RELATIONSHIP_FATHER: n_byte = 3;
+pub const RELATIONSHIP_DAUGHTER: n_byte = 4;
+pub const RELATIONSHIP_SON: n_byte = 5;
+pub const RELATIONSHIP_GRANDDAUGHTER: n_byte = 6;
+pub const RELATIONSHIP_GRANDSON: n_byte = 7;
+pub const RELATIONSHIP_SISTER: n_byte = 8;
+pub const RELATIONSHIP_BROTHER: n_byte = 9;
+pub const RELATIONSHIP_MATERNAL_GRANDMOTHER: n_byte = 10;
+pub const RELATIONSHIP_MATERNAL_GRANDFATHER: n_byte = 11;
+pub const RELATIONSHIP_PATERNAL_GRANDMOTHER: n_byte = 12;
+pub const RELATIONSHIP_PATERNAL_GRANDFATHER: n_byte = 13;
+pub const OTHER_MOTHER: n_byte = 14;
+pub const SHOUT_CONTENT: usize = 0;
+pub const SHOUT_HEARD: usize = 1;
+pub const SHOUT_CTR: usize = 2;
+pub const SHOUT_VOLUME: usize = 3;
+pub const SHOUT_FAMILY0: usize = 4;
+pub const SHOUT_FAMILY1: usize = 5;
+pub const SHOUT_REFRACTORY: n_byte = 10;
+pub const TERRITORY_NAME_UNKNOWN: n_byte = 0;
+pub const TERRITORY_NAME_ATOLL: n_byte = 1;
+pub const TERRITORY_NAME_BASIN: n_byte = 2;
+pub const TERRITORY_NAME_BAY: n_byte = 3;
+pub const TERRITORY_NAME_BEACH: n_byte = 4;
+pub const TERRITORY_NAME_CLIFF: n_byte = 5;
+pub const TERRITORY_NAME_FLATLAND: n_byte = 6;
+pub const TERRITORY_NAME_HEADLAND: n_byte = 7;
+pub const TERRITORY_NAME_HILL: n_byte = 8;
+pub const TERRITORY_NAME_LAGOON: n_byte = 9;
+pub const TERRITORY_NAME_LAKE: n_byte = 10;
+pub const TERRITORY_NAME_MOUNTAIN: n_byte = 11;
+pub const TERRITORY_NAME_PENINSULA: n_byte = 12;
+pub const TERRITORY_NAME_POND: n_byte = 13;
+pub const TERRITORY_NAME_RIDGE: n_byte = 14;
+pub const TERRITORY_NAME_RIVER: n_byte = 15;
+pub const TERRITORY_NAME_SPRING: n_byte = 16;
+pub const TERRITORY_NAME_STREAM: n_byte = 17;
+pub const TERRITORY_NAME_SUMMIT: n_byte = 18;
+pub const TERRITORY_NAME_TRENCH: n_byte = 19;
+pub const TERRITORY_NAME_VALLEY: n_byte = 20;
+pub const TERRITORY_NAME_TOTAL: n_byte = 21;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -599,6 +649,55 @@ pub struct BraincodeInstruction {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BraincodeIo {
+    pub awake: bool,
+    pub internal: bool,
+    pub first_sensors: [n_byte; 32],
+    pub second_sensors: [n_byte; 25],
+    pub third_sensors: [n_byte; 20],
+    pub episode_location: [n_byte2; 2],
+    pub attention: [n_byte; ATTENTION_SIZE],
+    pub social_friend_foe: n_byte,
+    pub social_attraction: n_byte,
+    pub social_familiarity: n_byte2,
+    pub brainprobe: [simulated_ibrain_probe; BRAINCODE_PROBES],
+    pub learned_preference: [n_byte; PREFERENCES],
+    pub shout: [n_byte; SHOUT_BYTES],
+    pub posture: n_byte,
+    pub macro_state: n_byte2,
+    pub goal_location: Option<[n_byte2; 2]>,
+    pub social_action: Option<n_byte>,
+    pub anecdote_requested: bool,
+    pub intention_requested: Option<(usize, n_byte2, n_byte)>,
+}
+
+impl Default for BraincodeIo {
+    fn default() -> Self {
+        Self {
+            awake: false,
+            internal: true,
+            first_sensors: [0; 32],
+            second_sensors: [0; 25],
+            third_sensors: [0; 20],
+            episode_location: [0; 2],
+            attention: [0; ATTENTION_SIZE],
+            social_friend_foe: SOCIAL_RESPECT_NORMAL,
+            social_attraction: 0,
+            social_familiarity: 0,
+            brainprobe: [simulated_ibrain_probe::default(); BRAINCODE_PROBES],
+            learned_preference: [0; PREFERENCES],
+            shout: [0; SHOUT_BYTES],
+            posture: 0,
+            macro_state: 0,
+            goal_location: None,
+            social_action: None,
+            anecdote_requested: false,
+            intention_requested: None,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct BraincodeVm {
     local: [n_byte; BRAINCODE_SIZE],
     remote: [n_byte; BRAINCODE_SIZE],
@@ -616,8 +715,25 @@ impl BraincodeVm {
         }
     }
 
+    pub const fn new_pair(
+        local: [n_byte; BRAINCODE_SIZE],
+        remote: [n_byte; BRAINCODE_SIZE],
+        registers: [n_byte; BRAINCODE_PSPACE_REGISTERS],
+    ) -> Self {
+        Self {
+            local,
+            remote,
+            registers,
+            pc: 0,
+        }
+    }
+
     pub const fn local(&self) -> &[n_byte; BRAINCODE_SIZE] {
         &self.local
+    }
+
+    pub const fn remote(&self) -> &[n_byte; BRAINCODE_SIZE] {
+        &self.remote
     }
 
     pub const fn registers(&self) -> [n_byte; BRAINCODE_PSPACE_REGISTERS] {
@@ -810,6 +926,62 @@ impl BraincodeVm {
         instruction
     }
 
+    pub fn execute_step_with_io(&mut self, io: &mut BraincodeIo) -> BraincodeInstruction {
+        let instruction = braincode_decode(&self.local, self.pc);
+        let addr0 = braincode_address(self.pc as n_int + n_int::from(instruction.value0));
+        let addr1 = braincode_address(self.pc as n_int + n_int::from(instruction.value1));
+        let read0 = self.read_address(addr0);
+        let read1 = self.read_address(addr1);
+
+        match instruction.opcode {
+            BRAINCODE_SEN => {
+                self.write_address(addr1, io.first_sensors[usize::from(read0 % 32)]);
+                self.pc = braincode_pc(self.pc as n_int + BRAINCODE_BYTES_PER_INSTRUCTION as n_int);
+                instruction
+            }
+            BRAINCODE_SEN2 => {
+                self.execute_second_sensor(io, read0, read1, instruction);
+                self.pc = braincode_pc(self.pc as n_int + BRAINCODE_BYTES_PER_INSTRUCTION as n_int);
+                instruction
+            }
+            BRAINCODE_SEN3 => {
+                let switcher = usize::from(read0 % 20);
+                let fallback = read1;
+                let value = if switcher < io.third_sensors.len() {
+                    io.third_sensors[switcher]
+                } else {
+                    fallback
+                };
+                self.write_address(addr1, value);
+                self.pc = braincode_pc(self.pc as n_int + BRAINCODE_BYTES_PER_INSTRUCTION as n_int);
+                instruction
+            }
+            BRAINCODE_ACT => {
+                self.execute_first_action(io, addr0, addr1, read0, read1, instruction);
+                self.pc = braincode_pc(self.pc as n_int + BRAINCODE_BYTES_PER_INSTRUCTION as n_int);
+                instruction
+            }
+            BRAINCODE_ACT2 => {
+                self.execute_second_action(io, read0, read1, instruction);
+                self.pc = braincode_pc(self.pc as n_int + BRAINCODE_BYTES_PER_INSTRUCTION as n_int);
+                instruction
+            }
+            BRAINCODE_ACT3 => {
+                self.execute_third_action(io, read0, read1, instruction);
+                self.pc = braincode_pc(self.pc as n_int + BRAINCODE_BYTES_PER_INSTRUCTION as n_int);
+                instruction
+            }
+            BRAINCODE_ANE => {
+                if !io.internal {
+                    io.anecdote_requested = true;
+                }
+                self.pc = braincode_pc(self.pc as n_int + BRAINCODE_BYTES_PER_INSTRUCTION as n_int);
+                instruction
+            }
+            _ => self.execute_step(),
+        }
+    }
+
     fn read_address(&self, address: usize) -> n_byte {
         if address < BRAINCODE_SIZE {
             self.local[address]
@@ -845,6 +1017,167 @@ impl BraincodeVm {
                 + (BRAINCODE_BYTES_PER_INSTRUCTION * (2 + usize::from(self.registers[0]))) as n_int,
         )
     }
+
+    fn execute_second_sensor(
+        &mut self,
+        io: &mut BraincodeIo,
+        switcher: n_byte,
+        read1: n_byte,
+        instruction: BraincodeInstruction,
+    ) {
+        let is_const1 = if instruction.constant1 {
+            instruction.value1
+        } else {
+            read1
+        };
+        match switcher % 25 {
+            0 => io.attention[ATTENTION_ACTOR] = is_const1 % SOCIAL_SIZE as n_byte,
+            1 => io.attention[ATTENTION_EPISODE] = is_const1 % EPISODIC_SIZE as n_byte,
+            2 => io.attention[ATTENTION_TERRITORY] = is_const1,
+            3 => io.attention[ATTENTION_BODY] = is_const1 % INVENTORY_SIZE as n_byte,
+            9..=18 | 20..=22 => {
+                self.write_address(
+                    addr_from_instruction(self.pc, instruction.value1),
+                    io.second_sensors[usize::from(switcher % 25)],
+                );
+            }
+            24 => {
+                io.attention[ATTENTION_RELATIONSHIP] = 1 + (read1 % (OTHER_MOTHER - 1));
+            }
+            _ => {}
+        }
+    }
+
+    fn execute_first_action(
+        &mut self,
+        io: &mut BraincodeIo,
+        addr0: usize,
+        _addr1: usize,
+        read0: n_byte,
+        read1: n_byte,
+        instruction: BraincodeInstruction,
+    ) {
+        let is_const1 = if instruction.constant1 {
+            instruction.value1
+        } else {
+            read1
+        };
+        match read0 % 6 {
+            0 if io.awake && read0 > 127 => {
+                io.social_action = Some(read1);
+                self.write_address(addr0, 0);
+            }
+            1 => io.goal_location = Some(io.episode_location),
+            2 => {
+                let pspace0 = self.registers[0];
+                if pspace0 > read1.wrapping_add(85) {
+                    io.social_friend_foe = io.social_friend_foe.saturating_add(1).min(170);
+                }
+                if read1 > pspace0.wrapping_add(85) {
+                    io.social_friend_foe = io.social_friend_foe.saturating_sub(1).max(85);
+                }
+            }
+            3 => {
+                let pspace0 = self.registers[0];
+                if read1 > pspace0.wrapping_add(85) {
+                    io.social_attraction = io.social_attraction.saturating_add(1);
+                }
+                if pspace0 > read1.wrapping_add(85) && io.social_attraction > 16 {
+                    io.social_attraction = io.social_attraction.saturating_sub(1);
+                }
+            }
+            4 => {
+                if (101..150).contains(&read1) {
+                    io.social_familiarity = io.social_familiarity.saturating_add(1);
+                }
+                if (151..200).contains(&read1) && io.social_familiarity > 10 {
+                    io.social_familiarity = io.social_familiarity.saturating_sub(1);
+                }
+            }
+            5 => {
+                let index = usize::from(self.registers[0]) % BRAINCODE_PROBES;
+                io.brainprobe[index].frequency =
+                    1 + (is_const1 % BRAINCODE_MAX_FREQUENCY as n_byte);
+            }
+            _ => {}
+        }
+    }
+
+    fn execute_second_action(
+        &mut self,
+        io: &mut BraincodeIo,
+        read0: n_byte,
+        read1: n_byte,
+        instruction: BraincodeInstruction,
+    ) {
+        let is_const1 = if instruction.constant1 {
+            instruction.value1
+        } else {
+            read1
+        };
+        let index = usize::from(self.registers[0]) % BRAINCODE_PROBES;
+        match read0 % 6 {
+            0 => io.brainprobe[index].probe_type = is_const1 & 1,
+            1 => io.brainprobe[index].address = is_const1,
+            2 if io.internal && io.awake => {
+                let message = is_const1;
+                if io.shout[SHOUT_CONTENT] == 0
+                    && io.shout[SHOUT_HEARD] == 0
+                    && io.shout[SHOUT_CTR] == 0
+                    && message > 0
+                {
+                    io.shout[SHOUT_CTR] = SHOUT_REFRACTORY;
+                    io.shout[SHOUT_VOLUME] = self.registers[0];
+                    io.shout[SHOUT_CONTENT] = message;
+                    io.macro_state |= BEING_STATE_SHOUTING;
+                }
+            }
+            3 => {
+                io.intention_requested = Some((
+                    usize::from(io.attention[ATTENTION_EPISODE]) % EPISODIC_SIZE,
+                    n_byte2::from(self.registers[0]) * 10,
+                    is_const1,
+                ));
+            }
+            4 => io.brainprobe[index].offset = is_const1,
+            5 if io.awake => io.posture = read1,
+            _ => {}
+        }
+    }
+
+    fn execute_third_action(
+        &mut self,
+        io: &mut BraincodeIo,
+        read0: n_byte,
+        read1: n_byte,
+        instruction: BraincodeInstruction,
+    ) {
+        let is_const1 = if instruction.constant1 {
+            instruction.value1
+        } else {
+            read1
+        };
+        let index = usize::from(self.registers[0]) % BRAINCODE_PROBES;
+        match read0 % 2 {
+            0 => io.brainprobe[index].position = is_const1,
+            1 => {
+                let preference = usize::from(self.registers[0]) % PREFERENCES;
+                if (56..155).contains(&read1) {
+                    io.learned_preference[preference] =
+                        io.learned_preference[preference].saturating_add(1);
+                }
+                if read1 >= 155 {
+                    io.learned_preference[preference] =
+                        io.learned_preference[preference].saturating_sub(1);
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+fn addr_from_instruction(pc: usize, value: n_byte) -> usize {
+    braincode_address(pc as n_int + n_int::from(value))
 }
 
 pub fn braincode_decode(braincode: &[n_byte; BRAINCODE_SIZE], pc: usize) -> BraincodeInstruction {
@@ -1438,6 +1771,7 @@ pub struct BeingSummary {
     child_generation_max: n_byte2,
     social_memory: [simulated_isocial; SOCIAL_SIZE],
     episodic_memory: [simulated_iepisodic; EPISODIC_SIZE],
+    territory_memory: [simulated_iplace; TERRITORY_AREA],
     immune_antigens: [n_byte; IMMUNE_ANTIGENS],
     immune_shape_antigen: [n_byte; IMMUNE_ANTIGENS],
     immune_antibodies: [n_byte; IMMUNE_POPULATION],
@@ -1494,6 +1828,7 @@ impl BeingSummary {
             child_generation_max: 0,
             social_memory: [simulated_isocial::default(); SOCIAL_SIZE],
             episodic_memory: [simulated_iepisodic::default(); EPISODIC_SIZE],
+            territory_memory: [simulated_iplace::default(); TERRITORY_AREA],
             immune_antigens: [0; IMMUNE_ANTIGENS],
             immune_shape_antigen: [0; IMMUNE_ANTIGENS],
             immune_antibodies: [0; IMMUNE_POPULATION],
@@ -1623,6 +1958,7 @@ impl BeingSummary {
             child_generation_max: 0,
             social_memory: [simulated_isocial::default(); SOCIAL_SIZE],
             episodic_memory: [simulated_iepisodic::default(); EPISODIC_SIZE],
+            territory_memory: [simulated_iplace::default(); TERRITORY_AREA],
             immune_antigens: [0; IMMUNE_ANTIGENS],
             immune_shape_antigen: [0; IMMUNE_ANTIGENS],
             immune_antibodies: [0; IMMUNE_POPULATION],
@@ -1646,6 +1982,7 @@ impl BeingSummary {
         if !being.load_episodic_memory(entries)? {
             being.init_episodic_memory();
         }
+        let _ = being.load_territory_memory(entries)?;
         Ok(being)
     }
 
@@ -1715,6 +2052,7 @@ impl BeingSummary {
             child_generation_max: 0,
             social_memory: [simulated_isocial::default(); SOCIAL_SIZE],
             episodic_memory: [simulated_iepisodic::default(); EPISODIC_SIZE],
+            territory_memory: [simulated_iplace::default(); TERRITORY_AREA],
             immune_antigens: [0; IMMUNE_ANTIGENS],
             immune_shape_antigen: [0; IMMUNE_ANTIGENS],
             immune_antibodies: [0; IMMUNE_POPULATION],
@@ -1789,6 +2127,7 @@ impl BeingSummary {
         if !being.load_episodic_memory(entries)? {
             being.init_episodic_memory();
         }
+        let _ = being.load_territory_memory(entries)?;
 
         Ok(being)
     }
@@ -1903,6 +2242,7 @@ impl BeingSummary {
         let mut events = Vec::new();
         object_array(&mut events, "social", self.native_social_array());
         object_array(&mut events, "episodic", self.native_episodic_array());
+        object_array(&mut events, "territory", self.native_territory_array());
         events
     }
 
@@ -1937,6 +2277,13 @@ impl BeingSummary {
         self.episodic_memory
             .iter()
             .map(|entry| ObjectValue::Object(episodic_entry_to_object(entry)))
+            .collect()
+    }
+
+    fn native_territory_array(&self) -> Vec<ObjectValue> {
+        self.territory_memory
+            .iter()
+            .map(|entry| ObjectValue::Object(territory_entry_to_object(entry)))
             .collect()
     }
 
@@ -1996,6 +2343,31 @@ impl BeingSummary {
         Ok(true)
     }
 
+    fn load_territory_memory(&mut self, entries: &[ObjectEntry]) -> Result<bool, &'static str> {
+        let territory = if let Some(events) = optional_object(entries, "events")? {
+            optional_field(events, "territory")
+        } else {
+            optional_field(entries, "territory")
+        };
+
+        let Some(territory) = territory else {
+            return Ok(false);
+        };
+
+        let ObjectValue::Array(values) = territory else {
+            return Err("territory array expected");
+        };
+
+        self.territory_memory = [simulated_iplace::default(); TERRITORY_AREA];
+        for (index, value) in values.iter().take(TERRITORY_AREA).enumerate() {
+            let ObjectValue::Object(entries) = value else {
+                return Err("territory entry object expected");
+            };
+            self.territory_memory[index] = territory_entry_from_object(entries)?;
+        }
+        Ok(true)
+    }
+
     pub fn to_simulated_being(&self) -> simulated_being {
         let mut being = simulated_being::default();
         being.constant.date_of_birth = self.date_of_birth;
@@ -2023,6 +2395,7 @@ impl BeingSummary {
         being.delta.awake = self.awake_level;
         being.events.social = self.social_memory;
         being.events.episodic = self.episodic_memory;
+        being.events.territory = self.territory_memory;
         being.changes.drives = self.drives;
         being.changes.shout = self.shout;
         being.changes.inventory = self.inventory;
@@ -2093,6 +2466,7 @@ impl BeingSummary {
             child_generation_max: native.changes.child_generation_max,
             social_memory: native.events.social,
             episodic_memory: native.events.episodic,
+            territory_memory: native.events.territory,
             immune_antigens: native.immune_system.antigens,
             immune_shape_antigen: native.immune_system.shape_antigen,
             immune_antibodies: native.immune_system.antibodies,
@@ -2241,6 +2615,10 @@ impl BeingSummary {
         &mut self.episodic_memory
     }
 
+    pub const fn territory_memory(&self) -> [simulated_iplace; TERRITORY_AREA] {
+        self.territory_memory
+    }
+
     pub const fn shout(&self) -> [n_byte; SHOUT_BYTES] {
         self.shout
     }
@@ -2251,6 +2629,22 @@ impl BeingSummary {
 
     pub const fn learned_preference(&self) -> [n_byte; PREFERENCES] {
         self.learned_preference
+    }
+
+    pub const fn date_of_conception(&self) -> n_byte4 {
+        self.date_of_conception
+    }
+
+    pub const fn fetal_genetics(&self) -> [n_genetics; CHROMOSOMES] {
+        self.fetal_genetics
+    }
+
+    pub const fn father_name(&self) -> [n_byte2; 2] {
+        self.father_name
+    }
+
+    pub const fn mother_name(&self) -> [n_byte2; 2] {
+        self.mother_name
     }
 
     pub const fn immune_seed(&self) -> [n_byte2; 2] {
@@ -2361,7 +2755,10 @@ impl BeingSummary {
         self.cycle_awake(land);
         self.cycle_episodic();
         self.cycle_drives(land_date);
+        self.cycle_territory(land);
+        self.cycle_internal_braincode(land);
         self.speed_advance();
+        self.update_brainprobes(land_time);
 
         if land_time == 0 {
             self.honor = self.honor.saturating_add(1);
@@ -3021,6 +3418,292 @@ impl BeingSummary {
         }
     }
 
+    fn cycle_territory(&mut self, land: &LandState) {
+        let index = territory_index_for_location(self.location);
+        self.attention[ATTENTION_TERRITORY] = index as n_byte;
+        let territory = &mut self.territory_memory[index];
+        territory.familiarity = territory.familiarity.saturating_add(1);
+        if territory.name == TERRITORY_NAME_UNKNOWN && territory.familiarity > 8 {
+            territory.name = territory_name_for_land(land, index);
+        }
+        if self
+            .territory_memory
+            .iter()
+            .any(|territory| territory.familiarity > 65_534)
+        {
+            for territory in &mut self.territory_memory {
+                territory.familiarity >>= 2;
+            }
+        }
+    }
+
+    fn cycle_internal_braincode(&mut self, land: &LandState) {
+        let self_view = self.clone();
+        let code = self.social_memory[0].braincode;
+        self.run_braincode_dialogue(&self_view, 0, code, land, true);
+    }
+
+    fn update_brainprobes(&mut self, land_time: n_byte4) {
+        let actor = usize::from(self.attention[ATTENTION_ACTOR]) % SOCIAL_SIZE;
+        let code = self.social_memory[actor].braincode;
+        for probe in &mut self.brainprobe {
+            if probe.frequency == 0 {
+                continue;
+            }
+            let frequency = n_byte4::from(probe.frequency);
+            if (land_time + n_byte4::from(probe.offset)) % frequency != 0 {
+                continue;
+            }
+            let address =
+                (usize::from(probe.address) + usize::from(probe.position)) % BRAINCODE_SIZE;
+            probe.state = code[address];
+        }
+    }
+
+    fn braincode_io_with(
+        &self,
+        other: &BeingSummary,
+        social_index: usize,
+        land: &LandState,
+        internal: bool,
+    ) -> BraincodeIo {
+        let social = self.social_memory[social_index % SOCIAL_SIZE];
+        let episode_index = usize::from(self.attention[ATTENTION_EPISODE]) % EPISODIC_SIZE;
+        let episode = self.episodic_memory[episode_index];
+        let territory_index = usize::from(self.attention[ATTENTION_TERRITORY]) % TERRITORY_AREA;
+        let local_territory = self.territory_memory[territory_index];
+        let remote_territory = other.territory_memory[territory_index];
+        let local_groomed = inventory_count_flag(&self.inventory, INVENTORY_GROOMED);
+        let remote_groomed = inventory_count_flag(&other.inventory, INVENTORY_GROOMED);
+        let local_wounds = inventory_count_flag(&self.inventory, INVENTORY_WOUND);
+        let remote_wounds = inventory_count_flag(&other.inventory, INVENTORY_WOUND);
+        let local_positive = affect_total(self.episodic_memory, true);
+        let local_negative = affect_total(self.episodic_memory, false);
+        let carrying = self.inventory[usize::from(BODY_RIGHT_HAND)]
+            | self.inventory[usize::from(BODY_LEFT_HAND)];
+        let mut first_sensors = [0; 32];
+        first_sensors[0] = self.honor;
+        first_sensors[1] = other.honor;
+        first_sensors[2] = self.parasites;
+        first_sensors[3] = other.parasites;
+        first_sensors[4] = self.crowding;
+        first_sensors[5] = (self.family_name & 255) as n_byte;
+        first_sensors[6] = (self.family_name >> 8) as n_byte;
+        first_sensors[7] = (other.family_name & 255) as n_byte;
+        first_sensors[8] = (other.family_name >> 8) as n_byte;
+        first_sensors[9] = self.facing;
+        first_sensors[10] = other.facing;
+        first_sensors[11] = self.speed();
+        first_sensors[12] = (social.familiarity & 255) as n_byte;
+        first_sensors[13] = social.friend_foe;
+        first_sensors[14] = social.attraction;
+        first_sensors[17] = (self.macro_state & 255) as n_byte;
+        first_sensors[18] = (self.macro_state >> 8) as n_byte;
+        first_sensors[19] = self.drives[DRIVE_HUNGER];
+        first_sensors[20] = self.drives[DRIVE_SOCIAL];
+        first_sensors[21] = self.drives[DRIVE_FATIGUE];
+        first_sensors[22] = self.drives[DRIVE_SEX];
+        first_sensors[23] = if self.is_female() == other.is_female() {
+            0
+        } else {
+            255
+        };
+        first_sensors[24] = if other.is_female() { 255 } else { 0 };
+        first_sensors[25] = if other.is_female() { 0 } else { 255 };
+        first_sensors[26] = remote_groomed << 4;
+        first_sensors[27] = local_groomed << 4;
+        first_sensors[28] = remote_wounds << 4;
+        first_sensors[29] = local_wounds << 4;
+        first_sensors[30] = self.posture;
+        first_sensors[31] = other.posture;
+
+        let mut second_sensors = [0; 25];
+        second_sensors[9] = episode.event;
+        second_sensors[10] = episode.food;
+        second_sensors[11] = (episode.affect & 255) as n_byte;
+        second_sensors[12] = (episode.arg & 255) as n_byte;
+        second_sensors[13] = apespace_to_byte(episode.space_time.location[0]);
+        second_sensors[14] = apespace_to_byte(episode.space_time.location[1]);
+        second_sensors[15] = (land.weather_pressure_at_map(
+            apespace_to_mapspace(n_int::from(self.location[0])),
+            apespace_to_mapspace(n_int::from(self.location[1])),
+        ) >> 9)
+            .clamp(0, 255) as n_byte;
+        second_sensors[17] = (land.time() >> 3) as n_byte;
+        second_sensors[18] = self.attention[ATTENTION_BODY].saturating_mul(30);
+        second_sensors[19] = local_territory.name;
+        second_sensors[20] = territory_familiarity_scaled(&self.territory_memory, territory_index);
+        second_sensors[21] = territory_familiarity_scaled(&other.territory_memory, territory_index);
+        second_sensors[22] = if carrying != 0 { 255 } else { 0 };
+
+        let mut third_sensors = [0; 20];
+        let local_genes = [
+            gene_eye_shape(self.genetics),
+            gene_eye_color(self.genetics),
+            gene_eye_separation(self.genetics),
+            gene_nose_shape(self.genetics),
+            gene_ear_shape(self.genetics),
+            gene_eyebrow_shape(self.genetics),
+            gene_mouth_shape(self.genetics),
+        ];
+        let remote_genes = [
+            gene_eye_shape(other.genetics),
+            gene_eye_color(other.genetics),
+            gene_eye_separation(other.genetics),
+            gene_nose_shape(other.genetics),
+            gene_ear_shape(other.genetics),
+            gene_eyebrow_shape(other.genetics),
+            gene_mouth_shape(other.genetics),
+        ];
+        for index in 0..7 {
+            third_sensors[index * 2] = local_genes[index] << 4;
+            third_sensors[index * 2 + 1] = remote_genes[index] << 4;
+        }
+        third_sensors[14] = *self.immune_antigens.iter().max().unwrap_or(&0);
+        third_sensors[15] = *other.immune_antigens.iter().max().unwrap_or(&0);
+        third_sensors[16] = local_positive;
+        third_sensors[17] = local_negative;
+        third_sensors[18] =
+            if internal && self.macro_state & (BEING_STATE_SHOUTING | BEING_STATE_SPEAKING) == 0 {
+                self.shout[SHOUT_HEARD]
+            } else {
+                0
+            };
+        third_sensors[19] = remote_territory.name;
+
+        BraincodeIo {
+            awake: self.awake_level != FULLY_ASLEEP,
+            internal,
+            first_sensors,
+            second_sensors,
+            third_sensors,
+            episode_location: episode.space_time.location,
+            attention: self.attention,
+            social_friend_foe: social.friend_foe,
+            social_attraction: social.attraction,
+            social_familiarity: social.familiarity,
+            brainprobe: self.brainprobe,
+            learned_preference: self.learned_preference,
+            shout: self.shout,
+            posture: self.posture,
+            macro_state: self.macro_state,
+            goal_location: None,
+            social_action: None,
+            anecdote_requested: false,
+            intention_requested: None,
+        }
+    }
+
+    fn run_braincode_dialogue(
+        &mut self,
+        other: &BeingSummary,
+        social_index: usize,
+        remote_code: [n_byte; BRAINCODE_SIZE],
+        land: &LandState,
+        internal: bool,
+    ) {
+        let social_index = social_index % SOCIAL_SIZE;
+        let local_code = self.social_memory[social_index].braincode;
+        let mut vm = BraincodeVm::new_pair(local_code, remote_code, self.braincode_register);
+        let mut io = self.braincode_io_with(other, social_index, land, internal);
+        let max_iterations = if internal {
+            BRAINCODE_MAX_ADDRESS / BRAINCODE_BYTES_PER_INSTRUCTION
+        } else {
+            8 + usize::from(self.learned_preference[PREFERENCE_CHAT])
+        };
+        for _ in 0..max_iterations {
+            vm.execute_step_with_io(&mut io);
+        }
+        self.social_memory[social_index].braincode = *vm.local();
+        self.braincode_register = vm.registers();
+        self.apply_braincode_io(social_index, io, other, land);
+    }
+
+    fn apply_braincode_io(
+        &mut self,
+        social_index: usize,
+        io: BraincodeIo,
+        other: &BeingSummary,
+        land: &LandState,
+    ) {
+        self.attention = io.attention;
+        self.brainprobe = io.brainprobe;
+        self.learned_preference = io.learned_preference;
+        self.shout = io.shout;
+        self.posture = io.posture;
+        self.macro_state = io.macro_state;
+        self.social_memory[social_index].friend_foe = io.social_friend_foe;
+        self.social_memory[social_index].attraction = io.social_attraction;
+        self.social_memory[social_index].familiarity = io.social_familiarity;
+        if let Some(location) = io.goal_location {
+            self.goal = [GOAL_LOCATION, location[0], location[1], 0];
+        }
+        if let Some(action) = io.social_action {
+            self.macro_state |= match action % 4 {
+                0 => BEING_STATE_SPEAKING,
+                1 => BEING_STATE_GROOMING,
+                2 => BEING_STATE_SHOWFORCE,
+                _ => BEING_STATE_MOVING,
+            };
+        }
+        if io.anecdote_requested {
+            self.copy_anecdote_from(other, land.date(), land.time());
+        }
+        if let Some((episode_index, affect, argument)) = io.intention_requested {
+            self.record_intention(episode_index, affect, argument, land.date(), land.time());
+        }
+    }
+
+    fn copy_anecdote_from(&mut self, other: &BeingSummary, land_date: n_byte4, land_time: n_byte4) {
+        if let Some(anecdote) = other.episodic_memory.iter().find(|entry| entry.event != 0) {
+            let mut copied = *anecdote;
+            copied.first_name[BEING_MEETER] = self.gender_name;
+            copied.family_name[BEING_MEETER] = self.family_name;
+            copied.space_time.date = land_date;
+            copied.space_time.time = land_time;
+            copied.space_time.location = self.location;
+            let replace = self.episodic_replacement_index(
+                copied.event,
+                copied.first_name[BEING_MEETER],
+                copied.family_name[BEING_MEETER],
+                copied.first_name[BEING_MET],
+                copied.family_name[BEING_MET],
+            );
+            self.episodic_memory[replace] = copied;
+            self.attention[ATTENTION_EPISODE] = replace as n_byte;
+        }
+    }
+
+    fn record_intention(
+        &mut self,
+        episode_index: usize,
+        affect: n_byte2,
+        argument: n_byte,
+        land_date: n_byte4,
+        land_time: n_byte4,
+    ) {
+        let episode = self.episodic_memory[episode_index % EPISODIC_SIZE];
+        if episode.event == 0 || episode.event >= EVENT_INTENTION {
+            return;
+        }
+        let replace = self.episodic_replacement_index(
+            episode.event + EVENT_INTENTION,
+            self.gender_name,
+            self.family_name,
+            episode.first_name[BEING_MET],
+            episode.family_name[BEING_MET],
+        );
+        self.episodic_memory[replace] = episode;
+        self.episodic_memory[replace].event = episode.event + EVENT_INTENTION;
+        self.episodic_memory[replace].affect = affect;
+        self.episodic_memory[replace].arg = n_byte2::from(argument);
+        self.episodic_memory[replace].space_time.date = land_date;
+        self.episodic_memory[replace].space_time.time = land_time;
+        self.episodic_memory[replace].first_name[BEING_MEETER] = self.gender_name;
+        self.episodic_memory[replace].family_name[BEING_MEETER] = self.family_name;
+        self.attention[ATTENTION_EPISODE] = replace as n_byte;
+    }
+
     fn init_immune(&mut self) {
         let mut seed = self.immune_seed;
         for index in (0..IMMUNE_ANTIGENS).step_by(2) {
@@ -3420,6 +4103,84 @@ fn affect_distance(affect: n_byte2) -> n_byte2 {
     affect.abs_diff(EPISODIC_AFFECT_ZERO)
 }
 
+fn affect_total(episodic: [simulated_iepisodic; EPISODIC_SIZE], positive: bool) -> n_byte {
+    let total = episodic.iter().fold(0u32, |total, entry| {
+        if entry.event == 0 {
+            return total;
+        }
+        if positive && entry.affect > EPISODIC_AFFECT_ZERO {
+            total + u32::from(entry.affect - EPISODIC_AFFECT_ZERO)
+        } else if !positive && entry.affect < EPISODIC_AFFECT_ZERO {
+            total + u32::from(EPISODIC_AFFECT_ZERO - entry.affect)
+        } else {
+            total
+        }
+    });
+    (total >> if positive { 7 } else { 1 }).min(255) as n_byte
+}
+
+fn inventory_count_flag(inventory: &[n_byte2; INVENTORY_SIZE], flag: n_byte2) -> n_byte {
+    inventory
+        .iter()
+        .filter(|item| **item & flag != 0)
+        .count()
+        .min(15) as n_byte
+}
+
+fn apespace_to_byte(value: n_byte2) -> n_byte {
+    ((n_uint::from(value) * 255) / n_uint::from(APESPACE_BOUNDS)) as n_byte
+}
+
+fn territory_index_for_location(location: [n_byte2; 2]) -> usize {
+    let map_x = apespace_to_mapspace(n_int::from(location[0]));
+    let map_y = apespace_to_mapspace(n_int::from(location[1]));
+    let territory_x = (positive_map_coord(map_x) >> MAP_TO_TERRITORY_RATIO)
+        .clamp(0, (TERRITORY_DIMENSION - 1) as n_int) as usize;
+    let territory_y = (positive_map_coord(map_y) >> MAP_TO_TERRITORY_RATIO)
+        .clamp(0, (TERRITORY_DIMENSION - 1) as n_int) as usize;
+    territory_x + (territory_y * TERRITORY_DIMENSION)
+}
+
+fn territory_familiarity_scaled(
+    territory: &[simulated_iplace; TERRITORY_AREA],
+    index: usize,
+) -> n_byte {
+    let max_familiarity = territory
+        .iter()
+        .map(|entry| n_uint::from(entry.familiarity))
+        .max()
+        .unwrap_or(0)
+        .max(1);
+    ((n_uint::from(territory[index % TERRITORY_AREA].familiarity) * 255) / max_familiarity)
+        as n_byte
+}
+
+fn territory_name_for_land(land: &LandState, index: usize) -> n_byte {
+    let territory_x = (index % TERRITORY_DIMENSION) as n_int;
+    let territory_y = (index / TERRITORY_DIMENSION) as n_int;
+    let map_x = territory_x << MAP_TO_TERRITORY_RATIO;
+    let map_y = territory_y << MAP_TO_TERRITORY_RATIO;
+    let center = land.land_location_map(map_x + 16, map_y + 16);
+    let east = land.land_location_map(map_x + 31, map_y + 16);
+    let west = land.land_location_map(map_x, map_y + 16);
+    let north = land.land_location_map(map_x + 16, map_y);
+    let south = land.land_location_map(map_x + 16, map_y + 31);
+    let relief = (east - west).abs() + (south - north).abs();
+    if center < WATER_MAP - 8 {
+        TERRITORY_NAME_LAKE
+    } else if center <= TIDE_MAX {
+        TERRITORY_NAME_BEACH
+    } else if center > WATER_MAP + 72 {
+        TERRITORY_NAME_MOUNTAIN
+    } else if relief > 96 {
+        TERRITORY_NAME_RIDGE
+    } else if center > WATER_MAP + 32 {
+        TERRITORY_NAME_HILL
+    } else {
+        TERRITORY_NAME_FLATLAND
+    }
+}
+
 pub fn is_night(time: n_byte4) -> bool {
     let hourish = time >> 5;
     !(11..=36).contains(&hourish)
@@ -3804,11 +4565,12 @@ impl PopulationState {
         for being in &mut self.beings {
             being.advance_minute(land);
         }
-        self.social_initial_loop(land_date, land_time);
+        self.social_initial_loop(land, land_date, land_time);
+        self.lifecycle_loop(land_date, land_time);
         self.social_secondary_loop_no_sim();
     }
 
-    fn social_initial_loop(&mut self, land_date: n_byte4, land_time: n_byte4) {
+    fn social_initial_loop(&mut self, land: &LandState, land_date: n_byte4, land_time: n_byte4) {
         let snapshot = self.beings.clone();
         let targets = snapshot
             .iter()
@@ -3828,7 +4590,7 @@ impl PopulationState {
                     let (left, right) = self.beings.split_at_mut(second);
                     let first_being = &mut left[first];
                     let second_being = &mut right[0];
-                    social_pair_cycle(first_being, second_being, land_date, land_time);
+                    social_pair_cycle(first_being, second_being, land, land_date, land_time);
                 }
             }
         }
@@ -3841,6 +4603,154 @@ impl PopulationState {
             being.social_coord[1] = being.social_coord[3];
         }
     }
+
+    fn lifecycle_loop(&mut self, land_date: n_byte4, land_time: n_byte4) {
+        if self.beings.len() >= self.max {
+            return;
+        }
+        let base_len = self.beings.len();
+        let parent_snapshot = self.beings.clone();
+        let mut births = Vec::new();
+        for (mother_index, mother) in self.beings.iter_mut().enumerate() {
+            if !mother.is_female() || mother.date_of_conception == 0 {
+                continue;
+            }
+            if land_date < mother.date_of_conception + GESTATION_DAYS {
+                continue;
+            }
+            if parent_snapshot.iter().any(|being| {
+                being.date_of_birth >= mother.date_of_conception
+                    && being.genetics == mother.fetal_genetics
+            }) {
+                continue;
+            }
+            let child_index = base_len + births.len();
+            let child = child_from_mother(mother, child_index, land_date);
+            mother.record_episodic_interaction(
+                &child,
+                EVENT_BIRTH,
+                AFFECT_MATE,
+                0,
+                land_date,
+                land_time,
+            );
+            if land_date >= mother.date_of_conception + GESTATION_DAYS + CONCEPTION_INHIBITION_DAYS
+            {
+                mother.date_of_conception = 0;
+            }
+            births.push((mother_index, child));
+            if base_len + births.len() >= self.max {
+                break;
+            }
+        }
+
+        for (mother_index, mut child) in births {
+            create_family_links(&mut self.beings, mother_index, &mut child);
+            self.beings.push(child);
+        }
+    }
+}
+
+fn child_from_mother(mother: &BeingSummary, index: usize, land_date: n_byte4) -> BeingSummary {
+    let genetics = mother.fetal_genetics;
+    let gender_name = inferred_gender_name(&format!("Ape {:03}", index + 1), genetics);
+    let family_name = if mother.father_name[1] != 0 {
+        ((mother.family_name & 255) << 8) | (mother.father_name[1] & 255)
+    } else {
+        mother.family_name
+    };
+    let mut child = BeingSummary::new(
+        format!("Ape {:03}", index + 1),
+        gender_name,
+        family_name,
+        land_date,
+        genetics,
+    );
+    child.location = mother.location;
+    child.facing = mother.facing;
+    child.random_seed = mother.random_seed;
+    child.energy = BEING_FULL;
+    child.height = BIRTH_HEIGHT;
+    child.mass = BIRTH_MASS;
+    child.generation_min = mother.child_generation_min + 1;
+    child.generation_max = mother.child_generation_max + 1;
+    child.mother_name = [mother.gender_name, mother.family_name];
+    child.father_name = mother.father_name;
+    child.immune_shape_antibody = mother.immune_shape_antibody;
+    child.immune_antibodies = mother.immune_antibodies;
+    child
+}
+
+fn create_family_links(beings: &mut [BeingSummary], mother_index: usize, child: &mut BeingSummary) {
+    let mother_name = [
+        beings[mother_index].gender_name,
+        beings[mother_index].family_name,
+    ];
+    let father_name = beings[mother_index].father_name;
+    let child_relation = if child.is_female() {
+        RELATIONSHIP_DAUGHTER
+    } else {
+        RELATIONSHIP_SON
+    };
+    set_relationship_between(
+        &mut beings[mother_index],
+        child,
+        child_relation,
+        RELATIONSHIP_MOTHER,
+    );
+    if let Some(father_index) = beings
+        .iter()
+        .position(|being| [being.gender_name, being.family_name] == father_name)
+    {
+        let (before, after) = beings.split_at_mut(father_index.max(mother_index));
+        if father_index > mother_index {
+            let father = &mut after[0];
+            set_relationship_between(father, child, child_relation, RELATIONSHIP_FATHER);
+        } else if father_index < mother_index {
+            let father = &mut before[father_index];
+            set_relationship_between(father, child, child_relation, RELATIONSHIP_FATHER);
+        }
+    }
+    child.mother_name = mother_name;
+    child.father_name = father_name;
+    let sibling_relation = if child.is_female() {
+        RELATIONSHIP_SISTER
+    } else {
+        RELATIONSHIP_BROTHER
+    };
+    for sibling in beings.iter_mut() {
+        let sibling_name = [sibling.gender_name, sibling.family_name];
+        if sibling_name == mother_name || sibling_name == father_name {
+            continue;
+        }
+        if sibling.date_of_birth == child.date_of_birth {
+            continue;
+        }
+        if sibling.mother_name == mother_name || sibling.father_name == father_name {
+            set_relationship_between(
+                child,
+                sibling,
+                if sibling.is_female() {
+                    RELATIONSHIP_SISTER
+                } else {
+                    RELATIONSHIP_BROTHER
+                },
+                sibling_relation,
+            );
+        }
+    }
+}
+
+fn set_relationship_between(
+    meeter: &mut BeingSummary,
+    met: &mut BeingSummary,
+    meeter_to_met: n_byte,
+    met_to_meeter: n_byte,
+) {
+    let meeter_index = meeter.meet_being(met, 0, 0);
+    let met_index = met.meet_being(meeter, 0, 0);
+    meeter.social_memory[meeter_index].relationship = meeter_to_met;
+    met.social_memory[met_index].relationship = met_to_meeter;
 }
 
 fn social_distance_under(first: &BeingSummary, second: &BeingSummary, distance: n_int) -> bool {
@@ -3853,6 +4763,7 @@ fn social_distance_under(first: &BeingSummary, second: &BeingSummary, distance: 
 fn social_pair_cycle(
     first: &mut BeingSummary,
     second: &mut BeingSummary,
+    land: &LandState,
     land_date: n_byte4,
     land_time: n_byte4,
 ) {
@@ -3897,9 +4808,16 @@ fn social_pair_cycle(
     {
         social_mate_native(first, second, first_index, distance, land_date, land_time);
         social_mate_native(second, first, second_index, distance, land_date, land_time);
-        social_chat_native(first, second, first_index, land_date, land_time);
-        social_chat_native(second, first, second_index, land_date, land_time);
+        social_chat_native(first, second, first_index, land, land_date, land_time);
+        social_chat_native(second, first, second_index, land, land_date, land_time);
     }
+
+    let first_view = first.clone();
+    let second_view = second.clone();
+    let first_remote = second.social_memory[second_index].braincode;
+    let second_remote = first.social_memory[first_index].braincode;
+    first.run_braincode_dialogue(&second_view, first_index, first_remote, land, false);
+    second.run_braincode_dialogue(&first_view, second_index, second_remote, land, false);
 }
 
 fn social_distance(first: &BeingSummary, second: &BeingSummary) -> n_int {
@@ -4144,6 +5062,7 @@ fn social_mate_native(
 
     if attraction > 0 {
         meeter.goal = [GOAL_MATE, met.gender_name, met.family_name, 0];
+        learn_mate_preferences(meeter, met);
         meeter.record_episodic_interaction(
             met,
             EVENT_SEEK_MATE,
@@ -4152,6 +5071,9 @@ fn social_mate_native(
             land_date,
             land_time,
         );
+        if distance < 16 {
+            social_conception_native(meeter, met, land_date, land_time);
+        }
     }
 }
 
@@ -4159,6 +5081,7 @@ fn social_chat_native(
     meeter: &mut BeingSummary,
     met: &BeingSummary,
     being_index: usize,
+    land: &LandState,
     land_date: n_byte4,
     land_time: n_byte4,
 ) {
@@ -4168,6 +5091,9 @@ fn social_chat_native(
 
     meeter.macro_state |= BEING_STATE_SPEAKING;
     meeter.reset_drive(DRIVE_SOCIAL);
+    meeter.learned_preference[PREFERENCE_CHAT] =
+        meeter.learned_preference[PREFERENCE_CHAT].saturating_add(1);
+    social_chat_territory_native(meeter, met, land, being_index);
     meeter.record_episodic_interaction(met, EVENT_CHAT, AFFECT_CHAT, 0, land_date, land_time);
 
     if let Some(anecdote) = met.episodic_memory.iter().find(|entry| entry.event != 0) {
@@ -4206,6 +5132,103 @@ fn social_chat_native(
         meeter.episodic_memory[replace] = copied;
         meeter.attention[ATTENTION_EPISODE] = replace as n_byte;
     }
+}
+
+fn learn_mate_preferences(meeter: &mut BeingSummary, met: &BeingSummary) {
+    let offset = usize::from(meeter.is_female());
+    preference_approach(
+        &mut meeter.learned_preference[PREFERENCE_MATE_PIGMENTATION_MALE + offset],
+        gene_pigmentation(met.genetics) << 4,
+    );
+    preference_approach(
+        &mut meeter.learned_preference[PREFERENCE_MATE_HAIR_MALE + offset],
+        gene_hair(met.genetics) << 4,
+    );
+    preference_approach(
+        &mut meeter.learned_preference[PREFERENCE_MATE_HEIGHT_MALE + offset],
+        ((n_uint::from(met.height) * 255) / n_uint::from(BEING_MAX_HEIGHT)) as n_byte,
+    );
+    preference_approach(
+        &mut meeter.learned_preference[PREFERENCE_MATE_FRAME_MALE + offset],
+        met.body_frame() << 4,
+    );
+}
+
+fn preference_approach(preference: &mut n_byte, target: n_byte) {
+    if *preference < target {
+        *preference = preference.saturating_add(1);
+    } else if *preference > target {
+        *preference = preference.saturating_sub(1);
+    }
+}
+
+fn social_chat_territory_native(
+    meeter: &mut BeingSummary,
+    met: &BeingSummary,
+    land: &LandState,
+    _being_index: usize,
+) {
+    let index = territory_index_for_location(meeter.location);
+    let local_name = meeter.territory_memory[index].name;
+    let remote_name = met.territory_memory[index].name;
+    if local_name == TERRITORY_NAME_UNKNOWN {
+        meeter.territory_memory[index].name = if remote_name != TERRITORY_NAME_UNKNOWN {
+            remote_name
+        } else {
+            territory_name_for_land(land, index)
+        };
+    }
+    meeter.territory_memory[index].familiarity =
+        meeter.territory_memory[index].familiarity.saturating_add(1);
+}
+
+fn social_conception_native(
+    first: &mut BeingSummary,
+    second: &mut BeingSummary,
+    land_date: n_byte4,
+    land_time: n_byte4,
+) {
+    let (female, male) = if first.is_female() {
+        (first, second)
+    } else if second.is_female() {
+        (second, first)
+    } else {
+        return;
+    };
+    if female.date_of_conception != 0 {
+        return;
+    }
+    female.fetal_genetics = child_genetics(female.genetics, male.genetics, &mut female.random_seed);
+    female.date_of_conception = land_date.max(1);
+    female.father_name = [male.gender_name, male.family_name];
+    female.mother_name = [female.gender_name, female.family_name];
+    female.child_generation_min = female.generation_min.min(male.generation_min);
+    female.child_generation_max = female.generation_max.max(male.generation_max);
+    female.reset_drive(DRIVE_SEX);
+    female.goal = [0; 4];
+    male.reset_drive(DRIVE_SEX);
+    female.record_episodic_interaction(male, EVENT_MATE, AFFECT_MATE, 0, land_date, land_time);
+    male.record_episodic_interaction(female, EVENT_MATE, AFFECT_MATE, 0, land_date, land_time);
+}
+
+fn child_genetics(
+    mother: [n_genetics; CHROMOSOMES],
+    father: [n_genetics; CHROMOSOMES],
+    random: &mut [n_byte2; 2],
+) -> [n_genetics; CHROMOSOMES] {
+    let mut child = [0; CHROMOSOMES];
+    for chromosome in 0..CHROMOSOMES {
+        let crossover = n_genetics::from(math_random(random));
+        let mask = crossover | (crossover << 16);
+        child[chromosome] = (mother[chromosome] & mask) | (father[chromosome] & !mask);
+    }
+    child[CHROMOSOME_Y] &= !3;
+    child[CHROMOSOME_Y] |= if math_random(random) & 1 == 0 {
+        SEX_FEMALE as n_genetics
+    } else {
+        SEX_MALE as n_genetics
+    };
+    child
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -4611,6 +5634,15 @@ fn native_write_being(output: &mut String, being: &BeingSummary) {
     {
         native_write_episodic(output, episodic);
     }
+    for (index, territory) in native
+        .events
+        .territory
+        .iter()
+        .enumerate()
+        .filter(|(_, entry)| entry.name != TERRITORY_NAME_UNKNOWN || entry.familiarity != 0)
+    {
+        native_write_territory(output, index, territory);
+    }
 }
 
 fn native_write_social(output: &mut String, entry: &simulated_isocial) {
@@ -4651,6 +5683,14 @@ fn native_write_episodic(output: &mut String, entry: &simulated_iepisodic) {
     native_write_field(output, "epfoo=", &[n_uint::from(entry.food)]);
     native_write_field(output, "epafe=", &[n_uint::from(entry.affect)]);
     native_write_field(output, "eparg=", &[n_uint::from(entry.arg)]);
+    output.push_str("};\n");
+}
+
+fn native_write_territory(output: &mut String, index: usize, entry: &simulated_iplace) {
+    output.push_str("terri{");
+    native_write_field(output, "tridx=", &[index as n_uint]);
+    native_write_field(output, "trnam=", &[n_uint::from(entry.name)]);
+    native_write_field(output, "trfam=", &[n_uint::from(entry.familiarity)]);
     output.push_str("};\n");
 }
 
@@ -4829,6 +5869,13 @@ pub fn startup_transfer_from_native_bytes(input: &[u8]) -> Result<StartupTransfe
                     &mut beings[index],
                     native_episodic_from_section(&section)?,
                 );
+            }
+            b"terri{" => {
+                let Some(index) = current_being else {
+                    return Err("native territory section before being");
+                };
+                let (territory_index, territory) = native_territory_from_section(&section)?;
+                native_add_territory_event(&mut beings[index], territory_index, territory);
             }
             b"weath{" => {
                 return Err("native section not supported yet");
@@ -5171,12 +6218,56 @@ fn native_episodic_from_section(
     Ok(entry)
 }
 
+fn native_territory_from_section(
+    section: &NativeFileSection,
+) -> Result<(usize, simulated_iplace), &'static str> {
+    let index = native_first_byte2(section, b"tridx=")?.unwrap_or(0) as usize;
+    if index >= TERRITORY_AREA {
+        return Err("native territory index out of range");
+    }
+    Ok((
+        index,
+        simulated_iplace {
+            name: native_first_byte(section, b"trnam=")?.unwrap_or(TERRITORY_NAME_UNKNOWN),
+            familiarity: native_first_byte2(section, b"trfam=")?.unwrap_or(0),
+        },
+    ))
+}
+
 fn native_add_social_event(being: &mut Vec<ObjectEntry>, entry: simulated_isocial) {
     native_push_event_object(being, "social", social_entry_to_object(&entry));
 }
 
 fn native_add_episodic_event(being: &mut Vec<ObjectEntry>, entry: simulated_iepisodic) {
     native_push_event_object(being, "episodic", episodic_entry_to_object(&entry));
+}
+
+fn native_add_territory_event(being: &mut Vec<ObjectEntry>, index: usize, entry: simulated_iplace) {
+    let events_index = if let Some(index) = being.iter().position(|entry| entry.name == "events") {
+        index
+    } else {
+        being.push(ObjectEntry::new("events", ObjectValue::Object(Vec::new())));
+        being.len() - 1
+    };
+
+    let ObjectValue::Object(events) = &mut being[events_index].value else {
+        return;
+    };
+    let array_index = if let Some(index) = events.iter().position(|entry| entry.name == "territory")
+    {
+        index
+    } else {
+        let territory = (0..TERRITORY_AREA)
+            .map(|_| ObjectValue::Object(territory_entry_to_object(&simulated_iplace::default())))
+            .collect();
+        events.push(ObjectEntry::new("territory", ObjectValue::Array(territory)));
+        events.len() - 1
+    };
+    if let ObjectValue::Array(values) = &mut events[array_index].value {
+        if index < values.len() {
+            values[index] = ObjectValue::Object(territory_entry_to_object(&entry));
+        }
+    }
 }
 
 fn native_push_event_object(
@@ -5779,6 +6870,20 @@ fn episodic_entry_to_object(entry: &simulated_iepisodic) -> Vec<ObjectEntry> {
     object_number(&mut object, "food", entry.food.into());
     object_number(&mut object, "affect", entry.affect.into());
     object_number(&mut object, "arg", entry.arg.into());
+    object
+}
+
+fn territory_entry_from_object(entries: &[ObjectEntry]) -> Result<simulated_iplace, &'static str> {
+    Ok(simulated_iplace {
+        name: optional_number_byte(entries, "name")?.unwrap_or(TERRITORY_NAME_UNKNOWN),
+        familiarity: optional_number_byte2(entries, "familiarity")?.unwrap_or(0),
+    })
+}
+
+fn territory_entry_to_object(entry: &simulated_iplace) -> Vec<ObjectEntry> {
+    let mut object = Vec::new();
+    object_number(&mut object, "name", entry.name.into());
+    object_number(&mut object, "familiarity", entry.familiarity.into());
     object
 }
 
@@ -6964,7 +8069,9 @@ mod tests {
 
         let mut population = PopulationState::from_beings(vec![first, second], 2);
         for _ in 0..20 {
-            population.social_initial_loop(AGE_OF_MATURITY + 1, 400);
+            let land =
+                LandState::from_snapshot(LandSnapshot::new(AGE_OF_MATURITY + 1, [1, 2], 400));
+            population.social_initial_loop(&land, AGE_OF_MATURITY + 1, 400);
             population.social_secondary_loop_no_sim();
         }
 
@@ -7122,9 +8229,18 @@ mod tests {
         );
         assert_eq!(first.goal()[0], GOAL_MATE);
         assert!(first.social_memory()[first_index].attraction > PAIR_BOND_THRESHOLD);
+        assert!(first.learned_preference()[PREFERENCE_MATE_HEIGHT_MALE] > 0);
 
         first.social_memory[first_index].friend_foe = 255;
-        social_chat_native(&mut first, &second, first_index, AGE_OF_MATURITY + 1, 401);
+        let land = LandState::from_snapshot(LandSnapshot::new(AGE_OF_MATURITY + 1, [1, 2], 401));
+        social_chat_native(
+            &mut first,
+            &second,
+            first_index,
+            &land,
+            AGE_OF_MATURITY + 1,
+            401,
+        );
         assert!(first.macro_state() & BEING_STATE_SPEAKING != 0);
         assert!(first
             .episodic_memory()
@@ -7134,6 +8250,122 @@ mod tests {
             .episodic_memory()
             .iter()
             .any(|entry| entry.event == EVENT_EAT && entry.food == FOOD_FRUIT));
+        assert!(first.learned_preference()[PREFERENCE_CHAT] > 0);
+        assert_ne!(
+            first.territory_memory()[territory_index_for_location(first.location())].name,
+            TERRITORY_NAME_UNKNOWN
+        );
+    }
+
+    #[test]
+    fn braincode_sensors_actuators_and_probes_run_against_being_state() {
+        let mut first = BeingSummary::new("Thinker".to_string(), 512, 100, 0, [2, 3, 4, 5]);
+        let second = BeingSummary::new("Other".to_string(), 768, 200, 0, [3, 4, 5, 6]);
+        let land = LandState::from_snapshot(LandSnapshot::new(0, [1, 2], 400));
+        let social_index = first.meet_being(&second, 0, 400);
+        first.drives[DRIVE_HUNGER] = 123;
+        first.braincode_register[0] = 0;
+
+        let mut code = [0; BRAINCODE_SIZE];
+        code[0] = BRAINCODE_SEN;
+        code[1] = 20;
+        code[2] = 60;
+        code[20] = 19;
+        code[3] = BRAINCODE_ACT | BRAINCODE_CONSTANT1_BIT;
+        code[4] = 23;
+        code[5] = 7;
+        code[26] = 5;
+        first.social_memory[social_index].braincode = code;
+
+        first.run_braincode_dialogue(&second, social_index, [0; BRAINCODE_SIZE], &land, true);
+
+        assert_eq!(first.social_memory()[social_index].braincode[60], 123);
+        assert_eq!(first.brainprobe()[0].frequency, 8);
+
+        first.brainprobe[0].address = 60;
+        first.brainprobe[0].position = 0;
+        first.update_brainprobes(400);
+        assert_eq!(first.brainprobe()[0].state, 123);
+    }
+
+    #[test]
+    fn territory_memory_native_roundtrips_and_updates_from_location() {
+        let mut being = BeingSummary::new("Mapper".to_string(), 512, 258, 0, [2, 3, 4, 5]);
+        being.energy = BEING_FULL;
+        being.location = [12_345, 23_456];
+        let territory_index = territory_index_for_location(being.location);
+        being.territory_memory[territory_index] = simulated_iplace {
+            name: TERRITORY_NAME_HILL,
+            familiarity: 77,
+        };
+        let state = SimState {
+            kind: KIND_OF_USE::KIND_LOAD_FILE,
+            land: LandState::from_snapshot(LandSnapshot::new(7, [11, 12], 400)),
+            random_seed: [0; 2],
+            population: PopulationState::from_beings(vec![being.clone()], 1),
+        };
+
+        let native = state.tranfer_startup_out_native();
+        let loaded = SimState::load_startup_bytes(native.written_data()).unwrap();
+        assert_eq!(
+            loaded.beings()[0].territory_memory()[territory_index],
+            simulated_iplace {
+                name: TERRITORY_NAME_HILL,
+                familiarity: 77,
+            }
+        );
+
+        let mut cycled = being;
+        cycled.cycle_territory(state.land());
+        assert!(cycled.territory_memory()[territory_index].familiarity > 77);
+    }
+
+    #[test]
+    fn conception_birth_and_family_relationships_create_child() {
+        let mut mother = BeingSummary::new(
+            "Mother".to_string(),
+            n_byte2::from(SEX_FEMALE) << 8,
+            100,
+            0,
+            [3, 4, 5, 6],
+        );
+        let mut father = BeingSummary::new(
+            "Father".to_string(),
+            n_byte2::from(SEX_MALE) << 8,
+            200,
+            0,
+            [2, 7, 8, 9],
+        );
+        social_conception_native(&mut mother, &mut father, 1, 10);
+        assert_eq!(mother.date_of_conception(), 1);
+        assert_eq!(
+            mother.father_name(),
+            [father.gender_name(), father.family_name()]
+        );
+        assert_ne!(mother.fetal_genetics(), [0; CHROMOSOMES]);
+
+        let mut population = PopulationState::from_beings(vec![mother, father], 4);
+        population.lifecycle_loop(1 + GESTATION_DAYS, 20);
+
+        assert_eq!(population.len(), 3);
+        let child = &population.beings()[2];
+        assert_eq!(
+            child.mother_name(),
+            [population.beings()[0].gender_name(), 100]
+        );
+        let child_relationships = child
+            .social_memory()
+            .iter()
+            .map(|entry| entry.relationship)
+            .collect::<Vec<_>>();
+        assert!(
+            child_relationships.contains(&RELATIONSHIP_MOTHER),
+            "child relationships: {child_relationships:?}"
+        );
+        assert!(population.beings()[0]
+            .social_memory()
+            .iter()
+            .any(|entry| matches!(entry.relationship, RELATIONSHIP_DAUGHTER | RELATIONSHIP_SON)));
     }
 
     #[test]

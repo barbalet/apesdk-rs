@@ -1478,10 +1478,28 @@ fn format_braincode(being: &BeingSummary) -> String {
 }
 
 fn format_brainprobes(being: &BeingSummary) -> String {
-    format!(
+    let mut output = format!(
         "\nBrain probes for {}\n  Type    Posn  Freq Offset Addr State\n  ------------------------------------\n",
         being.name()
-    )
+    );
+    for (index, probe) in being.brainprobe().iter().enumerate() {
+        if probe.frequency == 0 && probe.state == 0 && probe.address == 0 && probe.position == 0 {
+            continue;
+        }
+        let probe_type = match probe.probe_type {
+            apesdk_sim::BRAINPROBE_OUTPUT_ACTUATOR => "ACT",
+            _ => "SEN",
+        };
+        output.push_str(&format!(
+            "  {index:02} {probe_type:>6} {pos:5} {freq:5} {offset:6} {addr:4} {state:5}\n",
+            pos = probe.position,
+            freq = probe.frequency,
+            offset = probe.offset,
+            addr = probe.address,
+            state = probe.state
+        ));
+    }
+    output
 }
 
 fn format_speech(being: &BeingSummary) -> String {
@@ -2002,6 +2020,23 @@ mod tests {
         assert!(actual.contains("speech\n\nSpeech for Ape 010\njkl.\n"));
         assert!(actual.contains("idea\nMatches 000.0000 percent\n"));
         assert!(actual.contains("08    000.0000  0000\n"));
+    }
+
+    #[test]
+    fn probes_command_prints_data_backed_probe_rows() {
+        let path = temp_save_path("probe_rows");
+        std::fs::write(
+            &path,
+            b"{\"information\":{\"signature\":20033,\"version number\":708},\"land\":{\"date\":0,\"genetics\":[1,2],\"time\":0},\"beings\":[{\"name\":\"Probe Ape\",\"delta\":{\"stored_energy\":3840},\"constant\":{\"date_of_birth\":0,\"name\":[512,258],\"genetics\":[2,3,4,5]},\"braindata\":{\"brainprobe\":[{\"probe_type\":1,\"position\":2,\"address\":3,\"frequency\":4,\"offset\":5,\"state\":6}]}}]}",
+        )
+        .expect("probe fixture should be writable");
+        let path_string = path.to_string_lossy();
+        let mut console = Console::default();
+        let actual = console.run_script(&format!("open {path_string}\nprobes\nquit\n"), true);
+
+        assert!(actual.contains("Brain probes for Probe Ape"));
+        assert!(actual.contains("00    ACT"));
+        assert!(actual.contains("     2     4      5    3     6"));
     }
 
     #[test]
