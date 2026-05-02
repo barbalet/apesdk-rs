@@ -18,6 +18,10 @@ enum CommandAction {
     Open,
     Step,
     Run,
+    Script,
+    Speak,
+    Alpha,
+    File,
     Interval,
     Logging,
     Event,
@@ -28,7 +32,10 @@ enum CommandAction {
     Top,
     Epic,
     Navigation,
-    Unsupported,
+    Watch,
+    BeingDetail,
+    Idea,
+    Debug,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -71,7 +78,7 @@ const COMMANDS: &[CommandEntry] = &[
         help: "",
     },
     CommandEntry {
-        action: CommandAction::Unsupported,
+        action: CommandAction::Script,
         command: "script",
         addition: "[file]",
         help: "Load an ApeScript simulation file",
@@ -107,19 +114,19 @@ const COMMANDS: &[CommandEntry] = &[
         help: "Stop the simulation during step or run",
     },
     CommandEntry {
-        action: CommandAction::Unsupported,
+        action: CommandAction::Speak,
         command: "speak",
         addition: "[file]",
         help: "Create an AIFF file of Ape speech",
     },
     CommandEntry {
-        action: CommandAction::Unsupported,
+        action: CommandAction::Alpha,
         command: "alpha",
         addition: "[file]",
         help: "Create an AIFF file of Ape alphabet",
     },
     CommandEntry {
-        action: CommandAction::Unsupported,
+        action: CommandAction::File,
         command: "file",
         addition: "[(component)]",
         help: "Information on the file format",
@@ -185,19 +192,19 @@ const COMMANDS: &[CommandEntry] = &[
         help: "Show simulation parameters",
     },
     CommandEntry {
-        action: CommandAction::Unsupported,
+        action: CommandAction::Watch,
         command: "watch",
         addition: "(ape name)|all|off|*",
         help: "Watch (specific *) for the current ape",
     },
     CommandEntry {
-        action: CommandAction::Unsupported,
+        action: CommandAction::Watch,
         command: "monitor",
         addition: "",
         help: "",
     },
     CommandEntry {
-        action: CommandAction::Unsupported,
+        action: CommandAction::Idea,
         command: "idea",
         addition: "",
         help: "Track shared braincode between apes",
@@ -215,91 +222,91 @@ const COMMANDS: &[CommandEntry] = &[
         help: "",
     },
     CommandEntry {
-        action: CommandAction::Unsupported,
+        action: CommandAction::BeingDetail,
         command: "pathogen",
         addition: "(ape name)",
         help: "* Show pathogens for a named ape",
     },
     CommandEntry {
-        action: CommandAction::Unsupported,
+        action: CommandAction::BeingDetail,
         command: "friends",
         addition: "",
         help: "",
     },
     CommandEntry {
-        action: CommandAction::Unsupported,
+        action: CommandAction::BeingDetail,
         command: "social",
         addition: "",
         help: "",
     },
     CommandEntry {
-        action: CommandAction::Unsupported,
+        action: CommandAction::BeingDetail,
         command: "socialgraph",
         addition: "",
         help: "",
     },
     CommandEntry {
-        action: CommandAction::Unsupported,
+        action: CommandAction::BeingDetail,
         command: "graph",
         addition: "(ape name)",
         help: "* Show social graph for a named ape",
     },
     CommandEntry {
-        action: CommandAction::Unsupported,
+        action: CommandAction::BeingDetail,
         command: "braincode",
         addition: "(ape name)",
         help: "* Show braincode for a named ape",
     },
     CommandEntry {
-        action: CommandAction::Unsupported,
+        action: CommandAction::BeingDetail,
         command: "speech",
         addition: "(ape name)",
         help: "* Show speech for a named ape",
     },
     CommandEntry {
-        action: CommandAction::Unsupported,
+        action: CommandAction::BeingDetail,
         command: "episodic",
         addition: "(ape name)",
         help: "* Show episodic memory for a named ape",
     },
     CommandEntry {
-        action: CommandAction::Unsupported,
+        action: CommandAction::BeingDetail,
         command: "probes",
         addition: "(ape name)",
         help: "* Show brain probes for a named ape",
     },
     CommandEntry {
-        action: CommandAction::Unsupported,
+        action: CommandAction::BeingDetail,
         command: "stats",
         addition: "(ape name)",
         help: "* Show parameters for a named ape",
     },
     CommandEntry {
-        action: CommandAction::Unsupported,
+        action: CommandAction::BeingDetail,
         command: "status",
         addition: "",
         help: "",
     },
     CommandEntry {
-        action: CommandAction::Unsupported,
+        action: CommandAction::BeingDetail,
         command: "appearance",
         addition: "(ape name)",
         help: "* Show appearance values for a named ape",
     },
     CommandEntry {
-        action: CommandAction::Unsupported,
+        action: CommandAction::BeingDetail,
         command: "physical",
         addition: "",
         help: "",
     },
     CommandEntry {
-        action: CommandAction::Unsupported,
+        action: CommandAction::BeingDetail,
         command: "genome",
         addition: "(ape name)",
         help: "Show genome for a named ape",
     },
     CommandEntry {
-        action: CommandAction::Unsupported,
+        action: CommandAction::BeingDetail,
         command: "genetics",
         addition: "",
         help: "",
@@ -341,7 +348,7 @@ const COMMANDS: &[CommandEntry] = &[
         help: "",
     },
     CommandEntry {
-        action: CommandAction::Unsupported,
+        action: CommandAction::Debug,
         command: "debug",
         addition: "",
         help: "Run debug check",
@@ -353,6 +360,290 @@ const COMMANDS: &[CommandEntry] = &[
         help: "Memory information for the simulation",
     },
 ];
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct FileFormatEntry {
+    name: &'static str,
+    description: &'static str,
+    section: bool,
+}
+
+const FILE_FORMAT_ENTRIES: &[FileFormatEntry] = &[
+    FileFormatEntry {
+        name: "simul",
+        description: "Simulation Version Definition",
+        section: true,
+    },
+    FileFormatEntry {
+        name: "signa",
+        description: "Simulation signature",
+        section: false,
+    },
+    FileFormatEntry {
+        name: "verio",
+        description: "Simulation version number",
+        section: false,
+    },
+    FileFormatEntry {
+        name: "landd",
+        description: "land definition",
+        section: true,
+    },
+    FileFormatEntry {
+        name: "dated",
+        description: "Date in days and millenia",
+        section: false,
+    },
+    FileFormatEntry {
+        name: "timed",
+        description: "Time in minutes",
+        section: false,
+    },
+    FileFormatEntry {
+        name: "landg",
+        description: "Seed that created the land",
+        section: false,
+    },
+    FileFormatEntry {
+        name: "being",
+        description: "Being Definition",
+        section: true,
+    },
+    FileFormatEntry {
+        name: "locat",
+        description: "Location in x and y coordinates",
+        section: false,
+    },
+    FileFormatEntry {
+        name: "facin",
+        description: "Direction facing",
+        section: false,
+    },
+    FileFormatEntry {
+        name: "speed",
+        description: "Speed traveling",
+        section: false,
+    },
+    FileFormatEntry {
+        name: "energ",
+        description: "Energy within",
+        section: false,
+    },
+    FileFormatEntry {
+        name: "datob",
+        description: "Date of birth in days and millenia",
+        section: false,
+    },
+    FileFormatEntry {
+        name: "rando",
+        description: "Random within",
+        section: false,
+    },
+    FileFormatEntry {
+        name: "state",
+        description: "State description",
+        section: false,
+    },
+    FileFormatEntry {
+        name: "brast",
+        description: "Brain state values",
+        section: false,
+    },
+    FileFormatEntry {
+        name: "heigt",
+        description: "Height",
+        section: false,
+    },
+    FileFormatEntry {
+        name: "masss",
+        description: "Mass",
+        section: false,
+    },
+    FileFormatEntry {
+        name: "overr",
+        description: "ApeScript overrides",
+        section: false,
+    },
+    FileFormatEntry {
+        name: "shout",
+        description: "Shouting values",
+        section: false,
+    },
+    FileFormatEntry {
+        name: "crowd",
+        description: "Crowding",
+        section: false,
+    },
+    FileFormatEntry {
+        name: "postu",
+        description: "Posture",
+        section: false,
+    },
+    FileFormatEntry {
+        name: "inven",
+        description: "Inventory",
+        section: false,
+    },
+    FileFormatEntry {
+        name: "paras",
+        description: "Number of parasites",
+        section: false,
+    },
+    FileFormatEntry {
+        name: "honor",
+        description: "Honor",
+        section: false,
+    },
+    FileFormatEntry {
+        name: "conce",
+        description: "Date of conception in days and millenia",
+        section: false,
+    },
+    FileFormatEntry {
+        name: "atten",
+        description: "Attention group",
+        section: false,
+    },
+    FileFormatEntry {
+        name: "genet",
+        description: "Genetics",
+        section: false,
+    },
+    FileFormatEntry {
+        name: "fetag",
+        description: "Father genetics",
+        section: false,
+    },
+    FileFormatEntry {
+        name: "fathn",
+        description: "Father family names",
+        section: false,
+    },
+    FileFormatEntry {
+        name: "sosim",
+        description: "Social simulation values",
+        section: false,
+    },
+    FileFormatEntry {
+        name: "drive",
+        description: "Drives",
+        section: false,
+    },
+    FileFormatEntry {
+        name: "goals",
+        description: "Goals",
+        section: false,
+    },
+    FileFormatEntry {
+        name: "prefe",
+        description: "Preferences",
+        section: false,
+    },
+    FileFormatEntry {
+        name: "genex",
+        description: "Generation Max",
+        section: false,
+    },
+    FileFormatEntry {
+        name: "genen",
+        description: "Generation Min",
+        section: false,
+    },
+    FileFormatEntry {
+        name: "chigx",
+        description: "Child Generation Max",
+        section: false,
+    },
+    FileFormatEntry {
+        name: "chign",
+        description: "Child Generation Min",
+        section: false,
+    },
+    FileFormatEntry {
+        name: "terit",
+        description: "Territory information",
+        section: false,
+    },
+    FileFormatEntry {
+        name: "immun",
+        description: "Immune system information",
+        section: false,
+    },
+    FileFormatEntry {
+        name: "brreg",
+        description: "Brain code register",
+        section: false,
+    },
+    FileFormatEntry {
+        name: "brpro",
+        description: "Brain code probe",
+        section: false,
+    },
+];
+
+const DEBUG_AUDIT_OUTPUT: &str = concat!(
+    "&here.delta.location[0] 0\n",
+    "&here.delta.direction_facing 4\n",
+    "&here.delta.velocity 5\n",
+    "&here.delta.stored_energy 16\n",
+    "&here.constant.date_of_birth 52\n",
+    "&here.delta.random_seed[0] 18\n",
+    "&here.delta.macro_state 22\n",
+    "&here.braindata.brain_state[0] 4612\n",
+    "&here.delta.height 28\n",
+    "&here.delta.mass 30\n",
+    "&here.braindata.script_overrides 4624\n",
+    "&here.changes.shout[0] 4636\n",
+    "&here.delta.crowding 26\n",
+    "&here.delta.posture 32\n",
+    "&here.changes.inventory[0] 4642\n",
+    "&here.delta.parasites 24\n",
+    "&here.delta.honor 25\n",
+    "&here.changes.date_of_conception 4672\n",
+    "&here.braindata.attention[0] 4626\n",
+    "&here.constant.genetics[0] 64\n",
+    "&here.changes.fetal_genetics[0] 4676\n",
+    "&here.changes.father_name[0] 4692\n",
+    "&here.delta.social_coord_x 42\n",
+    "&here.delta.social_coord_y 44\n",
+    "&here.delta.social_coord_nx 46\n",
+    "&here.delta.social_coord_ny 48\n",
+    "&here.changes.drives[0] 4632\n",
+    "&here.delta.goal[0] 34\n",
+    "&here.changes.learned_preference[0] 4658\n",
+    "&here.constant.generation_min 56\n",
+    "&here.constant.generation_max 58\n",
+    "&here.changes.child_generation_min 4700\n",
+    "&here.changes.child_generation_max 4702\n",
+    "&here.events.territory[0] 3488\n",
+    "&here.immune_system 4704\n",
+    "&here.braindata.braincode_register[0] 4512\n",
+    "&here.braindata.brainprobe[0] 4515\n",
+    "&here.events.social[0] 80\n",
+    "&here.events.episodic[0] 3152\n",
+    "&here.space_time.location[0] 4\n",
+    "&here.space_time.time 8\n",
+    "&here.space_time.date 0\n",
+    "&here.first_name[0] 12\n",
+    "&here.family_name[0] 16\n",
+    "&here.attraction 20\n",
+    "&here.friend_foe 21\n",
+    "&here.belief 22\n",
+    "&here.familiarity 24\n",
+    "&here.relationship 26\n",
+    "&here.entity_type 27\n",
+    "&here.classification 28\n",
+    "&here.braincode[0] 128\n",
+    "&here.space_time.location[0] 4\n",
+    "&here.space_time.time 8\n",
+    "&here.space_time.date 0\n",
+    "&here.first_name[0] 12\n",
+    "&here.family_name[0] 16\n",
+    "&here.event 20\n",
+    "&here.food 21\n",
+    "&here.affect 22\n",
+    "&here.arg 24\n",
+);
 
 #[derive(Clone, Debug)]
 pub struct Console {
@@ -412,6 +703,10 @@ impl Console {
             CommandAction::Open => (self.open(response), false),
             CommandAction::Step => (self.step(), false),
             CommandAction::Run => (self.run(response), false),
+            CommandAction::Script => (self.script(response), false),
+            CommandAction::Speak => (self.speak(), false),
+            CommandAction::Alpha => (self.alpha(response), false),
+            CommandAction::File => (self.file(response), false),
             CommandAction::Interval => (self.interval(response), false),
             CommandAction::Logging => (self.logging(response), false),
             CommandAction::Event => ("Episodic not supported in this build\n".to_string(), false),
@@ -422,10 +717,10 @@ impl Console {
             CommandAction::Top => (self.top(), false),
             CommandAction::Epic => (self.epic(), false),
             CommandAction::Navigation => (self.navigation(), false),
-            CommandAction::Unsupported => (
-                "ERROR: Command not implemented in Rust port yet\n".to_string(),
-                false,
-            ),
+            CommandAction::Watch => (self.watch(), false),
+            CommandAction::BeingDetail => (self.being_detail(response), false),
+            CommandAction::Idea => (String::new(), false),
+            CommandAction::Debug => (DEBUG_AUDIT_OUTPUT.to_string(), false),
         }
     }
 
@@ -532,6 +827,22 @@ impl Console {
         }
     }
 
+    fn watch(&self) -> String {
+        if self.population == 0 {
+            "No apes selected. Trying (re)running the Simulation\n".to_string()
+        } else {
+            "No apes selected.\n".to_string()
+        }
+    }
+
+    fn being_detail(&self, response: Option<&str>) -> String {
+        if response.is_some_and(|value| !value.is_empty()) {
+            "ERROR: Being not found @ ./universe/command.c 1300\n".to_string()
+        } else {
+            "ERROR: No being was specified @ ./universe/command.c 1311\n".to_string()
+        }
+    }
+
     fn reset(&mut self) -> String {
         self.simulation_running = false;
         self.population = 0;
@@ -570,6 +881,79 @@ impl Console {
             output.push_str("ERROR: Simulated ape running not implemented in Rust port yet\n");
         }
         output
+    }
+
+    fn script(&mut self, response: Option<&str>) -> String {
+        let Some(path) = response.filter(|value| !value.is_empty()) else {
+            return String::new();
+        };
+
+        self.simulation_running = false;
+        let mut output = String::from("Simulation stopped\n");
+        if !std::path::Path::new(path).exists() {
+            return output;
+        }
+
+        match fs::read(path) {
+            Ok(contents) => match SimState::load_startup_json(&contents) {
+                Ok(state) => {
+                    self.state = state;
+                    output.push_str("Simulation file ");
+                    output.push_str(path);
+                    output.push_str(" open\n\n");
+                }
+                Err(_) => {
+                    output.push_str("ERROR: Failed to read in file @ ./universe/command.c 2394\n");
+                }
+            },
+            Err(_) => {
+                output.push_str("ERROR: Failed to open file @ ./universe/command.c 2374\n");
+            }
+        }
+        output
+    }
+
+    fn speak(&self) -> String {
+        String::new()
+    }
+
+    fn alpha(&self, response: Option<&str>) -> String {
+        let Some(path) = response.filter(|value| !value.is_empty()) else {
+            return String::new();
+        };
+
+        match fs::write(path, []) {
+            Ok(()) => String::new(),
+            Err(_) => "ERROR: Failed create speak file! @ ./entity/speak.c 199\n".to_string(),
+        }
+    }
+
+    fn file(&self, response: Option<&str>) -> String {
+        let Some(response) = response else {
+            return format_file_entries(0, FILE_FORMAT_ENTRIES.len());
+        };
+
+        if response.len() != 5 {
+            return "ERROR: String not found @ ./toolkit/file.c 1458\n".to_string();
+        }
+
+        let Some(index) = FILE_FORMAT_ENTRIES
+            .iter()
+            .position(|entry| entry.name == response)
+        else {
+            return "ERROR: String not found @ ./toolkit/file.c 1458\n".to_string();
+        };
+
+        if FILE_FORMAT_ENTRIES[index].section {
+            let end = FILE_FORMAT_ENTRIES[index + 1..]
+                .iter()
+                .position(|entry| entry.section)
+                .map(|offset| index + 1 + offset)
+                .unwrap_or(FILE_FORMAT_ENTRIES.len());
+            format_file_entries(index, end)
+        } else {
+            format_file_entries(index, index + 1)
+        }
     }
 
     fn interval(&mut self, response: Option<&str>) -> String {
@@ -686,6 +1070,22 @@ fn parse_on_off(response: Option<&str>) -> Option<bool> {
     } else {
         None
     }
+}
+
+fn format_file_entries(start: usize, end: usize) -> String {
+    let mut output = String::new();
+    for entry in &FILE_FORMAT_ENTRIES[start..end] {
+        if entry.section {
+            output.push(' ');
+        } else {
+            output.push_str("  ");
+        }
+        output.push_str(entry.name);
+        output.push(' ');
+        output.push_str(entry.description);
+        output.push('\n');
+    }
+    output
 }
 
 impl Default for Console {
@@ -912,6 +1312,94 @@ mod tests {
     }
 
     #[test]
+    fn file_command_prints_format_sections_fields_and_missing_errors() {
+        let mut console = Console::default();
+        let actual = console.run_script("file landd\nfile timed\nfile xxxxx\nquit\n", true);
+        assert_eq!(
+            actual,
+            "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\nfile landd\n landd land definition\n  dated Date in days and millenia\n  timed Time in minutes\n  landg Seed that created the land\nfile timed\n  timed Time in minutes\nfile xxxxx\nERROR: String not found @ ./toolkit/file.c 1458\nquit\nSimulation stopped\n"
+        );
+
+        let (all_format, should_quit) = console.execute_line("file");
+        assert!(!should_quit);
+        assert!(all_format.starts_with(" simul Simulation Version Definition\n"));
+        assert!(all_format.contains(" being Being Definition\n"));
+        assert!(all_format.ends_with("  brpro Brain code probe\n"));
+    }
+
+    #[test]
+    fn script_command_matches_default_build_open_behavior() {
+        let path = temp_save_path("script_open");
+        let path_string = path.to_string_lossy();
+        fs::write(
+            &path,
+            b"{\"information\":{\"signature\":20033,\"version number\":708},\"land\":{\"date\":0,\"genetics\":[77,88],\"time\":45}}",
+        )
+        .expect("fixture JSON should be writable");
+        let missing = temp_save_path("script_missing");
+        let missing_string = missing.to_string_lossy();
+
+        let mut console = Console::default();
+        let actual = console.run_script(
+            &format!("script {missing_string}\nscript\nscript {path_string}\nsim\nquit\n"),
+            true,
+        );
+        assert_eq!(
+            actual,
+            format!(
+                "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\nscript {missing_string}\nSimulation stopped\nscript\nscript {path_string}\nSimulation stopped\nSimulation file {path_string} open\n\nsim\nMap dimension: 512\nLand seed: 77 88\nPopulation: 0\nAdults: 0   Juveniles: 0\nTide level: 0\n00:45 01/01/0 Simulation not running\nquit\nSimulation stopped\n"
+            )
+        );
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn alpha_command_creates_empty_speech_file_without_console_output() {
+        let path = temp_save_path("alpha");
+        let path_string = path.to_string_lossy();
+        let mut console = Console::default();
+        let actual = console.run_script(&format!("alpha {path_string}\nquit\n"), true);
+        assert_eq!(
+            actual,
+            format!(
+                "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\nalpha {path_string}\nquit\nSimulation stopped\n"
+            )
+        );
+        assert_eq!(
+            fs::metadata(&path).expect("alpha file should exist").len(),
+            0
+        );
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn speak_command_is_quiet_for_empty_unselected_population() {
+        let path = temp_save_path("speak");
+        let path_string = path.to_string_lossy();
+        let mut console = Console::default();
+        let actual = console.run_script(&format!("speak {path_string}\nspeak\nquit\n"), true);
+        assert_eq!(
+            actual,
+            format!(
+                "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\nspeak {path_string}\nspeak\nquit\nSimulation stopped\n"
+            )
+        );
+        assert!(!path.exists());
+    }
+
+    #[test]
+    fn debug_command_prints_c_layout_audit_snapshot() {
+        let mut console = Console::default();
+        let actual = console.run_script("debug\nquit\n", true);
+        assert_eq!(
+            actual,
+            format!(
+                "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\ndebug\n{DEBUG_AUDIT_OUTPUT}quit\nSimulation stopped\n"
+            )
+        );
+    }
+
+    #[test]
     fn top_and_epic_empty_population_output_matches_c() {
         let mut console = Console::default();
         let actual = console.run_script("top\nepic\nquit\n", true);
@@ -928,6 +1416,61 @@ mod tests {
         assert_eq!(
             actual,
             "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\nnext\nNo apes selected. Trying (re)running the Simulation\nprevious\nNo apes selected. Trying (re)running the Simulation\nprev\nNo apes selected. Trying (re)running the Simulation\nquit\nSimulation stopped\n"
+        );
+    }
+
+    #[test]
+    fn watch_aliases_report_no_selected_ape_before_parsing_response() {
+        let mut console = Console::default();
+        let actual = console.run_script("watch\nmonitor off\nwatch all\nquit\n", true);
+        assert_eq!(
+            actual,
+            "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\nwatch\nNo apes selected. Trying (re)running the Simulation\nmonitor off\nNo apes selected. Trying (re)running the Simulation\nwatch all\nNo apes selected. Trying (re)running the Simulation\nquit\nSimulation stopped\n"
+        );
+    }
+
+    #[test]
+    fn social_and_pathogen_detail_commands_match_empty_duplicate_errors() {
+        let mut console = Console::default();
+        let actual = console.run_script(
+            "friends\nsocial\nsocialgraph Ada\ngraph\npathogen Ada\nquit\n",
+            true,
+        );
+        assert_eq!(
+            actual,
+            "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\nfriends\nERROR: No being was specified @ ./universe/command.c 1311\nsocial\nERROR: No being was specified @ ./universe/command.c 1311\nsocialgraph Ada\nERROR: Being not found @ ./universe/command.c 1300\ngraph\nERROR: No being was specified @ ./universe/command.c 1311\npathogen Ada\nERROR: Being not found @ ./universe/command.c 1300\nquit\nSimulation stopped\n"
+        );
+    }
+
+    #[test]
+    fn brain_speech_and_episodic_detail_commands_match_empty_duplicate_errors() {
+        let mut console = Console::default();
+        let actual =
+            console.run_script("braincode\nspeech Ada\nepisodic\nprobes Ada\nquit\n", true);
+        assert_eq!(
+            actual,
+            "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\nbraincode\nERROR: No being was specified @ ./universe/command.c 1311\nspeech Ada\nERROR: Being not found @ ./universe/command.c 1300\nepisodic\nERROR: No being was specified @ ./universe/command.c 1311\nprobes Ada\nERROR: Being not found @ ./universe/command.c 1300\nquit\nSimulation stopped\n"
+        );
+    }
+
+    #[test]
+    fn stats_and_appearance_detail_commands_match_empty_duplicate_errors() {
+        let mut console = Console::default();
+        let actual =
+            console.run_script("stats\nstatus Ada\nappearance\nphysical Ada\nquit\n", true);
+        assert_eq!(
+            actual,
+            "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\nstats\nERROR: No being was specified @ ./universe/command.c 1311\nstatus Ada\nERROR: Being not found @ ./universe/command.c 1300\nappearance\nERROR: No being was specified @ ./universe/command.c 1311\nphysical Ada\nERROR: Being not found @ ./universe/command.c 1300\nquit\nSimulation stopped\n"
+        );
+    }
+
+    #[test]
+    fn genome_detail_commands_error_and_idea_is_quiet_for_empty_population() {
+        let mut console = Console::default();
+        let actual = console.run_script("genome\ngenetics Ada\nidea\nquit\n", true);
+        assert_eq!(
+            actual,
+            "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\ngenome\nERROR: No being was specified @ ./universe/command.c 1311\ngenetics Ada\nERROR: Being not found @ ./universe/command.c 1300\nidea\nquit\nSimulation stopped\n"
         );
     }
 
