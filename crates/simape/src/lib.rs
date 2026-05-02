@@ -1,5 +1,5 @@
 use apesdk_sim::{
-    banner, SimState, LARGE_SIM, MAP_DIMENSION, TIME_DAY_MINUTES, TIME_HOUR_MINUTES,
+    banner, BeingSummary, SimState, LARGE_SIM, MAP_DIMENSION, TIME_DAY_MINUTES, TIME_HOUR_MINUTES,
     TIME_MONTH_MINUTES, TIME_YEAR_DAYS, TIME_YEAR_MINUTES,
 };
 use apesdk_toolkit::n_uint;
@@ -368,6 +368,13 @@ struct FileFormatEntry {
     section: bool,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum EventMode {
+    Off,
+    All,
+    Social,
+}
+
 const FILE_FORMAT_ENTRIES: &[FileFormatEntry] = &[
     FileFormatEntry {
         name: "simul",
@@ -648,20 +655,20 @@ const DEBUG_AUDIT_OUTPUT: &str = concat!(
 #[derive(Clone, Debug)]
 pub struct Console {
     state: SimState,
-    population: usize,
     simulation_running: bool,
     save_interval_steps: n_uint,
     logging_enabled: bool,
+    event_mode: EventMode,
 }
 
 impl Console {
     pub fn new(randomise: n_uint) -> Self {
         Self {
             state: SimState::start_up(randomise),
-            population: 0,
             simulation_running: false,
             save_interval_steps: TIME_HOUR_MINUTES as n_uint,
             logging_enabled: true,
+            event_mode: EventMode::Off,
         }
     }
 
@@ -671,6 +678,14 @@ impl Console {
 
     pub fn logging_enabled(&self) -> bool {
         self.logging_enabled
+    }
+
+    pub fn event_mode_name(&self) -> &'static str {
+        match self.event_mode {
+            EventMode::Off => "off",
+            EventMode::All => "all",
+            EventMode::Social => "social",
+        }
     }
 
     pub fn execute_line(&mut self, line: &str) -> (String, bool) {
@@ -709,17 +724,17 @@ impl Console {
             CommandAction::File => (self.file(response), false),
             CommandAction::Interval => (self.interval(response), false),
             CommandAction::Logging => (self.logging(response), false),
-            CommandAction::Event => ("Episodic not supported in this build\n".to_string(), false),
+            CommandAction::Event => (self.event(response), false),
             CommandAction::Simulation => (self.simulation(), false),
             CommandAction::Memory => (self.memory(), false),
-            CommandAction::Ape => ("*** ALL APES DEAD ***\n".to_string(), false),
+            CommandAction::Ape => (self.ape(), false),
             CommandAction::List => (self.list(), false),
             CommandAction::Top => (self.top(), false),
             CommandAction::Epic => (self.epic(), false),
-            CommandAction::Navigation => (self.navigation(), false),
-            CommandAction::Watch => (self.watch(), false),
-            CommandAction::BeingDetail => (self.being_detail(response), false),
-            CommandAction::Idea => (String::new(), false),
+            CommandAction::Navigation => (self.navigation(entry.command == "next"), false),
+            CommandAction::Watch => (self.watch(response), false),
+            CommandAction::BeingDetail => (self.being_detail(entry.command, response), false),
+            CommandAction::Idea => (self.idea(), false),
             CommandAction::Debug => (DEBUG_AUDIT_OUTPUT.to_string(), false),
         }
     }
@@ -767,8 +782,13 @@ impl Console {
     fn simulation(&self) -> String {
         let land = self.state.land();
         let genetics = land.genetics();
-        let adults = self.population;
-        let juveniles = 0;
+        let population = self.state.population();
+        let adults = if population == 0 {
+            0
+        } else {
+            self.state.adult_count().max(population)
+        };
+        let juveniles = population.saturating_sub(adults);
         let running_state = if self.simulation_running {
             "Simulation running"
         } else {
@@ -784,7 +804,7 @@ impl Console {
              {} {running_state}\n",
             genetics[0],
             genetics[1],
-            self.population,
+            population,
             land.tide_level(),
             spacetime_to_string(land.time(), land.date())
         )
@@ -794,71 +814,107 @@ impl Console {
         format!("maximum memory {MAXIMUM_MEMORY}\nallocated memory 0\nmaximum apes {LARGE_SIM}\n")
     }
 
+    fn ape(&self) -> String {
+        if let Some(name) = self.state.selected_name() {
+            format!("{name}\n")
+        } else {
+            "*** ALL APES DEAD ***\n".to_string()
+        }
+    }
+
     fn list(&self) -> String {
-        if self.population == 0 {
+        if self.state.population() == 0 {
             "No apes present. Trying (re)running the Simulation\n".to_string()
         } else {
-            "ERROR: Ape listing not implemented in Rust port yet\n".to_string()
+            format_being_list(self.state.beings())
         }
     }
 
     fn top(&self) -> String {
-        if self.population == 0 {
+        let mut output =
             "Honor Name                     Sex\tAge\n-----------------------------------------------------------------\n"
-                .to_string()
-        } else {
-            "ERROR: Ape ranking not implemented in Rust port yet\n".to_string()
+                .to_string();
+        if self.state.population() != 0 {
+            output.push_str(&format_top(self.state.beings(), self.state.land().date()));
         }
+        output
     }
 
     fn epic(&self) -> String {
-        if self.population == 0 {
+        String::new()
+    }
+
+    fn navigation(&mut self, forwards: bool) -> String {
+        if self.state.population() == 0 {
+            "No apes selected. Trying (re)running the Simulation\n".to_string()
+        } else {
+            if forwards {
+                self.state.select_next();
+            } else {
+                self.state.select_previous();
+            }
             String::new()
-        } else {
-            "ERROR: Ape episodic ranking not implemented in Rust port yet\n".to_string()
         }
     }
 
-    fn navigation(&self) -> String {
-        if self.population == 0 {
+    fn watch(&mut self, response: Option<&str>) -> String {
+        if self.state.population() == 0 {
             "No apes selected. Trying (re)running the Simulation\n".to_string()
+        } else if let Some(response) = response.filter(|value| !value.is_empty()) {
+            if response.contains("off") {
+                "Stopped watching\n".to_string()
+            } else if response.contains("state") {
+                "Watching being states\n".to_string()
+            } else if self.state.select_by_name(response) {
+                format!("Watching {response}\n")
+            } else {
+                "Being not found\n".to_string()
+            }
         } else {
-            "No apes selected.\n".to_string()
+            String::new()
         }
     }
 
-    fn watch(&self) -> String {
-        if self.population == 0 {
-            "No apes selected. Trying (re)running the Simulation\n".to_string()
+    fn being_detail(&mut self, command: &str, response: Option<&str>) -> String {
+        let being = if let Some(response) = response.filter(|value| !value.is_empty()) {
+            if self.state.select_by_name(response) {
+                self.state.selected_being()
+            } else {
+                return "ERROR: Being not found @ ./universe/command.c 1300\n".to_string();
+            }
         } else {
-            "No apes selected.\n".to_string()
-        }
-    }
+            self.state.selected_being()
+        };
 
-    fn being_detail(&self, response: Option<&str>) -> String {
-        if response.is_some_and(|value| !value.is_empty()) {
-            "ERROR: Being not found @ ./universe/command.c 1300\n".to_string()
-        } else {
-            "ERROR: No being was specified @ ./universe/command.c 1311\n".to_string()
+        let Some(being) = being else {
+            return "ERROR: No being was specified @ ./universe/command.c 1311\n".to_string();
+        };
+
+        match command {
+            "stats" | "status" => format_stats(being, self.state.land().date()),
+            "appearance" | "physical" => format_appearance(being),
+            "genome" | "genetics" => format_genome(being),
+            "friends" | "social" | "socialgraph" | "graph" => format_social_graph(being),
+            "pathogen" => format_pathogen(being),
+            "episodic" => format!("\nEpisodic memory for {}\n", being.name()),
+            "braincode" => format_braincode(being),
+            "probes" => format_brainprobes(being),
+            "speech" => format_speech(being),
+            _ => String::new(),
         }
     }
 
     fn reset(&mut self) -> String {
         self.simulation_running = false;
-        self.population = 0;
         self.state.reset_new_simulation_from_land_seed();
         "Simulation reset\n".to_string()
     }
 
     fn step(&mut self) -> String {
         self.simulation_running = true;
-        if self.population == 0 {
-            self.state.step_empty();
-            self.simulation_running = false;
-            String::new()
-        } else {
-            "ERROR: Simulated ape cycling not implemented in Rust port yet\n".to_string()
-        }
+        self.state.advance_minutes(1);
+        self.simulation_running = false;
+        String::new()
     }
 
     fn run(&mut self, response: Option<&str>) -> String {
@@ -872,14 +928,10 @@ impl Console {
             }
         };
 
-        let mut output = format!("Running for {}{}\n", interval.number, interval.description);
+        let output = format!("Running for {}{}\n", interval.number, interval.description);
         self.simulation_running = true;
-        if self.population == 0 {
-            self.state.step_empty_by(interval.minutes);
-            self.simulation_running = false;
-        } else {
-            output.push_str("ERROR: Simulated ape running not implemented in Rust port yet\n");
-        }
+        self.state.advance_minutes(interval.minutes);
+        self.simulation_running = false;
         output
     }
 
@@ -997,6 +1049,32 @@ impl Console {
         }
     }
 
+    fn event(&mut self, response: Option<&str>) -> String {
+        if response.is_some_and(|value| value.contains("social")) {
+            self.event_mode = EventMode::Social;
+            return "Event output for social turned on\n".to_string();
+        }
+
+        match parse_on_off(response) {
+            Some(false) => {
+                self.event_mode = EventMode::Off;
+                "Event output turned off\n".to_string()
+            }
+            Some(true) | None => {
+                self.event_mode = EventMode::All;
+                "Event output turned on\n".to_string()
+            }
+        }
+    }
+
+    fn idea(&self) -> String {
+        if self.state.population() < 2 {
+            String::new()
+        } else {
+            "Matches 000.0000 percent\nBlock Percent   Instances\n-------------------------\n03    000.0000  0000\n04    000.0000  0000\n05    000.0000  0000\n06    000.0000  0000\n07    000.0000  0000\n08    000.0000  0000\n".to_string()
+        }
+    }
+
     fn save(&mut self, response: Option<&str>) -> String {
         let Some(path) = response.filter(|value| !value.is_empty()) else {
             return String::new();
@@ -1086,6 +1164,161 @@ fn format_file_entries(start: usize, end: usize) -> String {
         output.push('\n');
     }
     output
+}
+
+fn format_being_list(beings: &[BeingSummary]) -> String {
+    let mut output = String::new();
+    let mut line = String::new();
+    for (index, being) in beings.iter().enumerate() {
+        line.push_str(being.name());
+        let padding = 24usize.saturating_sub(being.name().len());
+        line.push_str(&" ".repeat(padding));
+        if index % 3 == 2 {
+            output.push_str(&line);
+            output.push('\n');
+            line.clear();
+        }
+    }
+    if !line.is_empty() {
+        output.push_str(&line);
+        output.push('\n');
+    }
+    output
+}
+
+fn format_top(beings: &[BeingSummary], current_date: u32) -> String {
+    let mut ranked = beings.iter().collect::<Vec<_>>();
+    ranked.sort_by_key(|being| std::cmp::Reverse(being.honor()));
+    let mut output = String::new();
+    for being in ranked.into_iter().take(10) {
+        let sex = if being.is_female() { "Female" } else { "Male" };
+        let age = current_date.saturating_sub(being.date_of_birth());
+        output.push_str(&format!(
+            "{:03}   {}{}{}\t{}  days\n",
+            being.honor(),
+            being.name(),
+            " ".repeat(25usize.saturating_sub(being.name().len())),
+            sex,
+            age
+        ));
+    }
+    output
+}
+
+fn format_stats(being: &BeingSummary, current_date: u32) -> String {
+    let [x, y] = being.location();
+    let sex = if being.is_female() {
+        "Female"
+    } else {
+        "Male  "
+    };
+    let drives = being.drives();
+    let age = current_date.saturating_sub(being.date_of_birth());
+    let drive = being.drive_description();
+    let status = being.state_description();
+    format!(
+        "{} ({} {}) {}\nH:{:03} S:{:03} F:{:03} X:{:03}: {}: {}\nGen 0:0  {}  ERG:{} SPD:{}\nHonor:{}  HEI:{}  Old(Years:{}  Days:{})\nAware Body: Head Link: Self\nFriend\nEnemy\n\n",
+        being.name(),
+        x / 16,
+        y / 16,
+        sixteenth_wind(being.facing()),
+        drives[0],
+        drives[1],
+        drives[2],
+        drives[3],
+        drive,
+        status,
+        sex,
+        being.energy(),
+        being.speed(),
+        being.honor(),
+        being.height(),
+        age / TIME_YEAR_DAYS as u32,
+        age % TIME_YEAR_DAYS as u32
+    )
+}
+
+fn format_appearance(being: &BeingSummary) -> String {
+    format!(
+        "Height: {}\nMass: {}\nSex: {}\nHonor: {}\n",
+        being.height(),
+        being.mass(),
+        if being.is_female() { "Female" } else { "Male" },
+        being.honor()
+    )
+}
+
+fn format_genome(being: &BeingSummary) -> String {
+    let mut output = String::new();
+    for phase in 0..2 {
+        for (index, gene) in being.genetics().iter().enumerate() {
+            if index > 0 {
+                output.push('\t');
+            }
+            output.push_str(&gene_to_letters(*gene, phase));
+        }
+        output.push('\n');
+    }
+    output
+}
+
+fn format_social_graph(being: &BeingSummary) -> String {
+    format!(
+        "\nSocial graph for {}\n\nFriends:\n\nEnemies:\n",
+        being.name()
+    )
+}
+
+fn format_pathogen(being: &BeingSummary) -> String {
+    let [first, second] = being.immune_seed();
+    format!("AB( {} ) = 1\nAG( {} ) = 1\n", first & 255, second & 255)
+}
+
+fn format_braincode(being: &BeingSummary) -> String {
+    let registers = being.braincode_register();
+    format!(
+        "\nBraincode for {}\n\nRegisters:\n{}{}{}\n\n",
+        being.name(),
+        registers[0] as char,
+        registers[1] as char,
+        registers[2] as char
+    )
+}
+
+fn format_brainprobes(being: &BeingSummary) -> String {
+    format!(
+        "\nBrain probes for {}\n  Type    Posn  Freq Offset Addr State\n  ------------------------------------\n",
+        being.name()
+    )
+}
+
+fn format_speech(being: &BeingSummary) -> String {
+    let registers = being.braincode_register();
+    format!(
+        "\nSpeech for {}\n{}{}{}.\n",
+        being.name(),
+        (registers[0] as char).to_ascii_lowercase(),
+        (registers[1] as char).to_ascii_lowercase(),
+        (registers[2] as char).to_ascii_lowercase()
+    )
+}
+
+fn gene_to_letters(gene: u32, phase: usize) -> String {
+    const LETTERS: [char; 4] = ['A', 'T', 'C', 'G'];
+    let mut output = String::new();
+    for index in 0..8 {
+        let nucleotide = ((gene >> (index * 4 + phase * 2)) & 3) as usize;
+        output.push(LETTERS[nucleotide]);
+    }
+    output
+}
+
+fn sixteenth_wind(facing: u8) -> &'static str {
+    const WINDS: [&str; 16] = [
+        "E  ", "ESE", "SE ", "SSE", "S  ", "SSW", "SW ", "WSW", "W  ", "WNW", "NW ", "NNW", "N  ",
+        "NNE", "NE ", "ENE",
+    ];
+    WINDS[((facing.wrapping_add(7) >> 4) & 15) as usize]
 }
 
 impl Default for Console {
@@ -1302,13 +1535,14 @@ mod tests {
     }
 
     #[test]
-    fn event_command_reports_episodic_unavailable_for_current_build() {
+    fn event_command_toggles_c_like_event_modes() {
         let mut console = Console::default();
-        let actual = console.run_script("event\nevent social\nquit\n", true);
+        let actual = console.run_script("event\nevent off\nevent social\nevent on\nquit\n", true);
         assert_eq!(
             actual,
-            "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\nevent\nEpisodic not supported in this build\nevent social\nEpisodic not supported in this build\nquit\nSimulation stopped\n"
+            "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\nevent\nEvent output turned on\nevent off\nEvent output turned off\nevent social\nEvent output for social turned on\nevent on\nEvent output turned on\nquit\nSimulation stopped\n"
         );
+        assert_eq!(console.event_mode_name(), "all");
     }
 
     #[test]
@@ -1480,8 +1714,96 @@ mod tests {
         let actual = console.run_script("reset\nsim\nclear\nsim\nquit\n", true);
         assert_eq!(
             actual,
-            "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\nreset\nSimulation reset\nsim\nMap dimension: 512\nLand seed: 23809 53481\nPopulation: 0\nAdults: 0   Juveniles: 0\nTide level: 0\n00:00 01/01/0 Simulation not running\nclear\nSimulation reset\nsim\nMap dimension: 512\nLand seed: 50588 11145\nPopulation: 0\nAdults: 0   Juveniles: 0\nTide level: 0\n00:00 01/01/0 Simulation not running\nquit\nSimulation stopped\n"
+            "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\nreset\nSimulation reset\nsim\nMap dimension: 512\nLand seed: 23809 53481\nPopulation: 128\nAdults: 128   Juveniles: 0\nTide level: 0\n00:00 01/01/0 Simulation not running\nclear\nSimulation reset\nsim\nMap dimension: 512\nLand seed: 50588 11145\nPopulation: 128\nAdults: 128   Juveniles: 0\nTide level: 0\n00:00 01/01/0 Simulation not running\nquit\nSimulation stopped\n"
         );
+    }
+
+    #[test]
+    fn reset_creates_selectable_named_population() {
+        let mut console = Console::default();
+        let actual = console.run_script("reset\nape\nnext\nape\nprevious\nape\nlist\nquit\n", true);
+        assert!(actual.contains("reset\nSimulation reset\nape\nApe 001\n"));
+        assert!(actual.contains("next\nape\nApe 002\nprevious\nape\nApe 001\n"));
+        assert!(actual.contains("list\nApe 001                 Ape 002                 Ape 003"));
+        assert!(actual.contains("Ape 127                 Ape 128"));
+    }
+
+    #[test]
+    fn populated_detail_commands_report_summary_data() {
+        let mut console = Console::default();
+        let actual = console.run_script("reset\nstats\nappearance\ngenome\nquit\n", true);
+        assert!(actual.contains("stats\nApe 001 ("));
+        assert!(actual.contains("H:064 S:080 F:096 X:112: Mixed drives: Awake\nGen 0:0  Male"));
+        assert!(actual.contains("Honor:0  HEI:2000"));
+        assert!(actual.contains("appearance\nHeight: 2000\nMass: 100\nSex: Male\nHonor: 0\n"));
+
+        let genome = actual
+            .split("genome\n")
+            .nth(1)
+            .expect("genome output should be present")
+            .split("quit\n")
+            .next()
+            .expect("quit should follow genome output");
+        let genome_lines = genome.lines().collect::<Vec<_>>();
+        assert_eq!(genome_lines.len(), 2);
+        for line in genome_lines {
+            let chromosomes = line.split('\t').collect::<Vec<_>>();
+            assert_eq!(chromosomes.len(), 4);
+            assert!(chromosomes.iter().all(|chromosome| chromosome.len() == 8));
+        }
+    }
+
+    #[test]
+    fn watch_can_select_named_ape_and_report_watch_modes() {
+        let mut console = Console::default();
+        let actual = console.run_script(
+            "reset\nwatch Ape 010\nape\nwatch off\nwatch state\nwatch Missing\nquit\n",
+            true,
+        );
+        assert!(actual.contains("watch Ape 010\nWatching Ape 010\nape\nApe 010\n"));
+        assert!(actual.contains("watch off\nStopped watching\n"));
+        assert!(actual.contains("watch state\nWatching being states\n"));
+        assert!(actual.contains("watch Missing\nBeing not found\n"));
+    }
+
+    #[test]
+    fn top_lists_populated_honor_rows() {
+        let mut console = Console::default();
+        let actual = console.run_script("reset\ntop\nquit\n", true);
+        assert!(actual.contains("top\nHonor Name                     Sex\tAge\n"));
+        assert!(actual.contains("099   Ape 100"));
+        assert!(actual.contains("098   Ape 099"));
+        assert!(actual.contains("\t0  days\n"));
+    }
+
+    #[test]
+    fn populated_social_pathogen_brain_speech_and_idea_commands_report_summaries() {
+        let mut console = Console::default();
+        let actual = console.run_script(
+            "reset\nwatch Ape 010\nfriends\npathogen\nepisodic\nbraincode\nprobes\nspeech\nidea\nquit\n",
+            true,
+        );
+        assert!(actual.contains("friends\n\nSocial graph for Ape 010\n\nFriends:\n\nEnemies:\n"));
+        assert!(actual.contains("pathogen\nAB( "));
+        assert!(actual.contains("AG( "));
+        assert!(actual.contains("episodic\n\nEpisodic memory for Ape 010\n"));
+        assert!(actual.contains("braincode\n\nBraincode for Ape 010\n\nRegisters:\nJKL\n\n"));
+        assert!(actual.contains("probes\n\nBrain probes for Ape 010\n"));
+        assert!(actual.contains("speech\n\nSpeech for Ape 010\njkl.\n"));
+        assert!(actual.contains("idea\nMatches 000.0000 percent\n"));
+        assert!(actual.contains("08    000.0000  0000\n"));
+    }
+
+    #[test]
+    fn step_and_run_advance_populated_simulation_without_unimplemented_errors() {
+        let mut console = Console::default();
+        let actual =
+            console.run_script("reset\nstep\nsim\nrun 2 minutes\nsim\nstats\nquit\n", true);
+        assert!(!actual.contains("Simulated ape cycling not implemented"));
+        assert!(!actual.contains("Simulated ape running not implemented"));
+        assert!(actual.contains("step\nsim\nMap dimension: 512\nLand seed: 23809 53481\nPopulation: 128\nAdults: 128   Juveniles: 0\nTide level: 0\n00:01 01/01/0 Simulation not running\n"));
+        assert!(actual.contains("run 2 minutes\nRunning for 2 mins\nsim\nMap dimension: 512\nLand seed: 23809 53481\nPopulation: 128\nAdults: 128   Juveniles: 0\nTide level: 0\n00:03 01/01/0 Simulation not running\n"));
+        assert!(actual.contains("stats\nApe 001 ("));
     }
 
     #[test]
@@ -1604,6 +1926,34 @@ mod tests {
             actual,
             format!(
                 "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\nopen {path_string}\nSimulation stopped\nSimulation file {path_string} open\n\nsim\nMap dimension: 512\nLand seed: 1 2\nPopulation: 0\nAdults: 0   Juveniles: 0\nTide level: 0\n05:00 28/01/0 Simulation not running\nquit\nSimulation stopped\n"
+            )
+        );
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn open_saved_json_restores_being_population_and_selection() {
+        let path = temp_save_path("population_roundtrip");
+        let path_string = path.to_string_lossy();
+        let mut console = Console::default();
+        let saved = console.run_script(&format!("reset\nsave {path_string}\nquit\n"), true);
+        assert!(saved.contains("Simulation file "));
+        let saved_json = fs::read_to_string(&path).expect("saved population JSON should exist");
+        assert!(saved_json.contains("\"beings\":[{\"name\":\"Ape 001\""));
+        assert!(saved_json.contains("\"delta\":{\"direction_facing\""));
+        assert!(saved_json.contains("\"constant\":{\"date_of_birth\""));
+        assert!(saved_json.contains("\"changes\":{\"drives\""));
+        assert!(saved_json.contains("\"braindata\":{\"braincode_register\""));
+        assert!(saved_json.contains("\"immune_system\":{\"antigens\""));
+        assert!(saved_json.contains("\"random_seed\""));
+
+        let mut loaded_console = Console::default();
+        let actual =
+            loaded_console.run_script(&format!("open {path_string}\nsim\nape\nquit\n"), true);
+        assert_eq!(
+            actual,
+            format!(
+                "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\nopen {path_string}\nSimulation stopped\nSimulation file {path_string} open\n\nsim\nMap dimension: 512\nLand seed: 23809 53481\nPopulation: 128\nAdults: 128   Juveniles: 0\nTide level: 0\n00:00 01/01/0 Simulation not running\nape\nApe 001\nquit\nSimulation stopped\n"
             )
         );
         let _ = fs::remove_file(path);
