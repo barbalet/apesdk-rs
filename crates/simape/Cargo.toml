@@ -1,0 +1,17 @@
+[package]
+name = "simape"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+apesdk-sim = { path = "../apesdk-sim" }
+apesdk-toolkit = { path = "../apesdk-toolkit" }
+
+[lib]
+name = "simape"
+path = "src/lib.rs"
+
+[[bin]]
+name = "simape"
+path = "src/main.rs"

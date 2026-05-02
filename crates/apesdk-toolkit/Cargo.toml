@@ -1,0 +1,10 @@
+[package]
+name = "apesdk-toolkit"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[lib]
+name = "apesdk_toolkit"
+path = "src/lib.rs"
+

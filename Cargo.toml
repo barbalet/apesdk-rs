@@ -1,0 +1,7 @@
+[workspace]
+members = [
+    "crates/apesdk-toolkit",
+    "crates/apesdk-sim",
+    "crates/simape",
+]
+resolver = "2"

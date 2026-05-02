@@ -1,0 +1,13 @@
+[package]
+name = "apesdk-sim"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+apesdk-toolkit = { path = "../apesdk-toolkit" }
+
+[lib]
+name = "apesdk_sim"
+path = "src/lib.rs"
+
