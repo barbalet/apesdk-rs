@@ -1,0 +1,6 @@
+# kind | name | source | gate | note
+transcript | help | golden/cli/sessions/help.commands | raw-transcript-diff | exact C/Rust transport-normalized diff
+transcript | help_errors | golden/cli/sessions/help_errors.commands | raw-transcript-diff | exact C/Rust transport-normalized diff
+transcript | command_edges | golden/cli/sessions/command_edges.commands | raw-transcript-diff | exact C/Rust transport-normalized diff
+save-open | cli-json | golden/cli/sessions/runtime_parity.commands | native-c-oracle | default C and Rust command paths reject JSON reopen
+binary | raw-native | rust_port/raw_c_binary_oracle.md | native-c-oracle | no default CLI framed-binary substitute

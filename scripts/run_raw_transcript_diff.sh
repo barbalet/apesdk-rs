@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+OUT_DIR="${1:-"$ROOT/target/raw-transcript-diff"}"
+shift || true
+
+if [ "$#" -eq 0 ]; then
+    set -- help help_errors command_edges
+fi
+
+FULL_DATE="${APESDK_FULL_DATE:-May  1 2026}"
+NATIVE_DIR="$OUT_DIR/native-build"
+RAW_DIR="$OUT_DIR/raw"
+TRANSPORT_DIR="$OUT_DIR/transport"
+
+mkdir -p "$RAW_DIR/native" "$RAW_DIR/rust" "$TRANSPORT_DIR/native" "$TRANSPORT_DIR/rust"
+
+APESDK_FULL_DATE="$FULL_DATE" "$ROOT/scripts/build_native_simape.sh" "$NATIVE_DIR" >/dev/null
+
+run_one() {
+    local binary="$1"
+    local commands="$2"
+    local output="$3"
+    if command -v expect >/dev/null 2>&1; then
+        "$ROOT/golden/cli/run_cli_session.expect" "$binary" "$commands" "$output"
+    else
+        "$binary" < "$commands" > "$output" || true
+    fi
+}
+
+for name in "$@"; do
+    commands="$ROOT/golden/cli/sessions/$name.commands"
+    if [ ! -f "$commands" ]; then
+        echo "missing session: $name" >&2
+        exit 1
+    fi
+    if grep -Eiq '^[[:space:]]*run[[:space:]]+forever([[:space:]]|$)' "$commands"; then
+        echo "session is unsafe for native raw diff: $name" >&2
+        exit 1
+    fi
+
+    run_one "$NATIVE_DIR/simape" "$commands" "$RAW_DIR/native/$name.txt"
+    run_one "$ROOT/target/debug/simape" "$commands" "$RAW_DIR/rust/$name.txt"
+    "$ROOT/scripts/transport_normalize_transcript.sh" "$RAW_DIR/native/$name.txt" > "$TRANSPORT_DIR/native/$name.txt"
+    "$ROOT/scripts/transport_normalize_transcript.sh" "$RAW_DIR/rust/$name.txt" > "$TRANSPORT_DIR/rust/$name.txt"
+    diff -u "$TRANSPORT_DIR/native/$name.txt" "$TRANSPORT_DIR/rust/$name.txt"
+done
+
+echo "raw-transcript-diff=pass out=$OUT_DIR full_date=$FULL_DATE sessions=$*"

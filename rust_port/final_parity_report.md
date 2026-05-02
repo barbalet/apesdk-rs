@@ -1,40 +1,34 @@
 # Final Parity Report
 
-Cycles 246-265 close the current Rust-port parity plan.
+Cycles 266-300 extend the earlier approved-corpus closure into the strict
+native command-line parity path.
 
-## Approved Corpus
+## Default CLI Parity
 
-- CLI sessions: help, help errors, runtime parity, state save/load, empty
-  startup matrix, populated short matrix, save/open matrix, and command edges.
-- Trace fixtures: braincode, social/family, lifecycle, immune, movement/body,
-  terrain/food, save/open continuity, population stress, release/debug, and
-  final gate summary.
-- Save/load formats: JSON transfer, native-text transfer, and Rust framed
-  binary transfer.
+- `save` writes JSON for every filename extension, matching native C
+  `command_save`.
+- `open` reads native transfer text on the default command-line path, matching
+  native C `tranfer_in`.
+- JSON and framed-binary compatibility remain library-level regression support,
+  not default CLI behavior.
 
-## Gates
+## Absolute Gates
 
-- `cargo fmt --all --check`
-- `cargo test`
-- `scripts/run_parity_ci.sh /private/tmp/apesdk_parity_ci_246_265`
-- `scripts/run_release_debug_gate.sh /private/tmp/apesdk_release_debug_246_265`
-- `scripts/performance_smoke.sh /private/tmp/apesdk_performance_smoke_246_265`
+- `scripts/run_raw_transcript_diff.sh` compares native C and Rust transcripts
+  with only CRLF transport cleanup.
+- `scripts/run_absolute_parity_ci.sh` runs formatting, tests, strict transcript
+  smoke diffing, and trace diff smoke.
+- `scripts/generate_c_oracle_artifacts.sh` captures native C oracle transcripts
+  for review.
 
-## Last Local Run
+## Last Strict Scope
 
-- Formatting: pass
-- Rust tests: pass, including 79 `apesdk-sim`, 27 `apesdk-toolkit`, and 52
-  `simape` unit tests.
-- Parity CI: pass at `/private/tmp/apesdk_parity_ci_246_265b`
-- Release/debug transcript diff: pass at
-  `/private/tmp/apesdk_release_debug_246_265`
-- Performance smoke: pass at `/private/tmp/apesdk_performance_smoke_246_265`
-- Trace diff smoke: pass for `golden/traces/final_gate_summary.trace`
+The promoted exact transcript corpus currently includes `help`, `help_errors`,
+and `command_edges`. Deeper engine categories require direct C trace promotion
+before they can be signed off under the same no-normalization rule.
 
-## Signoff Scope
+## Signoff Rule
 
-The checked-in Rust command-line `simape` corpus is locked at transcript level
-for the approved sessions and at trace-fixture level for the implemented native
-engine categories. The remaining differences from an external raw native C
-byte-for-byte oracle are explicitly documented in
-`rust_port/final_drift_register.md`.
+The project no longer accepts documented drift as a completion condition.
+Outstanding parity work must be represented as fixture tasks and closed with
+native C oracle output.

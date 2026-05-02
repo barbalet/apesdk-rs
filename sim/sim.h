@@ -56,7 +56,9 @@
 
 /*! @define */
 #define	SHORT_VERSION_NAME		 "Simulated Ape 0.708 "
+#ifndef FULL_DATE
 #define	FULL_DATE				 __DATE__
+#endif
 
 /*! @define */
 #define	VERSION_NUMBER		     708
@@ -452,4 +454,3 @@ void  spacetime_set( n_spacetime *set, n_byte2 *location );
 void spacetime_convert_to_map( n_vect2 *value );
 
 #endif /* _SIM_H_ */
-

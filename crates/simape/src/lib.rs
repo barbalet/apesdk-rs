@@ -719,7 +719,7 @@ impl Console {
                 ("Simulation stopped\n".to_string(), false)
             }
             CommandAction::Save => (self.save(response), false),
-            CommandAction::Open => (self.open(response), false),
+            CommandAction::Open => self.open(response),
             CommandAction::Step => (self.step(), false),
             CommandAction::Run => (self.run(response), false),
             CommandAction::Script => (self.script(response), false),
@@ -1088,13 +1088,7 @@ impl Console {
 
         self.simulation_running = false;
         let mut output = String::from("Simulation stopped\n");
-        let file = if binary_save_path(path) {
-            self.state.tranfer_startup_out_binary()
-        } else if path.contains(".native") || path.ends_with(".ape") {
-            self.state.tranfer_startup_out_native()
-        } else {
-            self.state.tranfer_startup_out_json()
-        };
+        let file = self.state.tranfer_startup_out_json();
         match fs::write(path, file.written_data()) {
             Ok(()) => {
                 output.push_str("Simulation file ");
@@ -1110,35 +1104,36 @@ impl Console {
         output
     }
 
-    fn open(&mut self, response: Option<&str>) -> String {
+    fn open(&mut self, response: Option<&str>) -> (String, bool) {
         let Some(path) = response.filter(|value| !value.is_empty()) else {
-            return String::new();
+            return (String::new(), false);
         };
 
         self.simulation_running = false;
         let mut output = String::from("Simulation stopped\n");
+        if !std::path::Path::new(path).exists() {
+            return (output, false);
+        }
         match fs::read(path) {
-            Ok(contents) => match SimState::load_startup_bytes(&contents) {
+            Ok(contents) => match SimState::load_native_transfer_bytes(&contents) {
                 Ok(state) => {
                     self.state = state;
                     output.push_str("Simulation file ");
                     output.push_str(path);
                     output.push_str(" open\n\n");
+                    (output, false)
                 }
                 Err(_) => {
                     output.push_str("ERROR: Failed to read in file @ ./universe/command.c 2394\n");
+                    (output, true)
                 }
             },
             Err(_) => {
-                output.push_str("ERROR: Failed to open file @ ./universe/command.c 2388\n");
+                output.push_str("ERROR: Failed to open file @ ./universe/command.c 2374\n");
+                (output, true)
             }
         }
-        output
     }
-}
-
-fn binary_save_path(path: &str) -> bool {
-    path.ends_with(".bin") || path.ends_with(".binary") || path.ends_with(".nab")
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -2282,7 +2277,7 @@ mod tests {
         .expect("probe fixture should be writable");
         let path_string = path.to_string_lossy();
         let mut console = Console::default();
-        let actual = console.run_script(&format!("open {path_string}\nprobes\nquit\n"), true);
+        let actual = console.run_script(&format!("script {path_string}\nprobes\nquit\n"), true);
 
         assert!(actual.contains("Brain probes for Probe Ape"));
         assert!(actual.contains("00    ACT"));
@@ -2300,7 +2295,7 @@ mod tests {
         .expect("fixture JSON should be writable");
 
         let mut console = Console::default();
-        let actual = console.run_script(&format!("open {path_string}\nfriends\nquit\n"), true);
+        let actual = console.run_script(&format!("script {path_string}\nfriends\nquit\n"), true);
 
         assert!(actual.contains("\nSocial graph for Social Ape\n\nFriends:\n"));
         assert!(actual.contains("    00042  *00111-00222* Mother 1\n"));
@@ -2319,7 +2314,7 @@ mod tests {
         .expect("fixture JSON should be writable");
 
         let mut console = Console::default();
-        let actual = console.run_script(&format!("open {path_string}\nepisodic\nquit\n"), true);
+        let actual = console.run_script(&format!("script {path_string}\nepisodic\nquit\n"), true);
 
         assert!(actual.contains("\nEpisodic memory for Episode Ape\n"));
         assert!(actual.contains("<Was eating vegetation now affect:+50>\n"));
@@ -2360,7 +2355,7 @@ mod tests {
 
         let mut console = Console::default();
         let actual = console.run_script(
-            &format!("open {path_string}\nrun 1 minute\nepisodic\nquit\n"),
+            &format!("script {path_string}\nrun 1 minute\nepisodic\nquit\n"),
             true,
         );
         assert!(actual.contains("Running for 1 mins\n"));
@@ -2498,7 +2493,7 @@ mod tests {
     }
 
     #[test]
-    fn open_saved_json_restores_startup_state() {
+    fn open_saved_json_fails_like_native_c_cli() {
         let path = temp_save_path("open_success");
         let path_string = path.to_string_lossy();
         fs::write(
@@ -2513,7 +2508,7 @@ mod tests {
         assert_eq!(
             actual,
             format!(
-                "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\nopen {path_string}\nSimulation stopped\nSimulation file {path_string} open\n\nsim\nMap dimension: 512\nLand seed: 1 2\nPopulation: 0\nAdults: 0   Juveniles: 0\nTide level: 132\n05:00 28/01/0 Simulation not running\nquit\nSimulation stopped\n"
+                "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\nopen {path_string}\nSimulation stopped\nERROR: Failed to read in file @ ./universe/command.c 2394\n"
             )
         );
         let _ = fs::remove_file(path);
@@ -2542,7 +2537,7 @@ mod tests {
     }
 
     #[test]
-    fn open_framed_binary_transfer_restores_startup_state() {
+    fn open_framed_binary_transfer_fails_on_default_cli_path() {
         let path = temp_save_path("open_binary_success");
         let path_string = path.to_string_lossy();
         fs::write(&path, binary_startup_land_fixture(27, 300, [1, 2]))
@@ -2554,50 +2549,49 @@ mod tests {
         assert_eq!(
             actual,
             format!(
-                "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\nopen {path_string}\nSimulation stopped\nSimulation file {path_string} open\n\nsim\nMap dimension: 512\nLand seed: 1 2\nPopulation: 0\nAdults: 0   Juveniles: 0\nTide level: 132\n05:00 28/01/0 Simulation not running\nquit\nSimulation stopped\n"
+                "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\nopen {path_string}\nSimulation stopped\nERROR: Failed to read in file @ ./universe/command.c 2394\n"
             )
         );
         let _ = fs::remove_file(path);
     }
 
     #[test]
-    fn save_native_extension_writes_native_transfer_that_open_can_read() {
+    fn save_native_extension_writes_json_like_native_c_cli() {
         let path = temp_save_path("roundtrip.native");
         let path_string = path.to_string_lossy();
         let mut console = Console::default();
         let saved = console.run_script(&format!("reset\nsave {path_string}\nquit\n"), true);
         assert!(saved.contains("Simulation file "));
-        let saved_native = fs::read_to_string(&path).expect("native save should exist");
-        assert!(saved_native.starts_with("simul{signa=20033;verio=708;};"));
-        assert!(saved_native.contains("landd{"));
-        assert!(saved_native.contains("being{"));
+        let saved_native = fs::read_to_string(&path).expect("native extension save should exist");
+        assert!(saved_native.starts_with("{\"information\""));
+        assert!(saved_native.contains("\"beings\":["));
 
         let mut console = Console::default();
         let opened = console.run_script(&format!("open {path_string}\nsim\nquit\n"), true);
-        assert!(opened.contains("Simulation file "));
-        assert!(opened.contains("Population: 128\n"));
+        assert!(opened.contains("ERROR: Failed to read in file @ ./universe/command.c 2394\n"));
+        assert!(!opened.contains("Population: 128\n"));
         let _ = fs::remove_file(path);
     }
 
     #[test]
-    fn save_binary_extension_writes_framed_transfer_that_open_can_read() {
+    fn save_binary_extension_writes_json_like_native_c_cli() {
         let path = temp_save_path("roundtrip_binary").with_extension("bin");
         let path_string = path.to_string_lossy();
         let mut console = Console::default();
         let saved = console.run_script(&format!("reset\nsave {path_string}\nquit\n"), true);
         assert!(saved.contains("Simulation file "));
-        let saved_binary = fs::read(&path).expect("binary save should exist");
-        assert!(saved_binary.starts_with(NATIVE_BINARY_MAGIC));
+        let saved_binary = fs::read_to_string(&path).expect("binary extension save should exist");
+        assert!(saved_binary.starts_with("{\"information\""));
 
         let mut console = Console::default();
         let opened = console.run_script(&format!("open {path_string}\nsim\nquit\n"), true);
-        assert!(opened.contains("Simulation file "));
-        assert!(opened.contains("Population: 128\n"));
+        assert!(opened.contains("ERROR: Failed to read in file @ ./universe/command.c 2394\n"));
+        assert!(!opened.contains("Population: 128\n"));
         let _ = fs::remove_file(path);
     }
 
     #[test]
-    fn open_saved_json_restores_being_population_and_selection() {
+    fn open_saved_json_population_fails_like_native_c_cli() {
         let path = temp_save_path("population_roundtrip");
         let path_string = path.to_string_lossy();
         let mut console = Console::default();
@@ -2618,23 +2612,23 @@ mod tests {
         assert_eq!(
             actual,
             format!(
-                "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\nopen {path_string}\nSimulation stopped\nSimulation file {path_string} open\n\nsim\nMap dimension: 512\nLand seed: 23809 53481\nPopulation: 128\nAdults: 128   Juveniles: 0\nTide level: 128\n00:00 01/01/0 Simulation not running\nape\nApe 001\nquit\nSimulation stopped\n"
+                "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\nopen {path_string}\nSimulation stopped\nERROR: Failed to read in file @ ./universe/command.c 2394\n"
             )
         );
         let _ = fs::remove_file(path);
     }
 
     #[test]
-    fn load_alias_reads_saved_json_and_malformed_json_fails() {
+    fn load_alias_reads_native_transfer_and_malformed_json_fails() {
         let path = temp_save_path("load_alias");
         let path_string = path.to_string_lossy();
         let bad_path = temp_save_path("load_bad");
         let bad_path_string = bad_path.to_string_lossy();
         fs::write(
             &path,
-            b"{\"information\":{\"signature\":20033,\"version number\":708},\"land\":{\"date\":0,\"genetics\":[33,44],\"time\":0}}",
+            b"simul{signa=20033;verio=708;};landd{dated=0;timed=0;landg=33,44;};",
         )
-        .expect("fixture JSON should be writable");
+        .expect("fixture native transfer should be writable");
         fs::write(&bad_path, b"{\"information\":true}")
             .expect("bad fixture JSON should be writable");
 
@@ -2673,15 +2667,15 @@ mod tests {
             true,
         );
 
-        assert_eq!(actual.matches("Population: 128\n").count(), 3);
-        assert_eq!(actual.matches("Simulation file ").count(), 6);
+        assert_eq!(actual.matches("Population: 128\n").count(), 0);
+        assert_eq!(actual.matches("Simulation file ").count(), 3);
         assert!(actual.contains("ERROR: Failed to read in file @ ./universe/command.c 2394\n"));
         assert!(fs::read_to_string(&native_path)
-            .expect("native matrix save should be readable")
-            .starts_with("simul{signa=20033;verio=708;};"));
-        assert!(fs::read(&binary_path)
-            .expect("binary matrix save should be readable")
-            .starts_with(NATIVE_BINARY_MAGIC));
+            .expect("native extension matrix save should be readable")
+            .starts_with("{\"information\""));
+        assert!(fs::read_to_string(&binary_path)
+            .expect("binary extension matrix save should be readable")
+            .starts_with("{\"information\""));
 
         let _ = fs::remove_file(json_path);
         let _ = fs::remove_file(native_path);

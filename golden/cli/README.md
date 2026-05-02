@@ -45,9 +45,9 @@ That file is intentionally not part of the repository because it contains
 randomly seeded simulation state.
 
 Current C behavior: opening the JSON file saved from the startup simulation
-fails in the loader with `Signature not first in file`. The transcript captures
-that behavior as the compatibility target until the Rust port explicitly decides
-to fix or migrate the save/load format.
+fails in the loader with `Signature not first in file`. The Rust default CLI now
+preserves that behavior; alternate library compatibility loaders are kept out of
+the native command-line parity gate.
 
 ## Harness
 
@@ -60,8 +60,9 @@ RUST_SIMAPE=target/debug/simape \
 scripts/run_cli_transcripts.sh /private/tmp/apesdk_transcripts
 ```
 
-Use `scripts/normalize_transcript.sh` for line-ending, temporary-path, and
-known volatile length normalization before reviewing transcript diffs.
+Use `scripts/normalize_transcript.sh` only for older fixture review where
+volatile paths or generated lengths are already documented by the fixture. The
+strict native C gate below does not use this normalizer.
 
 For final release-hardening checks:
 
@@ -69,3 +70,12 @@ For final release-hardening checks:
 scripts/run_release_debug_gate.sh /private/tmp/apesdk_release_debug_gate
 scripts/performance_smoke.sh /private/tmp/apesdk_performance_smoke
 ```
+
+For the stricter native C gate introduced after cycle 265:
+
+```sh
+scripts/run_absolute_parity_ci.sh /private/tmp/apesdk_absolute_parity
+```
+
+That path does not use `scripts/normalize_transcript.sh`; it only removes CRLF
+transport characters before diffing.

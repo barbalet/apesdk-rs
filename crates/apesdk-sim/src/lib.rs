@@ -5304,6 +5304,11 @@ impl SimState {
         startup_transfer_from_json_bytes(input).map(|startup| Self::from_startup_transfer(&startup))
     }
 
+    pub fn load_native_transfer_bytes(input: &[u8]) -> Result<Self, &'static str> {
+        startup_transfer_from_native_bytes(input)
+            .map(|startup| Self::from_startup_transfer(&startup))
+    }
+
     pub fn load_startup_bytes(input: &[u8]) -> Result<Self, &'static str> {
         match startup_transfer_from_json_bytes(input) {
             Ok(startup) => Ok(Self::from_startup_transfer(&startup)),

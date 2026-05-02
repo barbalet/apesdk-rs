@@ -33,16 +33,4 @@ Simulation file /private/tmp/simape_runtime_parity.json saved
 
 open /private/tmp/simape_runtime_parity.json
 Simulation stopped
-Simulation file /private/tmp/simape_runtime_parity.json open
-
-stats
-Ape 001 (1313 22) SW 
-H:064 S:080 F:000 X:112: Mixed drives: Sleeping
-Gen 0:0  Male    ERG:3840 SPD:0
-Honor:0  HEI:61  Old(Years:0  Days:0)
-Aware Body: Head Link: Associate
-Friend
-Enemy
-
-quit
-Simulation stopped
+ERROR: Failed to read in file @ ./universe/command.c 2394

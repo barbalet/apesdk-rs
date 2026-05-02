@@ -69,3 +69,13 @@ scripts/performance_smoke.sh /private/tmp/apesdk_performance_smoke
 This records lightweight wall-clock smoke timings for the help, populated
 short-run, and save/open command matrices. It is a regression tripwire, not a
 substitute for transcript or trace gates.
+
+## Absolute Parity Gate
+
+```sh
+scripts/run_absolute_parity_ci.sh /private/tmp/apesdk_absolute_parity
+```
+
+This pins the native C and Rust build date, uses the fixed native seed, captures
+raw C/Rust transcripts, applies only CRLF transport cleanup, and diffs the
+promoted exact corpus.

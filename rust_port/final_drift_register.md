@@ -1,32 +1,31 @@
-# Final Drift Register
+# Final Parity Closure Register
 
-This register closes cycles 263-265 for the current approved fixture corpus.
+Cycles 266-300 retire the prior documented-difference model.
 
 ## Status
 
-There are no untriaged drift items in the checked-in Rust fixture corpus. Each
-known difference is either covered by a regression fixture or explicitly
-accepted below.
+No difference is treated as complete by documentation alone. Each parity
+category is now one of:
 
-## Accepted Differences
+- exact under the absolute gate
+- represented by an open fixture task
+- outside the default command-line path reachable from `longterm.c`
 
-- Native C startup save/open behavior: the current C transcript captures a
-  saved startup JSON file failing to reopen with `Signature not first in file`.
-  Rust intentionally preserves JSON reopen support and records the difference
-  through the save/open matrix.
-- Binary artifact shape: Rust currently writes and reads the framed `NAB1`
-  transfer format represented by the binary compatibility report. No raw C
-  byte-for-byte save artifact is checked in as a final external oracle.
-- Build metadata: native C and Rust banners/build details may differ by local
-  build date or compiler. Transcript normalization masks only documented
-  volatile paths and lengths, not state values.
+## Closed Items
 
-## Covered Drift Categories
+- Default command-line save/open drift: Rust `save` now writes JSON for every
+  extension like native C, and Rust `open` now accepts native transfer text
+  while rejecting JSON/framed binary input on the default CLI path.
+- Build metadata drift: native C and Rust harness builds share the
+  `APESDK_FULL_DATE` value.
+- Source-path drift: the native harness compiles C sources with `./folder/file.c`
+  paths so error locations match Rust's command output.
+- Transcript normalization drift: the absolute transcript gate uses only
+  transport cleanup.
 
-- Pregnancy, birth, carrying, suckling, immune, movement/body, terrain/food,
-  social, territory, family, braincode, and save/open behavior have regression
-  coverage through Rust unit tests and manifest trace fixtures.
-- Empty, populated short-run, save/open, command-edge, and runtime parity
-  sessions are captured through `scripts/run_cli_transcripts.sh`.
-- Release/debug transcript determinism is gated by
-  `scripts/run_release_debug_gate.sh`.
+## Open Fixture Tasks
+
+- Promote direct C state trace emitters for deeper terrain, braincode, social,
+  lifecycle, immune, movement, and save/load categories.
+- Promote raw native binary artifacts only after a C oracle target generates
+  reachable command-line byte fixtures.

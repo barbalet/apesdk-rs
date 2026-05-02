@@ -1420,3 +1420,15 @@ normalization.
 
 Validation: absolute parity CI passes repeatedly from a clean checkout and the
 final signoff records zero differences.
+
+## Cycle 266-300 Run Status
+
+The 35-cycle implementation pass completed the strict default command-line
+save/open behavior, pinned native/Rust build metadata, C-style source path
+alignment, transport-only transcript diffing, and the absolute parity CI smoke
+gate. The promoted exact corpus is `help`, `help_errors`, and `command_edges`.
+
+The deeper engine and raw-save objectives from cycles 270-295 remain open
+fixture tasks until direct C raw binary oracles, C state trace emitters, long
+seeded raw transcript matrices, and fuzzed mismatch corpora are generated and
+matched.

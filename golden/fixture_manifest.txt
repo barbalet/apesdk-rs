@@ -25,3 +25,4 @@ trace | save_open_continuity | golden/traces/save_open_continuity.trace | rust-u
 trace | population_stress | golden/traces/population_stress.trace | rust-unit | trace
 trace | release_debug_determinism | golden/traces/release_debug_determinism.trace | script | trace
 trace | final_gate_summary | golden/traces/final_gate_summary.trace | manual | trace
+absolute | oracle_manifest | golden/absolute/oracle_manifest.txt | raw-transcript-diff | transport-only
