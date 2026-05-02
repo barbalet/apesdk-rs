@@ -1778,7 +1778,7 @@ mod tests {
         assert_eq!(
             actual,
             format!(
-                "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\nscript {missing_string}\nSimulation stopped\nscript\nscript {path_string}\nSimulation stopped\nSimulation file {path_string} open\n\nsim\nMap dimension: 512\nLand seed: 77 88\nPopulation: 0\nAdults: 0   Juveniles: 0\nTide level: 0\n00:45 01/01/0 Simulation not running\nquit\nSimulation stopped\n"
+                "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\nscript {missing_string}\nSimulation stopped\nscript\nscript {path_string}\nSimulation stopped\nSimulation file {path_string} open\n\nsim\nMap dimension: 512\nLand seed: 77 88\nPopulation: 0\nAdults: 0   Juveniles: 0\nTide level: 130\n00:45 01/01/0 Simulation not running\nquit\nSimulation stopped\n"
             )
         );
         let _ = fs::remove_file(path);
@@ -2051,8 +2051,8 @@ mod tests {
             console.run_script("reset\nstep\nsim\nrun 2 minutes\nsim\nstats\nquit\n", true);
         assert!(!actual.contains("Simulated ape cycling not implemented"));
         assert!(!actual.contains("Simulated ape running not implemented"));
-        assert!(actual.contains("step\nsim\nMap dimension: 512\nLand seed: 23809 53481\nPopulation: 128\nAdults: 128   Juveniles: 0\nTide level: 0\n00:01 01/01/0 Simulation not running\n"));
-        assert!(actual.contains("run 2 minutes\nRunning for 2 mins\nsim\nMap dimension: 512\nLand seed: 23809 53481\nPopulation: 128\nAdults: 128   Juveniles: 0\nTide level: 0\n00:03 01/01/0 Simulation not running\n"));
+        assert!(actual.contains("step\nsim\nMap dimension: 512\nLand seed: 23809 53481\nPopulation: 128\nAdults: 128   Juveniles: 0\nTide level: 128\n00:01 01/01/0 Simulation not running\n"));
+        assert!(actual.contains("run 2 minutes\nRunning for 2 mins\nsim\nMap dimension: 512\nLand seed: 23809 53481\nPopulation: 128\nAdults: 128   Juveniles: 0\nTide level: 128\n00:03 01/01/0 Simulation not running\n"));
         assert!(actual.contains("stats\nApe 001 ("));
     }
 
@@ -2065,7 +2065,7 @@ mod tests {
         );
         assert_eq!(
             actual,
-            "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\nstep\nsim\nMap dimension: 512\nLand seed: 7633 53305\nPopulation: 0\nAdults: 0   Juveniles: 0\nTide level: 0\n00:01 01/01/0 Simulation not running\nrun 1 minute\nRunning for 1 mins\nsim\nMap dimension: 512\nLand seed: 7633 53305\nPopulation: 0\nAdults: 0   Juveniles: 0\nTide level: 0\n00:02 01/01/0 Simulation not running\nrun 1 day\nRunning for 1 days\nsim\nMap dimension: 512\nLand seed: 7633 53305\nPopulation: 0\nAdults: 0   Juveniles: 0\nTide level: 0\n00:02 02/01/0 Simulation not running\nrun forever\nERROR: Run forever not implemented in Rust port yet\nrun\nERROR: Time not specified, examples: run 2 days, run 6 hours @ ./universe/command.c 2211\nquit\nSimulation stopped\n"
+            "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\nstep\nsim\nMap dimension: 512\nLand seed: 7633 53305\nPopulation: 0\nAdults: 0   Juveniles: 0\nTide level: 128\n00:01 01/01/0 Simulation not running\nrun 1 minute\nRunning for 1 mins\nsim\nMap dimension: 512\nLand seed: 7633 53305\nPopulation: 0\nAdults: 0   Juveniles: 0\nTide level: 128\n00:02 01/01/0 Simulation not running\nrun 1 day\nRunning for 1 days\nsim\nMap dimension: 512\nLand seed: 7633 53305\nPopulation: 0\nAdults: 0   Juveniles: 0\nTide level: 129\n00:02 02/01/0 Simulation not running\nrun forever\nERROR: Run forever not implemented in Rust port yet\nrun\nERROR: Time not specified, examples: run 2 days, run 6 hours @ ./universe/command.c 2211\nquit\nSimulation stopped\n"
         );
     }
 
@@ -2175,7 +2175,7 @@ mod tests {
         assert_eq!(
             actual,
             format!(
-                "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\nopen {path_string}\nSimulation stopped\nSimulation file {path_string} open\n\nsim\nMap dimension: 512\nLand seed: 1 2\nPopulation: 0\nAdults: 0   Juveniles: 0\nTide level: 0\n05:00 28/01/0 Simulation not running\nquit\nSimulation stopped\n"
+                "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\nopen {path_string}\nSimulation stopped\nSimulation file {path_string} open\n\nsim\nMap dimension: 512\nLand seed: 1 2\nPopulation: 0\nAdults: 0   Juveniles: 0\nTide level: 132\n05:00 28/01/0 Simulation not running\nquit\nSimulation stopped\n"
             )
         );
         let _ = fs::remove_file(path);
@@ -2203,7 +2203,7 @@ mod tests {
         assert_eq!(
             actual,
             format!(
-                "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\nopen {path_string}\nSimulation stopped\nSimulation file {path_string} open\n\nsim\nMap dimension: 512\nLand seed: 23809 53481\nPopulation: 128\nAdults: 128   Juveniles: 0\nTide level: 0\n00:00 01/01/0 Simulation not running\nape\nApe 001\nquit\nSimulation stopped\n"
+                "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\nopen {path_string}\nSimulation stopped\nSimulation file {path_string} open\n\nsim\nMap dimension: 512\nLand seed: 23809 53481\nPopulation: 128\nAdults: 128   Juveniles: 0\nTide level: 128\n00:00 01/01/0 Simulation not running\nape\nApe 001\nquit\nSimulation stopped\n"
             )
         );
         let _ = fs::remove_file(path);

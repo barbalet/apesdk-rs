@@ -3,9 +3,10 @@
 //! Simulator constants and C-compatible public types for the ApeSDK Rust port.
 
 use apesdk_toolkit::{
-    array_add, array_number, math_random, math_random3, math_tan, n_byte, n_byte2, n_byte4, n_int,
-    n_spacetime, n_uint, n_vect2, object_array, object_number, object_object, object_parse_json,
-    object_string, object_top_object, vect2_direction, NFile, ObjectEntry, ObjectValue,
+    array_add, array_number, math_random, math_random3, math_sine, math_tan, n_byte, n_byte2,
+    n_byte4, n_int, n_spacetime, n_uint, n_vect2, object_array, object_number, object_object,
+    object_parse_json, object_string, object_top_object, vect2_direction, vect2_dot, NFile,
+    ObjectEntry, ObjectValue,
 };
 
 pub const SHORT_VERSION_NAME: &str = "Simulated Ape 0.708 ";
@@ -56,6 +57,13 @@ pub const MAP_APE_RESOLUTION_SIZE: n_byte2 = (MAP_DIMENSION << APE_TO_MAP_BIT_RA
 pub const APESPACE_BOUNDS: n_byte2 = MAP_APE_RESOLUTION_SIZE - 1;
 pub const TERRITORY_DIMENSION: usize = MAP_DIMENSION >> MAP_TO_TERRITORY_RATIO;
 pub const TERRITORY_AREA: usize = TERRITORY_DIMENSION * TERRITORY_DIMENSION;
+pub const WATER_MAP: n_int = 128;
+pub const WATER_MAP2: n_int = WATER_MAP * 2;
+pub const TIDE_AMPLITUDE_LUNAR: n_int = 8;
+pub const TIDE_AMPLITUDE_SOLAR: n_int = 2;
+pub const TIDE_MAX: n_int = WATER_MAP + TIDE_AMPLITUDE_LUNAR + TIDE_AMPLITUDE_SOLAR;
+pub const LUNAR_ORBIT_MINS: n_int = 39_312;
+pub const NEW_SD_MULTIPLE: n_int = 26_880;
 
 pub const TERRAIN_WINDOW_WIDTH: usize = 4096;
 pub const TERRAIN_WINDOW_HEIGHT: usize = 3072;
@@ -115,7 +123,18 @@ pub const BEING_MAX_MASS_FAT_G: n_byte2 = BEING_MAX_MASS_G >> 2;
 pub const BEING_MAX_HEIGHT_MM: n_byte2 = 2_000;
 pub const BEING_MAX_HEIGHT: n_byte2 = n_byte2::MAX;
 pub const ENERGY_GRASS: n_byte2 = 50;
+pub const ENERGY_BUSH: n_byte2 = 100;
+pub const ENERGY_FRUIT: n_byte2 = 100;
+pub const ENERGY_SEAWEED: n_byte2 = 30;
+pub const ENERGY_SHELLFISH: n_byte2 = 300;
+pub const ENERGY_BIRD_EGGS: n_byte2 = 800;
+pub const ENERGY_LIZARD_EGGS: n_byte2 = 1_000;
 pub const FOOD_VEGETABLE: n_byte = 0;
+pub const FOOD_FRUIT: n_byte = 1;
+pub const FOOD_SHELLFISH: n_byte = 2;
+pub const FOOD_SEAWEED: n_byte = 3;
+pub const FOOD_BIRD_EGGS: n_byte = 4;
+pub const FOOD_LIZARD_EGGS: n_byte = 5;
 pub const BODY_HEAD: n_byte = 0;
 pub const BODY_TEETH: n_byte = 1;
 pub const BODY_BACK: n_byte = 2;
@@ -187,8 +206,11 @@ pub const AFFECT_SQUABBLE_VICTOR: i32 = 1_100;
 pub const AFFECT_SQUABBLE_VANQUISHED: i32 = -800;
 pub const IMMUNE_FIT: n_byte = 5;
 pub const MIN_ANTIBODIES: n_byte = 16;
+pub const PATHOGEN_ENVIRONMENT_PROB: n_byte2 = 100;
 pub const PATHOGEN_MUTATION_PROB: n_byte2 = 100;
 pub const ANTIBODY_DEPLETION_PROB: n_byte2 = 100;
+pub const PATHOGEN_TRANSMISSION_FOOD_VEGETABLE: n_byte = 4;
+pub const PATHOGEN_TRANSMISSION_TOTAL: n_byte2 = 8;
 
 pub const LARGE_SIM: n_uint = 256;
 pub const INITIAL_POPULATION: usize = (LARGE_SIM as usize) >> 1;
@@ -426,6 +448,37 @@ impl LandSnapshot {
     }
 }
 
+const BIOLOGY_OPERATOR_AREA: usize = 0;
+const BIOLOGY_OPERATOR_BUSH: usize = 6;
+const BIOLOGY_OPERATOR_GRASS: usize = 7;
+const BIOLOGY_OPERATOR_TREE: usize = 8;
+const BIOLOGY_OPERATOR_SEAWEED: usize = 9;
+const BIOLOGY_OPERATOR_ROCKPOOL: usize = 10;
+const BIOLOGY_OPERATOR_BEACH: usize = 11;
+const OFFSET_GRASS: n_int = 40;
+const OFFSET_BUSH: n_int = 14;
+const TERRAIN_OPERATOR_KIND: [&[u8; 6]; 17] = [
+    b"+.....", b".+....", b"..+...", b"...+..", b"....+.", b".....+", b".-+.+-", b"..+.+-",
+    b"-++.+-", b"-++.-+", b"+.-.-+", b"+-+-++", b"..+-.-", b"..--.-", b"..+++-", b"-+.-.-",
+    b"..+-+-",
+];
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct TerrainSample {
+    pub height: n_int,
+    pub slope: n_vect2,
+    pub map_position: [n_int; 2],
+    pub water: bool,
+    pub intertidal: bool,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FoodSample {
+    pub food_type: n_byte,
+    pub max_energy: n_byte2,
+    pub energy: n_byte2,
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct LandState {
     date: n_byte4,
@@ -452,6 +505,7 @@ impl LandState {
         state.time = snapshot.time;
         state.tile_genetics[0] = snapshot.genetics;
         state.genetics = snapshot.genetics;
+        state.update_tide();
         state
     }
 
@@ -486,6 +540,7 @@ impl LandState {
         if kind != KIND_OF_USE::KIND_LOAD_FILE {
             self.time = (5 * TIME_HOUR_MINUTES) as n_byte4;
             self.date = start;
+            self.update_tide();
         }
     }
 
@@ -495,6 +550,7 @@ impl LandState {
             self.time = 0;
             self.date += 1;
         }
+        self.update_tide();
     }
 
     pub fn advance_minutes(&mut self, minutes: n_uint) {
@@ -504,6 +560,9 @@ impl LandState {
             .date
             .wrapping_add((total_minutes / day_minutes) as n_byte4);
         self.time = (total_minutes % day_minutes) as n_byte4;
+        if minutes != 0 {
+            self.update_tide();
+        }
     }
 
     pub fn seed_genetics(&mut self, random: &mut [n_byte2; 2]) {
@@ -514,6 +573,189 @@ impl LandState {
         }
         self.genetics[0] = random_byte2(random);
         self.genetics[1] = random_byte2(random);
+    }
+
+    pub fn update_tide(&mut self) {
+        let current_time = n_int::try_from(
+            n_uint::from(self.time)
+                .wrapping_add(n_uint::from(self.date).wrapping_mul(TIME_DAY_MINUTES as n_uint)),
+        )
+        .unwrap_or(n_int::MAX);
+        let lunar_mins = current_time.rem_euclid(LUNAR_ORBIT_MINS);
+        let lunar_angle_256 = (((n_int::from(self.time) * 255) / 720)
+            + ((lunar_mins * 255) / LUNAR_ORBIT_MINS))
+            & 255;
+        let solar_mins = current_time.rem_euclid((TIME_DAY_MINUTES * TIME_YEAR_DAYS) as n_int);
+        let solar_angle_256 = (solar_mins * 255) / (TIME_DAY_MINUTES * TIME_YEAR_DAYS) as n_int;
+        let lunar = math_sine(lunar_angle_256, NEW_SD_MULTIPLE / TIDE_AMPLITUDE_LUNAR);
+        let solar = math_sine(solar_angle_256, NEW_SD_MULTIPLE / TIDE_AMPLITUDE_SOLAR);
+        self.tide_level = (WATER_MAP + lunar + solar).clamp(0, 255) as n_byte;
+    }
+
+    pub fn height_at(&self, location: [n_byte2; 2]) -> n_int {
+        self.land_location_map(
+            apespace_to_mapspace(n_int::from(location[0])),
+            apespace_to_mapspace(n_int::from(location[1])),
+        )
+    }
+
+    pub fn terrain_sample(&self, location: [n_byte2; 2]) -> TerrainSample {
+        let map_x = apespace_to_mapspace(n_int::from(location[0]));
+        let map_y = apespace_to_mapspace(n_int::from(location[1]));
+        let height = self.land_location_map(map_x, map_y);
+        let slope = n_vect2::new(
+            height - self.land_location_map(map_x + 1, map_y),
+            height - self.land_location_map(map_x, map_y + 1),
+        );
+        TerrainSample {
+            height,
+            slope,
+            map_position: [positive_map_coord(map_x), positive_map_coord(map_y)],
+            water: water_test(height, self.tide_level),
+            intertidal: height <= TIDE_MAX,
+        }
+    }
+
+    pub fn biology_at(&self, location: [n_byte2; 2], operator: usize) -> n_int {
+        let index = operator
+            .saturating_sub(BIOLOGY_OPERATOR_AREA)
+            .min(TERRAIN_OPERATOR_KIND.len() - 1);
+        self.land_operator_interpolated(
+            n_int::from(location[0]),
+            n_int::from(location[1]),
+            TERRAIN_OPERATOR_KIND[index],
+        )
+    }
+
+    pub fn food_source_at(&self, location: [n_byte2; 2]) -> FoodSample {
+        let height = self.height_at(location);
+        let (food_type, max_energy) = if height > TIDE_MAX {
+            self.land_food_source(location)
+        } else {
+            self.intertidal_food_source(location)
+        };
+        FoodSample {
+            food_type,
+            max_energy,
+            energy: 0,
+        }
+    }
+
+    fn land_location_map(&self, map_x: n_int, map_y: n_int) -> n_int {
+        let x = positive_map_coord(map_x);
+        let y = positive_map_coord(map_y);
+        let seed0 = n_int::from(self.genetics[0]);
+        let seed1 = n_int::from(self.genetics[1]);
+        let broad = math_sine((x * 3 + y * 5 + seed0) & 255, 512);
+        let ridge = math_sine((x * 11 - y * 7 + seed1) & 255, 1_024);
+        let dither = (((x * 37) ^ (y * 53) ^ seed0 ^ (seed1 << 1)) & 31) - 15;
+        (WATER_MAP + broad + ridge + dither).clamp(0, 255)
+    }
+
+    fn land_operator_interpolated(&self, loc_x: n_int, loc_y: n_int, kind: &[u8; 6]) -> n_int {
+        let loc_x = n_int::from(wrap_apespace(loc_x));
+        let loc_y = n_int::from(wrap_apespace(loc_y));
+        let map_x = apespace_to_mapspace(loc_x);
+        let map_y = apespace_to_mapspace(loc_y);
+        let local_x = loc_x - (map_x << APE_TO_MAP_BIT_RATIO);
+        let local_y = loc_y - (map_y << APE_TO_MAP_BIT_RATIO);
+        let next_x_weight = ((map_x + 1) << APE_TO_MAP_BIT_RATIO) - loc_x;
+        let next_y_weight = ((map_y + 1) << APE_TO_MAP_BIT_RATIO) - loc_y;
+
+        let mut interpolated =
+            (self.land_operator(map_x + 1, map_y, kind) * local_x) >> APE_TO_MAP_BIT_RATIO;
+        interpolated +=
+            (self.land_operator(map_x - 1, map_y, kind) * next_x_weight) >> APE_TO_MAP_BIT_RATIO;
+        interpolated +=
+            (self.land_operator(map_x, map_y + 1, kind) * local_y) >> APE_TO_MAP_BIT_RATIO;
+        interpolated +=
+            (self.land_operator(map_x, map_y - 1, kind) * next_y_weight) >> APE_TO_MAP_BIT_RATIO;
+        interpolated >> 1
+    }
+
+    fn land_operator(&self, loc_x: n_int, loc_y: n_int, kind: &[u8; 6]) -> n_int {
+        let fg_raw = self.land_location_map(loc_x, loc_y);
+        let dfg = (self.land_location_map(loc_x + 1, loc_y) - fg_raw) * 8;
+        let fdg = (self.land_location_map(loc_x, loc_y + 1) - fg_raw) * 8;
+        let fg = fg_raw - WATER_MAP;
+        let mut total = 0;
+        let mut number_sum = 0;
+
+        for (index, operator) in kind.iter().copied().enumerate() {
+            if operator == b'.' {
+                continue;
+            }
+            let temp_add = match index {
+                0 => ((dfg * dfg) + (fdg * fdg)) >> 6,
+                1 => ((WATER_MAP + fg) * (WATER_MAP + fg)) >> 8,
+                2 => ((WATER_MAP - fg) * (WATER_MAP - fg)) >> 8,
+                3 => {
+                    if is_night(self.time) {
+                        continue;
+                    }
+                    let hour_angle = (((self.time << 6) as n_int / 180) + 32) & 255;
+                    let time_weather = vect2_direction(hour_angle, 105 * 32);
+                    operator_sun(fg, dfg, fdg, time_weather.x + 8, time_weather.y + 8)
+                }
+                4 => operator_sun(fg, dfg, fdg, 11, 11),
+                5 => {
+                    let salt = -(fg - TIDE_AMPLITUDE_LUNAR - TIDE_AMPLITUDE_SOLAR);
+                    if !(0..=((TIDE_AMPLITUDE_LUNAR + TIDE_AMPLITUDE_SOLAR) * 2)).contains(&salt) {
+                        if operator == b'+' {
+                            total = 0;
+                        }
+                        continue;
+                    }
+                    ((salt * salt) + (dfg * fdg)) >> 4
+                }
+                _ => continue,
+            };
+            number_sum += 1;
+            if operator == b'+' {
+                total += temp_add;
+            } else {
+                total += WATER_MAP2 - temp_add;
+            }
+        }
+
+        if number_sum == 0 {
+            0
+        } else {
+            total / number_sum
+        }
+    }
+
+    fn food_values(&self, location: [n_byte2; 2]) -> (n_int, n_int, n_int) {
+        let mut grass = self.biology_at(location, BIOLOGY_OPERATOR_GRASS) + OFFSET_GRASS;
+        let trees = self.biology_at(location, BIOLOGY_OPERATOR_TREE);
+        let bush = self.biology_at(location, BIOLOGY_OPERATOR_BUSH) + OFFSET_BUSH;
+        grass += land_dither(grass, trees, bush);
+        (grass, trees, bush)
+    }
+
+    fn land_food_source(&self, location: [n_byte2; 2]) -> (n_byte, n_byte2) {
+        let (grass, trees, bush) = self.food_values(location);
+        if grass > bush && grass > trees {
+            (FOOD_VEGETABLE, ENERGY_GRASS)
+        } else if bush > trees {
+            (FOOD_VEGETABLE, ENERGY_BUSH)
+        } else {
+            (FOOD_FRUIT, ENERGY_FRUIT)
+        }
+    }
+
+    fn intertidal_food_source(&self, location: [n_byte2; 2]) -> (n_byte, n_byte2) {
+        let seaweed = self.biology_at(location, BIOLOGY_OPERATOR_SEAWEED);
+        let rockpool = self.biology_at(location, BIOLOGY_OPERATOR_ROCKPOOL);
+        let mut beach = self.biology_at(location, BIOLOGY_OPERATOR_BEACH);
+        beach += land_dither(seaweed, rockpool, beach);
+        if seaweed > rockpool && seaweed > beach {
+            (FOOD_SEAWEED, ENERGY_SEAWEED)
+        } else if rockpool > beach {
+            (FOOD_SHELLFISH, ENERGY_SHELLFISH)
+        } else {
+            (FOOD_VEGETABLE, BEING_DEAD)
+        }
     }
 }
 
@@ -1473,7 +1715,9 @@ impl BeingSummary {
         self.drives[drive] = 0;
     }
 
-    fn advance_minute(&mut self, land_date: n_byte4, land_time: n_byte4) {
+    fn advance_minute(&mut self, land: &LandState) {
+        let land_date = land.date();
+        let land_time = land.time();
         self.awake_level = self.awake_level_for_time(land_time);
         self.awake = self.awake_level != FULLY_ASLEEP;
         self.cycle_universal();
@@ -1483,7 +1727,7 @@ impl BeingSummary {
             return;
         }
 
-        self.cycle_awake(land_date, land_time);
+        self.cycle_awake(land);
         self.cycle_episodic();
         self.cycle_drives(land_date);
         self.speed_advance();
@@ -1523,19 +1767,40 @@ impl BeingSummary {
         }
     }
 
-    fn cycle_awake(&mut self, land_date: n_byte4, land_time: n_byte4) {
+    fn cycle_awake(&mut self, land: &LandState) {
+        let land_date = land.date();
+        let land_time = land.time();
+        let terrain = land.terrain_sample(self.location);
         let mut state = BEING_STATE_AWAKE;
+        if terrain.water {
+            state |= BEING_STATE_SWIMMING;
+        }
         if self.energy_less_than(BEING_HUNGRY + 1) {
             state |= BEING_STATE_HUNGRY;
         }
 
-        let mut target_speed = self.temporary_speed();
+        let (mut target_speed, water_ahead) = self.temporary_speed(land);
+        if state & BEING_STATE_SWIMMING != 0 || water_ahead {
+            self.turn_away_from_water(land);
+            target_speed = (target_speed * (n_int::from(gene_swim(self.genetics)) + 8)) >> 4;
+            state |= BEING_STATE_SWIMMING;
+            self.posture = 0;
+            for (index, item) in self.inventory.iter_mut().enumerate() {
+                if index != usize::from(BODY_HEAD) && index != usize::from(BODY_BACK) {
+                    *item = 0;
+                }
+            }
+            self.parasites = self.parasites.saturating_sub(1);
+        } else {
+            target_speed = (target_speed * (n_int::from(gene_speed(self.genetics)) + 8)) >> 3;
+        }
+
         if state & BEING_STATE_HUNGRY != 0 {
             if self.speed() == 0 {
-                let food_energy = self.food_energy();
-                if food_energy > 0 {
-                    self.energy_delta(i32::from(food_energy));
-                    self.record_episodic_food(food_energy, FOOD_VEGETABLE, land_date, land_time);
+                let food = self.eat_food(land);
+                if food.energy > 0 {
+                    self.energy_delta(i32::from(food.energy));
+                    self.record_episodic_food(food.energy, food.food_type, land_date, land_time);
                     self.reset_drive(DRIVE_HUNGER);
                     state |= BEING_STATE_EATING;
                     if age_days_at(land_date, self.date_of_birth) < AGE_OF_MATURITY
@@ -1543,7 +1808,7 @@ impl BeingSummary {
                     {
                         self.height = self
                             .height
-                            .saturating_add(energy_to_growth(food_energy))
+                            .saturating_add(energy_to_growth(food.energy))
                             .min(BEING_MAX_HEIGHT);
                     }
                 } else {
@@ -1557,8 +1822,9 @@ impl BeingSummary {
         }
 
         self.calculate_speed(target_speed, state);
+        self.genetic_wandering();
         self.move_forward();
-        let energy_cost = self.move_energy();
+        let energy_cost = self.move_energy(land);
         if energy_cost > 0 {
             self.energy_delta(-energy_cost);
         }
@@ -1569,11 +1835,16 @@ impl BeingSummary {
         self.mass = self.calculated_mass();
     }
 
-    fn temporary_speed(&mut self) -> n_int {
-        math_random3(&mut self.random_seed);
-        let turn = ((math_random(&mut self.random_seed) & 7) as n_int) - 3;
-        self.wander(turn);
-        1 + (math_random(&mut self.random_seed) & 39) as n_int
+    fn temporary_speed(&self, land: &LandState) -> (n_int, bool) {
+        let facing_vector = self.facing_vector(4);
+        let terrain = land.terrain_sample(self.location);
+        let looking = [
+            wrap_apespace(n_int::from(self.location[0]) + facing_vector.x),
+            wrap_apespace(n_int::from(self.location[1]) + facing_vector.y),
+        ];
+        let water_ahead = land.terrain_sample(looking).water;
+        let delta_z = vect2_dot(terrain.slope, facing_vector, 1, 24);
+        (((delta_z + 280) >> 4), water_ahead)
     }
 
     fn calculate_speed(&mut self, target_speed: n_int, state: n_byte2) {
@@ -1610,22 +1881,84 @@ impl BeingSummary {
         self.location[1] = wrap_apespace(n_int::from(self.location[1]) + dy);
     }
 
-    fn move_energy(&self) -> i32 {
-        let speed = i32::from(self.speed());
-        let delta_energy = (512 * speed) / 80;
-        let delta_energy = (delta_energy * delta_energy) >> 9;
-        (delta_energy + 4 + ((i32::from(self.mass) * 5) / i32::from(BEING_MAX_MASS_G))) >> 2
+    fn move_energy(&self, land: &LandState) -> i32 {
+        let speed = n_int::from(self.speed());
+        let terrain = land.terrain_sample(self.location);
+        let facing_vector = self.facing_vector(1);
+        let delta_z = vect2_dot(terrain.slope, facing_vector, 1, 96);
+        let mut delta_energy = ((512 - delta_z) * speed) / 80;
+
+        if terrain.water {
+            delta_energy = (delta_energy * delta_energy) >> 9;
+            let insulation = (n_int::from(self.body_fat().min(BEING_MAX_MASS_FAT_G)) * 5)
+                / n_int::from(BEING_MAX_MASS_FAT_G);
+            ((delta_energy + 10 - insulation).max(0) >> 3) as i32
+        } else {
+            if delta_z > 0 {
+                delta_energy += n_int::from(gene_hill_climb(self.genetics));
+            }
+            delta_energy = (delta_energy * delta_energy) >> 9;
+            ((delta_energy + 4 + ((n_int::from(self.mass) * 5) / n_int::from(BEING_MAX_MASS_G)))
+                >> 2) as i32
+        }
     }
 
-    fn food_energy(&self) -> n_byte2 {
+    fn eat_food(&mut self, land: &LandState) -> FoodSample {
+        let source = land.food_source_at(self.location);
+        let energy = self.food_absorption(source.max_energy, source.food_type);
+        FoodSample { energy, ..source }
+    }
+
+    fn food_absorption(&mut self, max_energy: n_byte2, food_type: n_byte) -> n_byte2 {
+        if max_energy == BEING_DEAD {
+            self.immune_ingest_pathogen(food_type);
+            return 0;
+        }
         let vegetable = gene_energy_from_vegetables(self.genetics);
         let fruit = gene_energy_from_fruits(self.genetics);
+        let shellfish = gene_energy_from_shellfish(self.genetics);
         let seaweed = gene_energy_from_seaweed(self.genetics);
         let bird_eggs = gene_energy_from_bird_eggs(self.genetics);
         let lizard_eggs = gene_energy_from_lizard_eggs(self.genetics);
         let denominator = 1 + vegetable + fruit + seaweed + bird_eggs + lizard_eggs;
-        let absorbed = (vegetable << 4) / denominator;
-        ((n_uint::from(ENERGY_GRASS) * n_uint::from(1 + absorbed)) >> 3).min(320) as n_byte2
+        self.immune_ingest_pathogen(food_type);
+        let absorbed = match food_type {
+            FOOD_VEGETABLE => (vegetable << 4) / denominator,
+            FOOD_FRUIT => (fruit << 4) / denominator,
+            FOOD_SHELLFISH => (shellfish << 4) / denominator,
+            FOOD_SEAWEED => (seaweed << 4) / denominator,
+            FOOD_BIRD_EGGS => (bird_eggs << 4) / denominator,
+            FOOD_LIZARD_EGGS => (lizard_eggs << 4) / denominator,
+            _ => return 0,
+        };
+        ((n_uint::from(max_energy) * n_uint::from(1 + absorbed)) >> 3).min(320) as n_byte2
+    }
+
+    fn turn_away_from_water(&mut self, land: &LandState) {
+        let base_location = self.location;
+        for water_turn in 0..7 {
+            let turn = 8 - water_turn;
+            let plus = ((n_int::from(self.facing) + turn) & 255) as n_byte;
+            let minus = ((n_int::from(self.facing) + 256 - turn) & 255) as n_byte;
+            let plus_height = land.height_at(lookahead_location(base_location, plus));
+            let minus_height = land.height_at(lookahead_location(base_location, minus));
+            if minus_height > plus_height {
+                self.wander(-turn);
+            } else if minus_height < plus_height {
+                self.wander(turn);
+            }
+        }
+    }
+
+    fn genetic_wandering(&mut self) {
+        if self.goal != [0; 4] {
+            return;
+        }
+        let threshold = 1_000 + (3_600 * n_int::from(gene_stagger(self.genetics)));
+        if n_int::from(math_random(&mut self.random_seed)) < threshold {
+            let value = (math_random(&mut self.random_seed) & 7) as n_byte;
+            self.wander(math_spread_byte(value));
+        }
     }
 
     fn calculated_mass(&self) -> n_byte2 {
@@ -2014,6 +2347,25 @@ impl BeingSummary {
         }
     }
 
+    fn immune_ingest_pathogen(&mut self, food_type: n_byte) {
+        let transmission_type = food_type.saturating_add(PATHOGEN_TRANSMISSION_FOOD_VEGETABLE);
+        self.immune_acquire_pathogen(transmission_type);
+    }
+
+    fn immune_acquire_pathogen(&mut self, transmission_type: n_byte) {
+        math_random3(&mut self.immune_seed);
+        if self.immune_seed[0] >= PATHOGEN_ENVIRONMENT_PROB {
+            return;
+        }
+        let index = self.immune_seed[1] as usize % IMMUNE_ANTIGENS;
+        if self.immune_antigens[index] != 0 {
+            return;
+        }
+        math_random3(&mut self.immune_seed);
+        self.immune_antigens[index] = (self.immune_seed[0] & 7) as n_byte;
+        self.immune_shape_antigen[index] = random_pathogen(self.immune_seed[1], transmission_type);
+    }
+
     fn honor_immune(&self) -> n_byte {
         (self.honor / 8).max(1)
     }
@@ -2057,6 +2409,43 @@ fn age_days_at(current_date: n_byte4, date_of_birth: n_byte4) -> n_byte4 {
 fn wrap_apespace(value: n_int) -> n_byte2 {
     let bounds = n_int::from(APESPACE_BOUNDS);
     value.rem_euclid(bounds + 1) as n_byte2
+}
+
+fn lookahead_location(location: [n_byte2; 2], facing: n_byte) -> [n_byte2; 2] {
+    let vector = vect2_direction(n_int::from(facing), 128);
+    [
+        wrap_apespace(n_int::from(location[0]) + vector.x),
+        wrap_apespace(n_int::from(location[1]) + vector.y),
+    ]
+}
+
+fn math_spread_byte(value: n_byte) -> n_int {
+    let result = n_int::from(value >> 1);
+    if value & 1 == 1 {
+        -result
+    } else {
+        result
+    }
+}
+
+fn apespace_to_mapspace(value: n_int) -> n_int {
+    n_int::from(wrap_apespace(value)) >> APE_TO_MAP_BIT_RATIO
+}
+
+fn positive_map_coord(value: n_int) -> n_int {
+    value.rem_euclid(MAP_DIMENSION as n_int)
+}
+
+fn water_test(height: n_int, tide: n_byte) -> bool {
+    height < n_int::from(tide)
+}
+
+fn operator_sun(fg: n_int, dfg: n_int, _fdg: n_int, ct: n_int, st: n_int) -> n_int {
+    (((ct * fg) + (st * dfg)) >> 4) + WATER_MAP
+}
+
+fn land_dither(x: n_int, y: n_int, z: n_int) -> n_int {
+    ((x + y + z) & 15) - (((x & y) | z) & 7) - ((x | (y & z)) & 7)
 }
 
 fn clamp_byte2(value: n_int) -> n_byte2 {
@@ -2227,12 +2616,32 @@ fn gene_frame(genetics: [n_genetics; CHROMOSOMES]) -> n_byte {
     gene_val_reg(genetics, 10, 11, 1, 6)
 }
 
+fn gene_swim(genetics: [n_genetics; CHROMOSOMES]) -> n_byte {
+    gene_val_reg(genetics, 9, 11, 13, 7)
+}
+
+fn gene_speed(genetics: [n_genetics; CHROMOSOMES]) -> n_byte {
+    gene_val_reg(genetics, 14, 5, 12, 10)
+}
+
+fn gene_stagger(genetics: [n_genetics; CHROMOSOMES]) -> n_byte {
+    gene_val_reg(genetics, 12, 14, 3, 11)
+}
+
+fn gene_hill_climb(genetics: [n_genetics; CHROMOSOMES]) -> n_byte {
+    gene_val_reg(genetics, 4, 6, 5, 2)
+}
+
 fn gene_energy_from_vegetables(genetics: [n_genetics; CHROMOSOMES]) -> n_byte {
     gene_val_reg(genetics, 3, 13, 15, 3)
 }
 
 fn gene_energy_from_fruits(genetics: [n_genetics; CHROMOSOMES]) -> n_byte {
     gene_val_reg(genetics, 14, 7, 6, 4)
+}
+
+fn gene_energy_from_shellfish(genetics: [n_genetics; CHROMOSOMES]) -> n_byte {
+    gene_val_reg(genetics, 10, 12, 12, 2)
 }
 
 fn gene_energy_from_seaweed(genetics: [n_genetics; CHROMOSOMES]) -> n_byte {
@@ -2257,6 +2666,11 @@ fn body_fat(genetics: [n_genetics; CHROMOSOMES], energy: n_byte2) -> n_byte2 {
 
 fn pathogen_severity(pathogen: n_byte) -> n_byte {
     ((u16::from(pathogen) * u16::from(pathogen)) >> 11) as n_byte
+}
+
+fn random_pathogen(seed: n_byte2, pathogen_type: n_byte) -> n_byte {
+    (((seed % (255 / PATHOGEN_TRANSMISSION_TOTAL)) * PATHOGEN_TRANSMISSION_TOTAL)
+        + n_byte2::from(pathogen_type)) as n_byte
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -2353,9 +2767,11 @@ impl PopulationState {
         });
     }
 
-    fn advance_minute(&mut self, land_date: n_byte4, land_time: n_byte4) {
+    fn advance_minute(&mut self, land: &LandState) {
+        let land_date = land.date();
+        let land_time = land.time();
         for being in &mut self.beings {
-            being.advance_minute(land_date, land_time);
+            being.advance_minute(land);
         }
         self.social_initial_loop(land_date, land_time);
         self.social_secondary_loop_no_sim();
@@ -2620,8 +3036,7 @@ impl SimState {
 
         for _ in 0..minutes {
             self.land.advance_minutes(1);
-            self.population
-                .advance_minute(self.land.date(), self.land.time());
+            self.population.advance_minute(&self.land);
         }
         self.kind = KIND_OF_USE::KIND_NOTHING_TO_RUN;
     }
@@ -3490,6 +3905,62 @@ mod tests {
     }
 
     #[test]
+    fn land_tide_height_slope_and_water_sampling_are_deterministic() {
+        let mut land = LandState::from_snapshot(LandSnapshot::new(2, [7633, 53305], 719));
+        land.cycle();
+        assert_eq!(land.time(), 720);
+        assert!((WATER_MAP - TIDE_AMPLITUDE_LUNAR - TIDE_AMPLITUDE_SOLAR
+            ..=WATER_MAP + TIDE_AMPLITUDE_LUNAR + TIDE_AMPLITUDE_SOLAR)
+            .contains(&n_int::from(land.tide_level())));
+
+        let sample = land.terrain_sample([12_345, 23_456]);
+        assert_eq!(sample, land.terrain_sample([12_345, 23_456]));
+        assert_eq!(sample.map_position, [192, 366]);
+        assert_eq!(sample.water, sample.height < n_int::from(land.tide_level()));
+        assert_eq!(sample.intertidal, sample.height <= TIDE_MAX);
+    }
+
+    #[test]
+    fn terrain_biology_drives_land_and_intertidal_food_sources() {
+        let land = LandState::from_snapshot(LandSnapshot::new(5, [7633, 53305], 400));
+        let mut saw_land_food = false;
+        let mut saw_intertidal_food = false;
+        let mut saw_shellfish = false;
+        let mut saw_seaweed = false;
+
+        for map_x in (0..MAP_DIMENSION).step_by(7) {
+            for map_y in (0..MAP_DIMENSION).step_by(11) {
+                let location = [
+                    (map_x << APE_TO_MAP_BIT_RATIO) as n_byte2,
+                    (map_y << APE_TO_MAP_BIT_RATIO) as n_byte2,
+                ];
+                let food = land.food_source_at(location);
+                let height = land.height_at(location);
+                if height > TIDE_MAX && food.max_energy > BEING_DEAD {
+                    saw_land_food = true;
+                    assert!(matches!(food.food_type, FOOD_VEGETABLE | FOOD_FRUIT));
+                }
+                if height <= TIDE_MAX {
+                    saw_intertidal_food = true;
+                    if food.food_type == FOOD_SHELLFISH {
+                        saw_shellfish = true;
+                        assert_eq!(food.max_energy, ENERGY_SHELLFISH);
+                    }
+                    if food.food_type == FOOD_SEAWEED {
+                        saw_seaweed = true;
+                        assert_eq!(food.max_energy, ENERGY_SEAWEED);
+                    }
+                }
+            }
+        }
+
+        assert!(saw_land_food);
+        assert!(saw_intertidal_food);
+        assert!(saw_shellfish);
+        assert!(saw_seaweed);
+    }
+
+    #[test]
     fn startup_state_transfer_json_uses_seeded_land_snapshot() {
         let state = SimState::start_up(0x5261_f726);
         let file = state.tranfer_startup_out_json();
@@ -3773,6 +4244,7 @@ mod tests {
 
     #[test]
     fn speed_history_advance_and_move_energy_follow_native_shape() {
+        let land = LandState::from_snapshot(LandSnapshot::new(0, [7633, 53305], 400));
         let mut being = BeingSummary::new("Speedy".to_string(), 512, 258, 0, [2, 3, 4, 5]);
         being.set_speed(5);
         being.speed_advance();
@@ -3782,13 +4254,14 @@ mod tests {
         assert_eq!(being.ten_minute_distance(), 12);
 
         being.set_speed(0);
-        let resting = being.move_energy();
+        let resting = being.move_energy(&land);
         being.set_speed(20);
-        assert!(being.move_energy() > resting);
+        assert!(being.move_energy(&land) > resting);
     }
 
     #[test]
     fn awake_cycle_eats_grows_recalculates_mass_and_sets_state() {
+        let land = LandState::from_snapshot(LandSnapshot::new(0, [7633, 53305], 400));
         let mut being = BeingSummary::new(
             "Hungry".to_string(),
             512,
@@ -3798,15 +4271,63 @@ mod tests {
         );
         being.energy = BEING_HUNGRY - 1;
         being.random_seed = [1, 2];
+        being.location = (0..MAP_DIMENSION)
+            .step_by(5)
+            .flat_map(|map_x| {
+                (0..MAP_DIMENSION).step_by(5).map(move |map_y| {
+                    [
+                        (map_x << APE_TO_MAP_BIT_RATIO) as n_byte2,
+                        (map_y << APE_TO_MAP_BIT_RATIO) as n_byte2,
+                    ]
+                })
+            })
+            .find(|location| {
+                land.height_at(*location) > TIDE_MAX
+                    && land.food_source_at(*location).max_energy > BEING_DEAD
+            })
+            .expect("seeded land should expose edible land food");
         let before_energy = being.energy();
         let before_height = being.height();
 
-        being.cycle_awake(0, 0);
+        being.cycle_awake(&land);
 
         assert!(being.energy() > before_energy);
         assert!(being.height() > before_height);
         assert!(being.macro_state() & BEING_STATE_EATING != 0);
         assert!(being.mass() >= being.calculated_mass());
+    }
+
+    #[test]
+    fn food_absorption_supports_multiple_food_types_and_ingests_pathogens() {
+        let mut being = BeingSummary::new(
+            "Forager".to_string(),
+            512,
+            258,
+            0,
+            [n_genetics::MAX; CHROMOSOMES],
+        );
+        assert!(being.food_absorption(ENERGY_GRASS, FOOD_VEGETABLE) > 0);
+        assert!(being.food_absorption(ENERGY_FRUIT, FOOD_FRUIT) > 0);
+        assert!(being.food_absorption(ENERGY_SHELLFISH, FOOD_SHELLFISH) > 0);
+        assert!(being.food_absorption(ENERGY_SEAWEED, FOOD_SEAWEED) > 0);
+        assert!(being.food_absorption(ENERGY_BIRD_EGGS, FOOD_BIRD_EGGS) <= 320);
+        assert!(being.food_absorption(ENERGY_LIZARD_EGGS, FOOD_LIZARD_EGGS) <= 320);
+
+        let mut infected = None;
+        for seed in 0..10_000 {
+            let mut candidate = being.clone();
+            candidate.immune_seed = [seed, seed ^ 0x55aa];
+            let _ = candidate.food_absorption(ENERGY_SHELLFISH, FOOD_SHELLFISH);
+            if candidate.immune_antigens().iter().any(|value| *value > 0) {
+                infected = Some(candidate);
+                break;
+            }
+        }
+        let infected = infected.expect("pathogen environment probability should be reachable");
+        assert!(infected
+            .immune_shape_antigen()
+            .iter()
+            .any(|shape| shape & 7 == FOOD_SHELLFISH + PATHOGEN_TRANSMISSION_FOOD_VEGETABLE));
     }
 
     #[test]
