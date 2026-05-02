@@ -102,6 +102,12 @@ pub const DRIVE_HUNGER: usize = 0;
 pub const DRIVE_SOCIAL: usize = 1;
 pub const DRIVE_FATIGUE: usize = 2;
 pub const DRIVE_SEX: usize = 3;
+pub const PREFERENCE_GROOM_MALE: usize = 8;
+pub const PREFERENCE_GROOM_FEMALE: usize = 9;
+pub const PREFERENCE_ANECDOTE_EVENT_MUTATION: usize = 10;
+pub const PREFERENCE_ANECDOTE_AFFECT_MUTATION: usize = 11;
+pub const PREFERENCE_CHAT: usize = 12;
+pub const PREFERENCE_SOCIAL: usize = 13;
 pub const FATIGUE_SPEED_THRESHOLD: n_byte = 8;
 pub const THRESHOLD_SEEK_MATE: n_byte = 100;
 pub const BEING_MAX_MASS_G: n_byte2 = 7_000;
@@ -129,6 +135,56 @@ pub const BEING_MET: usize = 1;
 pub const RELATIONSHIP_SELF: n_byte = 1;
 pub const SOCIAL_RESPECT_NORMAL: n_byte = 127;
 pub const ENTITY_BEING: n_byte = 0;
+pub const EVENT_EAT: n_byte = 1;
+pub const EVENT_MATE: n_byte = 2;
+pub const EVENT_HIT: n_byte = 3;
+pub const EVENT_HIT_BY: n_byte = 4;
+pub const EVENT_SWIM: n_byte = 5;
+pub const EVENT_GROOM: n_byte = 6;
+pub const EVENT_GROOMED: n_byte = 7;
+pub const EVENT_CHAT: n_byte = 8;
+pub const EVENT_SHOUT: n_byte = 9;
+pub const EVENT_BIRTH: n_byte = 10;
+pub const EVENT_CARRIED: n_byte = 11;
+pub const EVENT_CARRIED_BY: n_byte = 12;
+pub const EVENT_SUCKLED: n_byte = 13;
+pub const EVENT_SUCKLED_BY: n_byte = 14;
+pub const EVENT_SEEK_MATE: n_byte = 15;
+pub const EVENT_WHACKED: n_byte = 16;
+pub const EVENT_WHACKED_BY: n_byte = 17;
+pub const EVENT_HURLED: n_byte = 18;
+pub const EVENT_HURLED_BY: n_byte = 19;
+pub const EVENT_HUGGED: n_byte = 20;
+pub const EVENT_HUGGED_BY: n_byte = 21;
+pub const EVENT_PRODDED: n_byte = 22;
+pub const EVENT_PRODDED_BY: n_byte = 23;
+pub const EVENT_DRAG: n_byte = 24;
+pub const EVENT_BRANDISH: n_byte = 25;
+pub const EVENT_DROP: n_byte = 26;
+pub const EVENT_PICKUP: n_byte = 27;
+pub const EVENT_GIVEN: n_byte = 28;
+pub const EVENT_GIVEN_BY: n_byte = 29;
+pub const EVENT_CHEW: n_byte = 30;
+pub const EVENT_BASH_OBJECTS: n_byte = 31;
+pub const EVENT_FISH: n_byte = 32;
+pub const EVENT_SMILED: n_byte = 33;
+pub const EVENT_SMILED_BY: n_byte = 34;
+pub const EVENT_GLOWERED: n_byte = 35;
+pub const EVENT_GLOWERED_BY: n_byte = 36;
+pub const EVENT_PATTED: n_byte = 37;
+pub const EVENT_PATTED_BY: n_byte = 38;
+pub const EVENT_POINT: n_byte = 39;
+pub const EVENT_POINTED: n_byte = 40;
+pub const EVENT_TICKLED: n_byte = 41;
+pub const EVENT_TICKLED_BY: n_byte = 42;
+pub const EVENT_INTENTION: n_byte = 128;
+pub const EPISODIC_AFFECT_ZERO: n_byte2 = 16_384;
+pub const AFFECT_MATE: i32 = 1_000;
+pub const AFFECT_CHAT: i32 = 100;
+pub const AFFECT_GROOM: i32 = 100;
+pub const AFFECT_SEEK_MATE: i32 = 600;
+pub const AFFECT_SQUABBLE_VICTOR: i32 = 1_100;
+pub const AFFECT_SQUABBLE_VANQUISHED: i32 = -800;
 pub const IMMUNE_FIT: n_byte = 5;
 pub const MIN_ANTIBODIES: n_byte = 16;
 pub const PATHOGEN_MUTATION_PROB: n_byte2 = 100;
@@ -495,7 +551,20 @@ pub struct BeingSummary {
     drives: [n_byte; DRIVES],
     braincode_register: [n_byte; BRAINCODE_PSPACE_REGISTERS],
     attention: [n_byte; ATTENTION_SIZE],
+    brainprobe: [simulated_ibrain_probe; BRAINCODE_PROBES],
+    brain_state: [n_byte2; 6],
+    script_overrides: n_byte2,
+    shout: [n_byte; SHOUT_BYTES],
+    inventory: [n_byte2; INVENTORY_SIZE],
+    learned_preference: [n_byte; PREFERENCES],
+    date_of_conception: n_byte4,
+    fetal_genetics: [n_genetics; CHROMOSOMES],
+    father_name: [n_byte2; 2],
+    mother_name: [n_byte2; 2],
+    child_generation_min: n_byte2,
+    child_generation_max: n_byte2,
     social_memory: [simulated_isocial; SOCIAL_SIZE],
+    episodic_memory: [simulated_iepisodic; EPISODIC_SIZE],
     immune_antigens: [n_byte; IMMUNE_ANTIGENS],
     immune_shape_antigen: [n_byte; IMMUNE_ANTIGENS],
     immune_antibodies: [n_byte; IMMUNE_POPULATION],
@@ -538,7 +607,20 @@ impl BeingSummary {
             drives: [127; DRIVES],
             braincode_register: [0; BRAINCODE_PSPACE_REGISTERS],
             attention: [0; ATTENTION_SIZE],
+            brainprobe: [simulated_ibrain_probe::default(); BRAINCODE_PROBES],
+            brain_state: [0; 6],
+            script_overrides: 0,
+            shout: [0; SHOUT_BYTES],
+            inventory: [0; INVENTORY_SIZE],
+            learned_preference: [0; PREFERENCES],
+            date_of_conception: 0,
+            fetal_genetics: [0; CHROMOSOMES],
+            father_name: [0; 2],
+            mother_name: [0; 2],
+            child_generation_min: 0,
+            child_generation_max: 0,
             social_memory: [simulated_isocial::default(); SOCIAL_SIZE],
+            episodic_memory: [simulated_iepisodic::default(); EPISODIC_SIZE],
             immune_antigens: [0; IMMUNE_ANTIGENS],
             immune_shape_antigen: [0; IMMUNE_ANTIGENS],
             immune_antibodies: [0; IMMUNE_POPULATION],
@@ -546,6 +628,7 @@ impl BeingSummary {
             immune_seed: [0; 2],
         };
         being.init_social_memory();
+        being.init_episodic_memory();
         being
     }
 
@@ -653,7 +736,20 @@ impl BeingSummary {
             drives: [127; DRIVES],
             braincode_register: [0; BRAINCODE_PSPACE_REGISTERS],
             attention: [0; ATTENTION_SIZE],
+            brainprobe: [simulated_ibrain_probe::default(); BRAINCODE_PROBES],
+            brain_state: [0; 6],
+            script_overrides: 0,
+            shout: [0; SHOUT_BYTES],
+            inventory: [0; INVENTORY_SIZE],
+            learned_preference: [0; PREFERENCES],
+            date_of_conception: 0,
+            fetal_genetics: [0; CHROMOSOMES],
+            father_name: [0; 2],
+            mother_name: [0; 2],
+            child_generation_min: 0,
+            child_generation_max: 0,
             social_memory: [simulated_isocial::default(); SOCIAL_SIZE],
+            episodic_memory: [simulated_iepisodic::default(); EPISODIC_SIZE],
             immune_antigens: [0; IMMUNE_ANTIGENS],
             immune_shape_antigen: [0; IMMUNE_ANTIGENS],
             immune_antibodies: [0; IMMUNE_POPULATION],
@@ -673,6 +769,9 @@ impl BeingSummary {
         }
         if !being.load_social_memory(entries)? {
             being.init_social_memory();
+        }
+        if !being.load_episodic_memory(entries)? {
+            being.init_episodic_memory();
         }
         Ok(being)
     }
@@ -729,7 +828,20 @@ impl BeingSummary {
             drives: [127; DRIVES],
             braincode_register: [0; BRAINCODE_PSPACE_REGISTERS],
             attention: [0; ATTENTION_SIZE],
+            brainprobe: [simulated_ibrain_probe::default(); BRAINCODE_PROBES],
+            brain_state: [0; 6],
+            script_overrides: 0,
+            shout: [0; SHOUT_BYTES],
+            inventory: [0; INVENTORY_SIZE],
+            learned_preference: [0; PREFERENCES],
+            date_of_conception: 0,
+            fetal_genetics: [0; CHROMOSOMES],
+            father_name: [0; 2],
+            mother_name: [0; 2],
+            child_generation_min: 0,
+            child_generation_max: 0,
             social_memory: [simulated_isocial::default(); SOCIAL_SIZE],
+            episodic_memory: [simulated_iepisodic::default(); EPISODIC_SIZE],
             immune_antigens: [0; IMMUNE_ANTIGENS],
             immune_shape_antigen: [0; IMMUNE_ANTIGENS],
             immune_antibodies: [0; IMMUNE_POPULATION],
@@ -741,6 +853,28 @@ impl BeingSummary {
             if let Some(drives) = optional_array_byte(changes, "drives", DRIVES)? {
                 being.drives.copy_from_slice(&drives);
             }
+            if let Some(shout) = optional_array_byte(changes, "shout", SHOUT_BYTES)? {
+                being.shout.copy_from_slice(&shout);
+            }
+            if let Some(inventory) = optional_array_byte2(changes, "inventory", INVENTORY_SIZE)? {
+                being.inventory.copy_from_slice(&inventory);
+            }
+            if let Some(preferences) =
+                optional_array_byte(changes, "learned_preference", PREFERENCES)?
+            {
+                being.learned_preference.copy_from_slice(&preferences);
+            }
+            being.date_of_conception =
+                optional_number_byte4(changes, "date_of_conception")?.unwrap_or(0);
+            if let Some(fetal_genetics) = optional_genetics4(changes, "fetal_genetics")? {
+                being.fetal_genetics = fetal_genetics;
+            }
+            being.father_name = optional_array_byte2_2(changes, "father_name")?.unwrap_or([0; 2]);
+            being.mother_name = optional_array_byte2_2(changes, "mother_name")?.unwrap_or([0; 2]);
+            let child_generation =
+                optional_array_byte2_2(changes, "child_generation_range")?.unwrap_or([0; 2]);
+            being.child_generation_min = child_generation[0];
+            being.child_generation_max = child_generation[1];
         }
         if let Some(brain) = optional_object(entries, "braindata")? {
             if let Some(registers) =
@@ -750,6 +884,13 @@ impl BeingSummary {
             }
             if let Some(attention) = optional_array_byte(brain, "attention", ATTENTION_SIZE)? {
                 being.attention.copy_from_slice(&attention);
+            }
+            if let Some(brain_state) = optional_array_byte2(brain, "brain_state", 6)? {
+                being.brain_state.copy_from_slice(&brain_state);
+            }
+            being.script_overrides = optional_number_byte2(brain, "script_overrides")?.unwrap_or(0);
+            if let Some(probes) = optional_brainprobe_array(brain, "brainprobe")? {
+                being.brainprobe = probes;
             }
         }
         if let Some(immune) = optional_object(entries, "immune_system")? {
@@ -771,6 +912,9 @@ impl BeingSummary {
 
         if !being.load_social_memory(entries)? {
             being.init_social_memory();
+        }
+        if !being.load_episodic_memory(entries)? {
+            being.init_episodic_memory();
         }
 
         Ok(being)
@@ -866,18 +1010,35 @@ impl BeingSummary {
     fn native_changes_object(&self) -> Vec<ObjectEntry> {
         let mut changes = Vec::new();
         object_array_byte(&mut changes, "drives", &self.drives);
+        object_array_byte(&mut changes, "shout", &self.shout);
+        object_array_byte2(&mut changes, "inventory", &self.inventory);
+        object_array_byte(&mut changes, "learned_preference", &self.learned_preference);
+        object_number(
+            &mut changes,
+            "date_of_conception",
+            self.date_of_conception.into(),
+        );
+        object_array_genetics(&mut changes, "fetal_genetics", &self.fetal_genetics);
+        object_array_byte2(&mut changes, "father_name", &self.father_name);
+        object_array_byte2(&mut changes, "mother_name", &self.mother_name);
+        let child_generation = [self.child_generation_min, self.child_generation_max];
+        object_array_byte2(&mut changes, "child_generation_range", &child_generation);
         changes
     }
 
     fn native_events_object(&self) -> Vec<ObjectEntry> {
         let mut events = Vec::new();
         object_array(&mut events, "social", self.native_social_array());
+        object_array(&mut events, "episodic", self.native_episodic_array());
         events
     }
 
     fn native_brain_object(&self) -> Vec<ObjectEntry> {
         let mut brain = Vec::new();
         object_array_byte(&mut brain, "braincode_register", &self.braincode_register);
+        object_array(&mut brain, "brainprobe", self.native_brainprobe_array());
+        object_array_byte2(&mut brain, "brain_state", &self.brain_state);
+        object_number(&mut brain, "script_overrides", self.script_overrides.into());
         object_array_byte(&mut brain, "attention", &self.attention);
         brain
     }
@@ -896,6 +1057,20 @@ impl BeingSummary {
         self.social_memory
             .iter()
             .map(|entry| ObjectValue::Object(social_entry_to_object(entry)))
+            .collect()
+    }
+
+    fn native_episodic_array(&self) -> Vec<ObjectValue> {
+        self.episodic_memory
+            .iter()
+            .map(|entry| ObjectValue::Object(episodic_entry_to_object(entry)))
+            .collect()
+    }
+
+    fn native_brainprobe_array(&self) -> Vec<ObjectValue> {
+        self.brainprobe
+            .iter()
+            .map(|entry| ObjectValue::Object(brainprobe_entry_to_object(entry)))
             .collect()
     }
 
@@ -919,6 +1094,31 @@ impl BeingSummary {
                 return Err("social entry object expected");
             };
             self.social_memory[index] = social_entry_from_object(entries)?;
+        }
+        Ok(true)
+    }
+
+    fn load_episodic_memory(&mut self, entries: &[ObjectEntry]) -> Result<bool, &'static str> {
+        let episodic = if let Some(events) = optional_object(entries, "events")? {
+            optional_field(events, "episodic")
+        } else {
+            optional_field(entries, "episodic")
+        };
+
+        let Some(episodic) = episodic else {
+            return Ok(false);
+        };
+
+        let ObjectValue::Array(values) = episodic else {
+            return Err("episodic array expected");
+        };
+
+        self.init_episodic_memory();
+        for (index, value) in values.iter().take(EPISODIC_SIZE).enumerate() {
+            let ObjectValue::Object(entries) = value else {
+                return Err("episodic entry object expected");
+            };
+            self.episodic_memory[index] = episodic_entry_from_object(entries)?;
         }
         Ok(true)
     }
@@ -949,8 +1149,21 @@ impl BeingSummary {
         being.delta.social_coord_ny = self.social_coord[3];
         being.delta.awake = self.awake_level;
         being.events.social = self.social_memory;
+        being.events.episodic = self.episodic_memory;
         being.changes.drives = self.drives;
+        being.changes.shout = self.shout;
+        being.changes.inventory = self.inventory;
+        being.changes.learned_preference = self.learned_preference;
+        being.changes.date_of_conception = self.date_of_conception;
+        being.changes.fetal_genetics = self.fetal_genetics;
+        being.changes.father_name = self.father_name;
+        being.changes.mother_name = self.mother_name;
+        being.changes.child_generation_min = self.child_generation_min;
+        being.changes.child_generation_max = self.child_generation_max;
         being.braindata.braincode_register = self.braincode_register;
+        being.braindata.brainprobe = self.brainprobe;
+        being.braindata.brain_state = self.brain_state;
+        being.braindata.script_overrides = self.script_overrides;
         being.braindata.attention = self.attention;
         being.immune_system.antigens = self.immune_antigens;
         being.immune_system.shape_antigen = self.immune_shape_antigen;
@@ -993,7 +1206,20 @@ impl BeingSummary {
             drives: native.changes.drives,
             braincode_register: native.braindata.braincode_register,
             attention: native.braindata.attention,
+            brainprobe: native.braindata.brainprobe,
+            brain_state: native.braindata.brain_state,
+            script_overrides: native.braindata.script_overrides,
+            shout: native.changes.shout,
+            inventory: native.changes.inventory,
+            learned_preference: native.changes.learned_preference,
+            date_of_conception: native.changes.date_of_conception,
+            fetal_genetics: native.changes.fetal_genetics,
+            father_name: native.changes.father_name,
+            mother_name: native.changes.mother_name,
+            child_generation_min: native.changes.child_generation_min,
+            child_generation_max: native.changes.child_generation_max,
             social_memory: native.events.social,
+            episodic_memory: native.events.episodic,
             immune_antigens: native.immune_system.antigens,
             immune_shape_antigen: native.immune_system.shape_antigen,
             immune_antibodies: native.immune_system.antibodies,
@@ -1106,6 +1332,18 @@ impl BeingSummary {
         self.attention
     }
 
+    pub const fn brainprobe(&self) -> [simulated_ibrain_probe; BRAINCODE_PROBES] {
+        self.brainprobe
+    }
+
+    pub const fn brain_state(&self) -> [n_byte2; 6] {
+        self.brain_state
+    }
+
+    pub const fn script_overrides(&self) -> n_byte2 {
+        self.script_overrides
+    }
+
     pub const fn body_attention(&self) -> n_byte {
         self.attention[ATTENTION_BODY]
     }
@@ -1120,6 +1358,26 @@ impl BeingSummary {
 
     pub fn social_memory_mut(&mut self) -> &mut [simulated_isocial; SOCIAL_SIZE] {
         &mut self.social_memory
+    }
+
+    pub const fn episodic_memory(&self) -> [simulated_iepisodic; EPISODIC_SIZE] {
+        self.episodic_memory
+    }
+
+    pub fn episodic_memory_mut(&mut self) -> &mut [simulated_iepisodic; EPISODIC_SIZE] {
+        &mut self.episodic_memory
+    }
+
+    pub const fn shout(&self) -> [n_byte; SHOUT_BYTES] {
+        self.shout
+    }
+
+    pub const fn inventory(&self) -> [n_byte2; INVENTORY_SIZE] {
+        self.inventory
+    }
+
+    pub const fn learned_preference(&self) -> [n_byte; PREFERENCES] {
+        self.learned_preference
     }
 
     pub const fn immune_seed(&self) -> [n_byte2; 2] {
@@ -1225,7 +1483,8 @@ impl BeingSummary {
             return;
         }
 
-        self.cycle_awake(land_date);
+        self.cycle_awake(land_date, land_time);
+        self.cycle_episodic();
         self.cycle_drives(land_date);
         self.speed_advance();
 
@@ -1264,7 +1523,7 @@ impl BeingSummary {
         }
     }
 
-    fn cycle_awake(&mut self, land_date: n_byte4) {
+    fn cycle_awake(&mut self, land_date: n_byte4, land_time: n_byte4) {
         let mut state = BEING_STATE_AWAKE;
         if self.energy_less_than(BEING_HUNGRY + 1) {
             state |= BEING_STATE_HUNGRY;
@@ -1276,6 +1535,7 @@ impl BeingSummary {
                 let food_energy = self.food_energy();
                 if food_energy > 0 {
                     self.energy_delta(i32::from(food_energy));
+                    self.record_episodic_food(food_energy, FOOD_VEGETABLE, land_date, land_time);
                     self.reset_drive(DRIVE_HUNGER);
                     state |= BEING_STATE_EATING;
                     if age_days_at(land_date, self.date_of_birth) < AGE_OF_MATURITY
@@ -1419,6 +1679,231 @@ impl BeingSummary {
             entry.friend_foe = SOCIAL_RESPECT_NORMAL;
         }
         self.social_memory[0].relationship = RELATIONSHIP_SELF;
+    }
+
+    fn init_episodic_memory(&mut self) {
+        self.episodic_memory = [simulated_iepisodic::default(); EPISODIC_SIZE];
+        for entry in &mut self.episodic_memory {
+            entry.affect = EPISODIC_AFFECT_ZERO;
+        }
+    }
+
+    fn ensure_social_self(&mut self) {
+        self.social_memory[0].relationship = RELATIONSHIP_SELF;
+        self.social_memory[0].entity_type = ENTITY_BEING;
+        self.social_memory[0].friend_foe = SOCIAL_RESPECT_NORMAL;
+    }
+
+    fn social_index_for(&self, gender_name: n_byte2, family_name: n_byte2) -> Option<usize> {
+        self.social_memory
+            .iter()
+            .take(SOCIAL_SIZE_BEINGS)
+            .position(|entry| {
+                entry.first_name[BEING_MET] == gender_name
+                    && entry.family_name[BEING_MET] == family_name
+            })
+    }
+
+    fn social_replacement_index(&self) -> usize {
+        self.social_memory
+            .iter()
+            .take(SOCIAL_SIZE_BEINGS)
+            .enumerate()
+            .skip(1)
+            .find(|(_, entry)| social_entry_empty(entry))
+            .map(|(index, _)| index)
+            .unwrap_or_else(|| {
+                self.social_memory
+                    .iter()
+                    .take(SOCIAL_SIZE_BEINGS)
+                    .enumerate()
+                    .skip(1)
+                    .min_by_key(|(_, entry)| entry.familiarity)
+                    .map(|(index, _)| index)
+                    .unwrap_or(1)
+            })
+    }
+
+    fn meet_being(
+        &mut self,
+        other: &BeingSummary,
+        land_date: n_byte4,
+        land_time: n_byte4,
+    ) -> usize {
+        self.ensure_social_self();
+        let index = self
+            .social_index_for(other.gender_name, other.family_name)
+            .unwrap_or_else(|| self.social_replacement_index());
+        let entry = &mut self.social_memory[index];
+        let newly_met = social_entry_empty(entry);
+        entry.entity_type = ENTITY_BEING;
+        entry.first_name[BEING_MEETER] = self.gender_name;
+        entry.family_name[BEING_MEETER] = self.family_name;
+        entry.first_name[BEING_MET] = other.gender_name;
+        entry.family_name[BEING_MET] = other.family_name;
+        entry.space_time.date = land_date;
+        entry.space_time.time = land_time;
+        entry.space_time.location = self.location;
+        entry.belief = other.macro_state;
+        entry.familiarity = entry.familiarity.saturating_add(1);
+        if newly_met {
+            entry.friend_foe = SOCIAL_RESPECT_NORMAL;
+            entry.relationship = 0;
+        }
+        self.attention[ATTENTION_ACTOR] = index as n_byte;
+        index
+    }
+
+    fn social_secondary_target(&self, beings: &[BeingSummary]) -> [n_byte2; 2] {
+        let origin = [
+            n_int::from(self.social_coord[0]),
+            n_int::from(self.social_coord[1]),
+        ];
+        let mut sum = [0, 0];
+        let mut count = 0;
+
+        for entry in self.social_memory.iter().take(SOCIAL_SIZE_BEINGS).skip(1) {
+            if social_entry_empty(entry) {
+                continue;
+            }
+            let Some(other) = beings.iter().find(|being| {
+                being.gender_name == entry.first_name[BEING_MET]
+                    && being.family_name == entry.family_name[BEING_MET]
+            }) else {
+                continue;
+            };
+            let weight = n_int::from(entry.friend_foe) - n_int::from(SOCIAL_RESPECT_NORMAL);
+            sum[0] += (n_int::from(other.social_coord[0]) - origin[0]) * weight;
+            sum[1] += (n_int::from(other.social_coord[1]) - origin[1]) * weight;
+            count += 1;
+        }
+
+        if count == 0 {
+            return [self.social_coord[0], self.social_coord[1]];
+        }
+
+        [
+            clamp_byte2(origin[0] + sum[0] / (count * 20)),
+            clamp_byte2(origin[1] + sum[1] / (count * 20)),
+        ]
+    }
+
+    fn record_episodic_food(
+        &mut self,
+        energy: n_byte2,
+        food_type: n_byte,
+        land_date: n_byte4,
+        land_time: n_byte4,
+    ) {
+        self.record_episodic_full(
+            EVENT_EAT,
+            i32::from(energy),
+            self.gender_name,
+            self.family_name,
+            0,
+            0,
+            0,
+            food_type,
+            land_date,
+            land_time,
+        );
+    }
+
+    fn record_episodic_interaction(
+        &mut self,
+        other: &BeingSummary,
+        event: n_byte,
+        affect: i32,
+        arg: n_byte2,
+        land_date: n_byte4,
+        land_time: n_byte4,
+    ) {
+        self.record_episodic_full(
+            event,
+            affect,
+            self.gender_name,
+            self.family_name,
+            other.gender_name,
+            other.family_name,
+            arg,
+            0,
+            land_date,
+            land_time,
+        );
+    }
+
+    fn record_episodic_full(
+        &mut self,
+        event: n_byte,
+        affect: i32,
+        name1: n_byte2,
+        family1: n_byte2,
+        name2: n_byte2,
+        family2: n_byte2,
+        arg: n_byte2,
+        food: n_byte,
+        land_date: n_byte4,
+        land_time: n_byte4,
+    ) {
+        let replace = self.episodic_replacement_index(event, name1, family1, name2, family2);
+        let entry = &mut self.episodic_memory[replace];
+        entry.event = event;
+        entry.affect =
+            (i32::from(EPISODIC_AFFECT_ZERO) + affect).clamp(0, i32::from(n_byte2::MAX)) as n_byte2;
+        entry.space_time.date = land_date;
+        entry.space_time.time = land_time;
+        entry.space_time.location = self.location;
+        entry.first_name = [name1, name2];
+        entry.family_name = [family1, family2];
+        entry.food = food;
+        entry.arg = arg;
+        self.attention[ATTENTION_EPISODE] = replace as n_byte;
+    }
+
+    fn episodic_replacement_index(
+        &self,
+        event: n_byte,
+        name1: n_byte2,
+        family1: n_byte2,
+        name2: n_byte2,
+        family2: n_byte2,
+    ) -> usize {
+        self.episodic_memory
+            .iter()
+            .position(|entry| {
+                entry.event == event
+                    && entry.first_name == [name1, name2]
+                    && entry.family_name == [family1, family2]
+            })
+            .or_else(|| {
+                self.episodic_memory
+                    .iter()
+                    .position(|entry| entry.event == 0)
+            })
+            .unwrap_or_else(|| {
+                self.episodic_memory
+                    .iter()
+                    .enumerate()
+                    .min_by_key(|(_, entry)| affect_distance(entry.affect))
+                    .map(|(index, _)| index)
+                    .unwrap_or(0)
+            })
+    }
+
+    fn cycle_episodic(&mut self) {
+        if self.awake_level == FULLY_ASLEEP {
+            return;
+        }
+        for entry in &mut self.episodic_memory {
+            if entry.event == 0 {
+                continue;
+            }
+            if entry.affect < EPISODIC_AFFECT_ZERO {
+                entry.affect = entry.affect.saturating_add(1);
+            } else if entry.affect > EPISODIC_AFFECT_ZERO {
+                entry.affect = entry.affect.saturating_sub(1);
+            }
+        }
     }
 
     fn init_immune(&mut self) {
@@ -1572,6 +2057,20 @@ fn age_days_at(current_date: n_byte4, date_of_birth: n_byte4) -> n_byte4 {
 fn wrap_apespace(value: n_int) -> n_byte2 {
     let bounds = n_int::from(APESPACE_BOUNDS);
     value.rem_euclid(bounds + 1) as n_byte2
+}
+
+fn clamp_byte2(value: n_int) -> n_byte2 {
+    value.clamp(0, n_int::from(n_byte2::MAX)) as n_byte2
+}
+
+fn social_entry_empty(entry: &simulated_isocial) -> bool {
+    entry.first_name[BEING_MET] == 0
+        && entry.family_name[BEING_MET] == 0
+        && entry.relationship <= RELATIONSHIP_SELF
+}
+
+fn affect_distance(affect: n_byte2) -> n_byte2 {
+    affect.abs_diff(EPISODIC_AFFECT_ZERO)
 }
 
 pub fn is_night(time: n_byte4) -> bool {
@@ -1858,7 +2357,188 @@ impl PopulationState {
         for being in &mut self.beings {
             being.advance_minute(land_date, land_time);
         }
+        self.social_initial_loop(land_date, land_time);
+        self.social_secondary_loop_no_sim();
     }
+
+    fn social_initial_loop(&mut self, land_date: n_byte4, land_time: n_byte4) {
+        let snapshot = self.beings.clone();
+        let targets = snapshot
+            .iter()
+            .map(|being| being.social_secondary_target(&snapshot))
+            .collect::<Vec<_>>();
+
+        for (being, target) in self.beings.iter_mut().zip(targets) {
+            being.ensure_social_self();
+            being.social_coord[2] = target[0];
+            being.social_coord[3] = target[1];
+        }
+
+        let len = self.beings.len();
+        for first in 0..len {
+            for second in first + 1..len {
+                if social_distance_under(&self.beings[first], &self.beings[second], 256) {
+                    let (left, right) = self.beings.split_at_mut(second);
+                    let first_being = &mut left[first];
+                    let second_being = &mut right[0];
+                    social_pair_cycle(first_being, second_being, land_date, land_time);
+                }
+            }
+        }
+    }
+
+    fn social_secondary_loop_no_sim(&mut self) {
+        for being in &mut self.beings {
+            being.social_coord[0] = being.social_coord[2];
+            being.social_coord[1] = being.social_coord[3];
+        }
+    }
+}
+
+fn social_distance_under(first: &BeingSummary, second: &BeingSummary, distance: n_int) -> bool {
+    let dx = n_int::from(first.location[0]).abs_diff(n_int::from(second.location[0]));
+    let dy = n_int::from(first.location[1]).abs_diff(n_int::from(second.location[1]));
+    let distance = distance as u64;
+    dx * dx + dy * dy <= distance * distance
+}
+
+fn social_pair_cycle(
+    first: &mut BeingSummary,
+    second: &mut BeingSummary,
+    land_date: n_byte4,
+    land_time: n_byte4,
+) {
+    let first_index = first.meet_being(second, land_date, land_time);
+    let second_index = second.meet_being(first, land_date, land_time);
+
+    let first_familiarity = first.social_memory[first_index].familiarity;
+    let second_familiarity = second.social_memory[second_index].familiarity;
+    if first_familiarity > 16 || second_familiarity > 16 {
+        social_groom_reduced(
+            first,
+            second,
+            first_index,
+            second_index,
+            land_date,
+            land_time,
+        );
+    } else if first.social_memory[first_index].friend_foe < SOCIAL_RESPECT_NORMAL - 32
+        || second.social_memory[second_index].friend_foe < SOCIAL_RESPECT_NORMAL - 32
+    {
+        social_squabble_reduced(
+            first,
+            second,
+            first_index,
+            second_index,
+            land_date,
+            land_time,
+        );
+    } else if first.drive(DRIVE_SEX) >= THRESHOLD_SEEK_MATE
+        && second.drive(DRIVE_SEX) >= THRESHOLD_SEEK_MATE
+        && first.is_female() != second.is_female()
+        && age_days_at(land_date, first.date_of_birth) >= AGE_OF_MATURITY
+        && age_days_at(land_date, second.date_of_birth) >= AGE_OF_MATURITY
+    {
+        first.goal = [1, second.gender_name, second.family_name, 0];
+        second.goal = [1, first.gender_name, first.family_name, 0];
+        first.record_episodic_interaction(
+            second,
+            EVENT_SEEK_MATE,
+            AFFECT_SEEK_MATE,
+            0,
+            land_date,
+            land_time,
+        );
+        second.record_episodic_interaction(
+            first,
+            EVENT_SEEK_MATE,
+            AFFECT_SEEK_MATE,
+            0,
+            land_date,
+            land_time,
+        );
+    }
+}
+
+fn social_groom_reduced(
+    first: &mut BeingSummary,
+    second: &mut BeingSummary,
+    first_index: usize,
+    second_index: usize,
+    land_date: n_byte4,
+    land_time: n_byte4,
+) {
+    first.social_memory[first_index].friend_foe = first.social_memory[first_index]
+        .friend_foe
+        .saturating_add(1);
+    second.social_memory[second_index].friend_foe = second.social_memory[second_index]
+        .friend_foe
+        .saturating_add(1);
+    first.macro_state |= BEING_STATE_GROOMING;
+    second.macro_state |= BEING_STATE_GROOMING;
+    first.honor = first.honor.saturating_add(1);
+    second.parasites = second.parasites.saturating_sub(1);
+    first.attention[ATTENTION_BODY] = BODY_BACK;
+    second.attention[ATTENTION_BODY] = BODY_BACK;
+    first.record_episodic_interaction(
+        second,
+        EVENT_GROOM,
+        AFFECT_GROOM,
+        n_byte2::from(BODY_BACK),
+        land_date,
+        land_time,
+    );
+    second.record_episodic_interaction(
+        first,
+        EVENT_GROOMED,
+        AFFECT_GROOM,
+        n_byte2::from(BODY_BACK),
+        land_date,
+        land_time,
+    );
+}
+
+fn social_squabble_reduced(
+    first: &mut BeingSummary,
+    second: &mut BeingSummary,
+    first_index: usize,
+    second_index: usize,
+    land_date: n_byte4,
+    land_time: n_byte4,
+) {
+    first.social_memory[first_index].friend_foe = first.social_memory[first_index]
+        .friend_foe
+        .saturating_sub(1);
+    second.social_memory[second_index].friend_foe = second.social_memory[second_index]
+        .friend_foe
+        .saturating_sub(1);
+    first.macro_state |= BEING_STATE_SHOWFORCE;
+    second.macro_state |= BEING_STATE_SHOWFORCE;
+    first.energy_delta(-4);
+    second.energy_delta(-4);
+    if first.energy >= second.energy {
+        first.honor = first.honor.saturating_add(1);
+        second.set_speed(16);
+    } else {
+        second.honor = second.honor.saturating_add(1);
+        first.set_speed(16);
+    }
+    first.record_episodic_interaction(
+        second,
+        EVENT_HIT,
+        AFFECT_SQUABBLE_VICTOR,
+        0,
+        land_date,
+        land_time,
+    );
+    second.record_episodic_interaction(
+        first,
+        EVENT_HIT_BY,
+        AFFECT_SQUABBLE_VANQUISHED,
+        0,
+        land_date,
+        land_time,
+    );
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -2137,6 +2817,14 @@ fn object_array_byte(object: &mut Vec<ObjectEntry>, name: &str, values: &[n_byte
     object_array(object, name, array);
 }
 
+fn object_array_genetics(object: &mut Vec<ObjectEntry>, name: &str, values: &[n_genetics]) {
+    let mut array = Vec::new();
+    for value in values {
+        array_add(&mut array, array_number((*value).into()));
+    }
+    object_array(object, name, array);
+}
+
 pub fn startup_transfer_from_json_bytes(input: &[u8]) -> Result<StartupTransfer, &'static str> {
     let parsed = object_parse_json(input)?;
     let root = expect_object(&parsed, "root object expected")?;
@@ -2293,6 +2981,23 @@ fn optional_array_byte2_4(
     }
 }
 
+fn optional_array_byte2(
+    entries: &[ObjectEntry],
+    name: &str,
+    expected: usize,
+) -> Result<Option<Vec<n_byte2>>, &'static str> {
+    match optional_field(entries, name) {
+        Some(ObjectValue::Array(values)) if values.len() == expected => values
+            .iter()
+            .map(array_byte2)
+            .collect::<Result<Vec<_>, _>>()
+            .map(Some),
+        Some(ObjectValue::Array(_)) => Err("array length mismatch"),
+        Some(_) => Err("json array expected"),
+        None => Ok(None),
+    }
+}
+
 fn optional_array_byte(
     entries: &[ObjectEntry],
     name: &str,
@@ -2305,6 +3010,45 @@ fn optional_array_byte(
             .collect::<Result<Vec<_>, _>>()
             .map(Some),
         Some(ObjectValue::Array(_)) => Err("array length mismatch"),
+        Some(_) => Err("json array expected"),
+        None => Ok(None),
+    }
+}
+
+fn optional_genetics4(
+    entries: &[ObjectEntry],
+    name: &str,
+) -> Result<Option<[n_genetics; CHROMOSOMES]>, &'static str> {
+    match optional_field(entries, name) {
+        Some(ObjectValue::Array(values)) if values.len() == CHROMOSOMES => {
+            let mut genetics = [0; CHROMOSOMES];
+            for (index, value) in values.iter().enumerate() {
+                genetics[index] = array_byte4(value)?;
+            }
+            Ok(Some(genetics))
+        }
+        Some(ObjectValue::Array(_)) => Err("genetics array should have four values"),
+        Some(_) => Err("genetics array expected"),
+        None => Ok(None),
+    }
+}
+
+fn optional_brainprobe_array(
+    entries: &[ObjectEntry],
+    name: &str,
+) -> Result<Option<[simulated_ibrain_probe; BRAINCODE_PROBES]>, &'static str> {
+    match optional_field(entries, name) {
+        Some(ObjectValue::Array(values)) if values.len() <= BRAINCODE_PROBES => {
+            let mut probes = [simulated_ibrain_probe::default(); BRAINCODE_PROBES];
+            for (index, value) in values.iter().enumerate() {
+                let ObjectValue::Object(entries) = value else {
+                    return Err("brainprobe entry object expected");
+                };
+                probes[index] = brainprobe_entry_from_object(entries)?;
+            }
+            Ok(Some(probes))
+        }
+        Some(ObjectValue::Array(_)) => Err("brainprobe array too long"),
         Some(_) => Err("json array expected"),
         None => Ok(None),
     }
@@ -2473,6 +3217,66 @@ fn social_entry_to_object(entry: &simulated_isocial) -> Vec<ObjectEntry> {
     if entry.braincode.iter().any(|byte| *byte != 0) {
         object_array_byte(&mut object, "braincode", &entry.braincode);
     }
+    object
+}
+
+fn episodic_entry_from_object(
+    entries: &[ObjectEntry],
+) -> Result<simulated_iepisodic, &'static str> {
+    let mut entry = simulated_iepisodic::default();
+    entry.affect = EPISODIC_AFFECT_ZERO;
+    if let Some(space_time) = optional_object(entries, "space_time")? {
+        entry.space_time.date = optional_number_byte4(space_time, "date")?.unwrap_or(0);
+        entry.space_time.location =
+            optional_array_byte2_2(space_time, "location")?.unwrap_or([0; 2]);
+        entry.space_time.time = optional_number_byte4(space_time, "time")?.unwrap_or(0);
+    }
+    entry.first_name = optional_array_byte2_2(entries, "first_name")?.unwrap_or([0; 2]);
+    entry.family_name = optional_array_byte2_2(entries, "family_name")?.unwrap_or([0; 2]);
+    entry.event = optional_number_byte(entries, "event")?.unwrap_or(0);
+    entry.food = optional_number_byte(entries, "food")?.unwrap_or(0);
+    entry.affect = optional_number_byte2(entries, "affect")?.unwrap_or(EPISODIC_AFFECT_ZERO);
+    entry.arg = optional_number_byte2(entries, "arg")?.unwrap_or(0);
+    Ok(entry)
+}
+
+fn episodic_entry_to_object(entry: &simulated_iepisodic) -> Vec<ObjectEntry> {
+    let mut object = Vec::new();
+    let mut space_time = Vec::new();
+    object_number(&mut space_time, "date", entry.space_time.date.into());
+    object_array_byte2(&mut space_time, "location", &entry.space_time.location);
+    object_number(&mut space_time, "time", entry.space_time.time.into());
+    object_object(&mut object, "space_time", space_time);
+    object_array_byte2(&mut object, "first_name", &entry.first_name);
+    object_array_byte2(&mut object, "family_name", &entry.family_name);
+    object_number(&mut object, "event", entry.event.into());
+    object_number(&mut object, "food", entry.food.into());
+    object_number(&mut object, "affect", entry.affect.into());
+    object_number(&mut object, "arg", entry.arg.into());
+    object
+}
+
+fn brainprobe_entry_from_object(
+    entries: &[ObjectEntry],
+) -> Result<simulated_ibrain_probe, &'static str> {
+    Ok(simulated_ibrain_probe {
+        probe_type: optional_number_byte(entries, "probe_type")?.unwrap_or(0),
+        position: optional_number_byte(entries, "position")?.unwrap_or(0),
+        address: optional_number_byte(entries, "address")?.unwrap_or(0),
+        frequency: optional_number_byte(entries, "frequency")?.unwrap_or(0),
+        offset: optional_number_byte(entries, "offset")?.unwrap_or(0),
+        state: optional_number_byte(entries, "state")?.unwrap_or(0),
+    })
+}
+
+fn brainprobe_entry_to_object(entry: &simulated_ibrain_probe) -> Vec<ObjectEntry> {
+    let mut object = Vec::new();
+    object_number(&mut object, "probe_type", entry.probe_type.into());
+    object_number(&mut object, "position", entry.position.into());
+    object_number(&mut object, "address", entry.address.into());
+    object_number(&mut object, "frequency", entry.frequency.into());
+    object_number(&mut object, "offset", entry.offset.into());
+    object_number(&mut object, "state", entry.state.into());
     object
 }
 
@@ -2997,7 +3801,7 @@ mod tests {
         let before_energy = being.energy();
         let before_height = being.height();
 
-        being.cycle_awake(0);
+        being.cycle_awake(0, 0);
 
         assert!(being.energy() > before_energy);
         assert!(being.height() > before_height);
@@ -3043,6 +3847,100 @@ mod tests {
         assert_eq!(entry.belief, 9);
         assert_eq!(entry.classification.feature_number, 3);
         assert_eq!(entry.classification.observations, 4);
+    }
+
+    #[test]
+    fn social_loops_meet_close_beings_and_record_interactions() {
+        let mut first = BeingSummary::new("First".to_string(), 512, 100, 0, [2, 3, 4, 5]);
+        let mut second = BeingSummary::new("Second".to_string(), 768, 200, 0, [3, 4, 5, 6]);
+        first.location = [100, 100];
+        second.location = [120, 120];
+        first.energy = BEING_FULL;
+        second.energy = BEING_FULL;
+
+        let mut population = PopulationState::from_beings(vec![first, second], 2);
+        for _ in 0..20 {
+            population.social_initial_loop(AGE_OF_MATURITY + 1, 400);
+            population.social_secondary_loop_no_sim();
+        }
+
+        let first = &population.beings()[0];
+        let second = &population.beings()[1];
+        assert_eq!(
+            first.social_memory()[1].first_name[BEING_MET],
+            second.gender_name()
+        );
+        assert_eq!(
+            second.social_memory()[1].first_name[BEING_MET],
+            first.gender_name()
+        );
+        assert!(first.social_memory()[1].familiarity >= 20);
+        assert!(first.social_memory()[1].friend_foe > SOCIAL_RESPECT_NORMAL);
+        assert!(first.macro_state() & BEING_STATE_GROOMING != 0);
+        assert!(first
+            .episodic_memory()
+            .iter()
+            .any(|entry| entry.event == EVENT_GROOM));
+        assert!(second
+            .episodic_memory()
+            .iter()
+            .any(|entry| entry.event == EVENT_GROOMED));
+    }
+
+    #[test]
+    fn episodic_memory_records_fades_and_roundtrips() {
+        let mut being = BeingSummary::new("Episode".to_string(), 512, 258, 0, [2, 3, 4, 5]);
+        being.energy = BEING_FULL;
+        being.record_episodic_food(ENERGY_GRASS, FOOD_VEGETABLE, 2, 30);
+        let recorded = being.episodic_memory()[0];
+        assert_eq!(recorded.event, EVENT_EAT);
+        assert_eq!(recorded.food, FOOD_VEGETABLE);
+        assert!(recorded.affect > EPISODIC_AFFECT_ZERO);
+
+        being.cycle_episodic();
+        assert!(being.episodic_memory()[0].affect < recorded.affect);
+
+        let state = SimState {
+            kind: KIND_OF_USE::KIND_LOAD_FILE,
+            land: LandState::from_snapshot(LandSnapshot::new(2, [1, 2], 31)),
+            random_seed: [0; 2],
+            population: PopulationState::from_beings(vec![being.clone()], 1),
+        };
+        let saved = state.tranfer_startup_out_json();
+        let loaded =
+            SimState::load_startup_json(saved.written_data()).expect("episodic JSON should reload");
+        assert_eq!(
+            loaded.beings()[0].episodic_memory(),
+            being.episodic_memory()
+        );
+    }
+
+    #[test]
+    fn native_save_and_load_include_expanded_brain_and_change_fields() {
+        let state = SimState::load_startup_json(
+            b"{\"information\":{\"signature\":20033,\"version number\":708},\"land\":{\"date\":0,\"genetics\":[1,2],\"time\":0},\"beings\":[{\"name\":\"Expanded Ape\",\"delta\":{\"stored_energy\":3840},\"constant\":{\"date_of_birth\":0,\"genetics\":[2,3,4,5]},\"changes\":{\"drives\":[1,2,3,4],\"shout\":[1,2,3,4,5,6],\"inventory\":[10,11,12,13,14,15,16,17],\"learned_preference\":[1,1,1,1,1,1,1,1,2,3,4,5,6,7],\"date_of_conception\":99,\"fetal_genetics\":[9,8,7,6],\"father_name\":[5,6],\"mother_name\":[7,8],\"child_generation_range\":[3,4]},\"braindata\":{\"braincode_register\":[65,66,67],\"brain_state\":[1,2,3,4,5,6],\"script_overrides\":12,\"attention\":[0,1,2,3,4,5],\"brainprobe\":[{\"probe_type\":1,\"position\":2,\"address\":3,\"frequency\":4,\"offset\":5,\"state\":6}]},\"events\":{\"episodic\":[{\"space_time\":{\"date\":1,\"location\":[2,3],\"time\":4},\"first_name\":[512,0],\"family_name\":[258,0],\"event\":1,\"food\":0,\"affect\":16434,\"arg\":50}]}}]}",
+        )
+        .unwrap();
+        let being = &state.beings()[0];
+        assert_eq!(being.shout(), [1, 2, 3, 4, 5, 6]);
+        assert_eq!(being.inventory(), [10, 11, 12, 13, 14, 15, 16, 17]);
+        assert_eq!(being.learned_preference()[PREFERENCE_CHAT], 6);
+        assert_eq!(being.brain_state(), [1, 2, 3, 4, 5, 6]);
+        assert_eq!(being.script_overrides(), 12);
+        assert_eq!(being.brainprobe()[0].probe_type, 1);
+        assert_eq!(being.episodic_memory()[0].event, EVENT_EAT);
+
+        let saved = state.tranfer_startup_out_json();
+        let saved_json =
+            std::str::from_utf8(saved.written_data()).expect("expanded save should be utf8");
+        assert!(saved_json.contains("\"episodic\""));
+        assert!(saved_json.contains("\"brainprobe\""));
+        assert!(saved_json.contains("\"inventory\""));
+        assert!(saved_json.contains("\"learned_preference\""));
+        let loaded =
+            SimState::load_startup_json(saved.written_data()).expect("expanded save should reload");
+        assert_eq!(loaded.beings()[0].brainprobe()[0].state, 6);
+        assert_eq!(loaded.beings()[0].episodic_memory()[0].affect, 16_434);
     }
 
     #[test]

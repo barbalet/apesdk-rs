@@ -1,8 +1,9 @@
 use apesdk_sim::{
     banner, relationship_description, BeingSummary, SimState, ATTENTION_RELATIONSHIP, BEING_MET,
-    ENTITY_BEING, LARGE_SIM, MAP_DIMENSION, RELATIONSHIP_SELF, SOCIAL_RESPECT_NORMAL,
-    SOCIAL_SIZE_BEINGS, TIME_DAY_MINUTES, TIME_HOUR_MINUTES, TIME_MONTH_MINUTES, TIME_YEAR_DAYS,
-    TIME_YEAR_MINUTES,
+    ENTITY_BEING, EPISODIC_AFFECT_ZERO, EVENT_CHAT, EVENT_EAT, EVENT_GROOM, EVENT_GROOMED,
+    EVENT_HIT, EVENT_HIT_BY, EVENT_INTENTION, EVENT_SEEK_MATE, FOOD_VEGETABLE, LARGE_SIM,
+    MAP_DIMENSION, RELATIONSHIP_SELF, SOCIAL_RESPECT_NORMAL, SOCIAL_SIZE_BEINGS, TIME_DAY_MINUTES,
+    TIME_HOUR_MINUTES, TIME_MONTH_MINUTES, TIME_YEAR_DAYS, TIME_YEAR_MINUTES,
 };
 use apesdk_toolkit::n_uint;
 use std::fs;
@@ -898,7 +899,9 @@ impl Console {
             "genome" | "genetics" => format_genome(being),
             "friends" | "social" | "socialgraph" | "graph" => format_social_graph(being),
             "pathogen" => format_pathogen(being),
-            "episodic" => format!("\nEpisodic memory for {}\n", being.name()),
+            "episodic" => {
+                format_episodic(being, self.state.land().date(), self.state.land().time())
+            }
             "braincode" => format_braincode(being),
             "probes" => format_brainprobes(being),
             "speech" => format_speech(being),
@@ -1274,6 +1277,141 @@ fn format_social_graph(being: &BeingSummary) -> String {
     output
 }
 
+fn format_episodic(being: &BeingSummary, current_date: u32, current_time: u32) -> String {
+    let mut output = format!("\nEpisodic memory for {}\n", being.name());
+    let attention = being.attention()[apesdk_sim::ATTENTION_EPISODE] as usize;
+    for (index, entry) in being.episodic_memory().iter().enumerate() {
+        if entry.event == 0 || entry.first_name[0] != being.gender_name() {
+            continue;
+        }
+        let Some(description) = episodic_description(being, entry, current_date, current_time)
+        else {
+            continue;
+        };
+        if index == attention {
+            output.push_str(" <");
+            output.push_str(&description);
+            output.push_str(">\n");
+        } else {
+            output.push_str("  ");
+            output.push_str(&description);
+            output.push('\n');
+        }
+    }
+    output
+}
+
+fn episodic_description(
+    being: &BeingSummary,
+    entry: &apesdk_sim::simulated_iepisodic,
+    current_date: u32,
+    current_time: u32,
+) -> Option<String> {
+    let intention = entry.event & EVENT_INTENTION != 0;
+    let event = entry.event & (EVENT_INTENTION - 1);
+    let mut output = String::new();
+    if intention {
+        output.push_str("Intends ");
+    }
+
+    match event {
+        EVENT_EAT => {
+            output.push_str("Was eating ");
+            output.push_str(match entry.food {
+                FOOD_VEGETABLE => "vegetation",
+                _ => "food",
+            });
+        }
+        EVENT_GROOM => {
+            output.push_str("Groomed *");
+            output.push_str(&social_name(
+                entry.first_name[BEING_MET],
+                entry.family_name[BEING_MET],
+            ));
+            output.push_str("*'s ");
+            output.push_str(apesdk_sim::body_inventory_description(entry.arg as u8));
+        }
+        EVENT_GROOMED => {
+            output.push_str("Groomed by *");
+            output.push_str(&social_name(
+                entry.first_name[BEING_MET],
+                entry.family_name[BEING_MET],
+            ));
+            output.push('*');
+        }
+        EVENT_CHAT => {
+            output.push_str("Chatted with *");
+            output.push_str(&social_name(
+                entry.first_name[BEING_MET],
+                entry.family_name[BEING_MET],
+            ));
+            output.push('*');
+        }
+        EVENT_HIT => {
+            output.push_str("Hit *");
+            output.push_str(&social_name(
+                entry.first_name[BEING_MET],
+                entry.family_name[BEING_MET],
+            ));
+            output.push('*');
+        }
+        EVENT_HIT_BY => {
+            output.push_str("Hit by *");
+            output.push_str(&social_name(
+                entry.first_name[BEING_MET],
+                entry.family_name[BEING_MET],
+            ));
+            output.push('*');
+        }
+        EVENT_SEEK_MATE => {
+            output.push_str("Searched for *");
+            output.push_str(&social_name(
+                entry.first_name[BEING_MET],
+                entry.family_name[BEING_MET],
+            ));
+            output.push('*');
+        }
+        _ => return None,
+    }
+    output.push_str(&elapsed_description(
+        entry.space_time.date,
+        entry.space_time.time,
+        current_date,
+        current_time,
+    ));
+    output.push_str(&format!(
+        " affect:{:+}",
+        i32::from(entry.affect) - i32::from(EPISODIC_AFFECT_ZERO)
+    ));
+    let _ = being;
+    Some(output)
+}
+
+fn elapsed_description(
+    event_date: u32,
+    event_time: u32,
+    current_date: u32,
+    current_time: u32,
+) -> String {
+    let days_elapsed = current_date.saturating_sub(event_date);
+    if days_elapsed == 0 {
+        let minutes = current_time.saturating_sub(event_time);
+        return match minutes {
+            0 => " now".to_string(),
+            1 => " a minute ago".to_string(),
+            2..=4 => " a few minutes ago".to_string(),
+            5..=59 => format!(" {minutes} minutes ago"),
+            60..=119 => " an hour ago".to_string(),
+            _ => format!(" {} hours ago", minutes / 60),
+        };
+    }
+    if days_elapsed == 1 {
+        " yesterday".to_string()
+    } else {
+        format!(" {days_elapsed} days ago")
+    }
+}
+
 fn append_social_rows(output: &mut String, being: &BeingSummary, friends: bool) {
     let social = being.social_memory();
     for entry in social.iter().take(SOCIAL_SIZE_BEINGS).skip(1) {
@@ -1524,6 +1662,19 @@ mod tests {
         );
         let expected = normalize(include_str!(
             "../../../golden/cli/transcripts/help_errors.txt"
+        ));
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn runtime_parity_transcript_matches_rust_golden() {
+        let mut console = Console::default();
+        let actual = console.run_script(
+            include_str!("../../../golden/cli/sessions/runtime_parity.commands"),
+            true,
+        );
+        let expected = normalize(include_str!(
+            "../../../golden/cli/transcripts/runtime_parity.txt"
         ));
         assert_eq!(actual, expected);
     }
@@ -1858,6 +2009,38 @@ mod tests {
         assert!(actual.contains("\nSocial graph for Social Ape\n\nFriends:\n"));
         assert!(actual.contains("    00042  *00111-00222* Mother 1\n"));
         assert!(actual.contains("\nEnemies:\n    00007  *00333-00444* 0\n"));
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn episodic_command_prints_data_backed_memory_rows() {
+        let path = temp_save_path("episodic_rows");
+        let path_string = path.to_string_lossy();
+        fs::write(
+            &path,
+            b"{\"information\":{\"signature\":20033,\"version number\":708},\"land\":{\"date\":0,\"genetics\":[1,2],\"time\":10},\"beings\":[{\"name\":\"Episode Ape\",\"gender name\":512,\"family name\":258,\"delta\":{\"stored_energy\":3840},\"constant\":{\"date_of_birth\":0,\"name\":[512,258],\"genetics\":[2,3,4,5]},\"braindata\":{\"attention\":[0,0,0,0,0,0]},\"events\":{\"episodic\":[{\"space_time\":{\"date\":0,\"location\":[10,20],\"time\":10},\"first_name\":[512,0],\"family_name\":[258,0],\"event\":1,\"food\":0,\"affect\":16434,\"arg\":50},{\"space_time\":{\"date\":0,\"location\":[10,20],\"time\":9},\"first_name\":[512,768],\"family_name\":[258,300],\"event\":6,\"food\":0,\"affect\":16484,\"arg\":2}]}}]}",
+        )
+        .expect("fixture JSON should be writable");
+
+        let mut console = Console::default();
+        let actual = console.run_script(&format!("open {path_string}\nepisodic\nquit\n"), true);
+
+        assert!(actual.contains("\nEpisodic memory for Episode Ape\n"));
+        assert!(actual.contains("<Was eating vegetation now affect:+50>\n"));
+        assert!(actual.contains("Groomed *00768-00300*'s Back a minute ago affect:+100\n"));
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn open_rejects_binary_native_save_until_binary_parity_is_ported() {
+        let path = temp_save_path("binary_reject");
+        let path_string = path.to_string_lossy();
+        fs::write(&path, b"NA\x02\xc4not-json").expect("binary fixture should be writable");
+
+        let mut console = Console::default();
+        let actual = console.run_script(&format!("open {path_string}\nquit\n"), true);
+
+        assert!(actual.contains("ERROR: Failed to read in file @ ./universe/command.c 2394\n"));
         let _ = fs::remove_file(path);
     }
 

@@ -1,0 +1,10 @@
+reset
+event social
+run 5 minutes
+stats
+friends
+episodic
+save /private/tmp/simape_runtime_parity.json
+open /private/tmp/simape_runtime_parity.json
+stats
+quit

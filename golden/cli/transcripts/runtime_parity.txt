@@ -1,0 +1,48 @@
+
+ *** Simulated Ape 0.708 Console, May  1 2026 ***
+      For a list of commands type 'help'
+
+reset
+Simulation reset
+event social
+Event output for social turned on
+run 5 minutes
+Running for 5 mins
+stats
+Ape 001 (1313 22) SW 
+H:064 S:080 F:000 X:112: Mixed drives: Sleeping
+Gen 0:0  Male    ERG:3840 SPD:0
+Honor:0  HEI:61  Old(Years:0  Days:0)
+Aware Body: Head Link: Associate
+Friend
+Enemy
+
+friends
+
+Social graph for Ape 001
+
+Friends:
+
+Enemies:
+episodic
+
+Episodic memory for Ape 001
+save /private/tmp/simape_runtime_parity.json
+Simulation stopped
+Simulation file /private/tmp/simape_runtime_parity.json saved
+
+open /private/tmp/simape_runtime_parity.json
+Simulation stopped
+Simulation file /private/tmp/simape_runtime_parity.json open
+
+stats
+Ape 001 (1313 22) SW 
+H:064 S:080 F:000 X:112: Mixed drives: Sleeping
+Gen 0:0  Male    ERG:3840 SPD:0
+Honor:0  HEI:61  Old(Years:0  Days:0)
+Aware Body: Head Link: Associate
+Friend
+Enemy
+
+quit
+Simulation stopped
