@@ -1,6 +1,8 @@
 use apesdk_sim::{
-    banner, BeingSummary, SimState, LARGE_SIM, MAP_DIMENSION, TIME_DAY_MINUTES, TIME_HOUR_MINUTES,
-    TIME_MONTH_MINUTES, TIME_YEAR_DAYS, TIME_YEAR_MINUTES,
+    banner, relationship_description, BeingSummary, SimState, ATTENTION_RELATIONSHIP, BEING_MET,
+    ENTITY_BEING, LARGE_SIM, MAP_DIMENSION, RELATIONSHIP_SELF, SOCIAL_RESPECT_NORMAL,
+    SOCIAL_SIZE_BEINGS, TIME_DAY_MINUTES, TIME_HOUR_MINUTES, TIME_MONTH_MINUTES, TIME_YEAR_DAYS,
+    TIME_YEAR_MINUTES,
 };
 use apesdk_toolkit::n_uint;
 use std::fs;
@@ -1217,7 +1219,7 @@ fn format_stats(being: &BeingSummary, current_date: u32) -> String {
     let drive = being.drive_description();
     let status = being.state_description();
     format!(
-        "{} ({} {}) {}\nH:{:03} S:{:03} F:{:03} X:{:03}: {}: {}\nGen 0:0  {}  ERG:{} SPD:{}\nHonor:{}  HEI:{}  Old(Years:{}  Days:{})\nAware Body: Head Link: Self\nFriend\nEnemy\n\n",
+        "{} ({} {}) {}\nH:{:03} S:{:03} F:{:03} X:{:03}: {}: {}\nGen 0:0  {}  ERG:{} SPD:{}\nHonor:{}  HEI:{}  Old(Years:{}  Days:{})\nAware Body: {} Link: {}\nFriend\nEnemy\n\n",
         being.name(),
         x / 16,
         y / 16,
@@ -1230,21 +1232,23 @@ fn format_stats(being: &BeingSummary, current_date: u32) -> String {
         status,
         sex,
         being.energy(),
-        being.speed(),
+        being.ten_minute_distance(),
         being.honor(),
-        being.height(),
+        being.real_height_mm(),
         age / TIME_YEAR_DAYS as u32,
-        age % TIME_YEAR_DAYS as u32
+        age % TIME_YEAR_DAYS as u32,
+        being.body_attention_description(),
+        relationship_description(being.attention()[ATTENTION_RELATIONSHIP])
     )
 }
 
 fn format_appearance(being: &BeingSummary) -> String {
     format!(
-        "Height: {}\nMass: {}\nSex: {}\nHonor: {}\n",
-        being.height(),
-        being.mass(),
-        if being.is_female() { "Female" } else { "Male" },
-        being.honor()
+        "Height: {:.3} m\nMass: {:.2} Kg\nBody fat: {:.2} Kg\nBody frame: {:02}\n",
+        f32::from(being.real_height_mm()) / 1000.0,
+        f32::from(being.mass()) / 100.0,
+        f32::from(being.body_fat()) / 100.0,
+        being.body_frame()
     )
 }
 
@@ -1263,10 +1267,52 @@ fn format_genome(being: &BeingSummary) -> String {
 }
 
 fn format_social_graph(being: &BeingSummary) -> String {
-    format!(
-        "\nSocial graph for {}\n\nFriends:\n\nEnemies:\n",
-        being.name()
-    )
+    let mut output = format!("\nSocial graph for {}\n\nFriends:\n", being.name());
+    append_social_rows(&mut output, being, true);
+    output.push_str("\nEnemies:\n");
+    append_social_rows(&mut output, being, false);
+    output
+}
+
+fn append_social_rows(output: &mut String, being: &BeingSummary, friends: bool) {
+    let social = being.social_memory();
+    for entry in social.iter().take(SOCIAL_SIZE_BEINGS).skip(1) {
+        if social_entry_empty(entry) || entry.entity_type != ENTITY_BEING {
+            continue;
+        }
+
+        let is_friend = entry.friend_foe >= SOCIAL_RESPECT_NORMAL;
+        if is_friend != friends {
+            continue;
+        }
+
+        let relationship = if entry.relationship > RELATIONSHIP_SELF {
+            format!(" {}", relationship_description(entry.relationship))
+        } else {
+            String::new()
+        };
+        output.push_str(&format!(
+            "    {:05}  *{}*{} {}\n",
+            entry.familiarity,
+            social_name(entry.first_name[BEING_MET], entry.family_name[BEING_MET]),
+            relationship,
+            u8::from(entry.attraction > 0)
+        ));
+    }
+}
+
+fn social_entry_empty(entry: &apesdk_sim::simulated_isocial) -> bool {
+    entry.first_name[BEING_MET] == 0
+        && entry.family_name[BEING_MET] == 0
+        && entry.relationship <= RELATIONSHIP_SELF
+}
+
+fn social_name(first_name: u16, family_name: u16) -> String {
+    if first_name == 0 && family_name == 0 {
+        "Unknown".to_string()
+    } else {
+        format!("{first_name:05}-{family_name:05}")
+    }
 }
 
 fn format_pathogen(being: &BeingSummary) -> String {
@@ -1734,8 +1780,10 @@ mod tests {
         let actual = console.run_script("reset\nstats\nappearance\ngenome\nquit\n", true);
         assert!(actual.contains("stats\nApe 001 ("));
         assert!(actual.contains("H:064 S:080 F:096 X:112: Mixed drives: Awake\nGen 0:0  Male"));
-        assert!(actual.contains("Honor:0  HEI:2000"));
-        assert!(actual.contains("appearance\nHeight: 2000\nMass: 100\nSex: Male\nHonor: 0\n"));
+        assert!(actual.contains("Honor:0  HEI:61"));
+        assert!(actual.contains("Aware Body: Head Link: Associate\n"));
+        assert!(actual.contains("appearance\nHeight: 0.061 m\nMass: 1.00 Kg\nBody fat:"));
+        assert!(actual.contains("\nBody frame: "));
 
         let genome = actual
             .split("genome\n")
@@ -1792,6 +1840,25 @@ mod tests {
         assert!(actual.contains("speech\n\nSpeech for Ape 010\njkl.\n"));
         assert!(actual.contains("idea\nMatches 000.0000 percent\n"));
         assert!(actual.contains("08    000.0000  0000\n"));
+    }
+
+    #[test]
+    fn populated_social_graph_prints_data_backed_friend_and_enemy_rows() {
+        let path = temp_save_path("social_graph");
+        let path_string = path.to_string_lossy();
+        fs::write(
+            &path,
+            b"{\"information\":{\"signature\":20033,\"version number\":708},\"land\":{\"date\":0,\"genetics\":[1,2],\"time\":0},\"beings\":[{\"name\":\"Social Ape\",\"delta\":{\"stored_energy\":3840},\"constant\":{\"date_of_birth\":0,\"genetics\":[2,3,4,5]},\"events\":{\"social\":[{\"relationship\":1,\"entity_type\":0,\"friend_foe\":127},{\"first_name\":[0,111],\"family_name\":[0,222],\"friend_foe\":127,\"familiarity\":42,\"relationship\":2,\"entity_type\":0,\"attraction\":1},{\"first_name\":[0,333],\"family_name\":[0,444],\"friend_foe\":0,\"familiarity\":7,\"relationship\":0,\"entity_type\":0}]}}]}",
+        )
+        .expect("fixture JSON should be writable");
+
+        let mut console = Console::default();
+        let actual = console.run_script(&format!("open {path_string}\nfriends\nquit\n"), true);
+
+        assert!(actual.contains("\nSocial graph for Social Ape\n\nFriends:\n"));
+        assert!(actual.contains("    00042  *00111-00222* Mother 1\n"));
+        assert!(actual.contains("\nEnemies:\n    00007  *00333-00444* 0\n"));
+        let _ = fs::remove_file(path);
     }
 
     #[test]

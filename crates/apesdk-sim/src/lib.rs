@@ -3,9 +3,9 @@
 //! Simulator constants and C-compatible public types for the ApeSDK Rust port.
 
 use apesdk_toolkit::{
-    array_add, array_number, math_random, math_random3, n_byte, n_byte2, n_byte4, n_spacetime,
-    n_uint, object_array, object_number, object_object, object_parse_json, object_string,
-    object_top_object, NFile, ObjectEntry, ObjectValue,
+    array_add, array_number, math_random, math_random3, math_tan, n_byte, n_byte2, n_byte4, n_int,
+    n_spacetime, n_uint, n_vect2, object_array, object_number, object_object, object_parse_json,
+    object_string, object_top_object, vect2_direction, NFile, ObjectEntry, ObjectValue,
 };
 
 pub const SHORT_VERSION_NAME: &str = "Simulated Ape 0.708 ";
@@ -104,6 +104,31 @@ pub const DRIVE_FATIGUE: usize = 2;
 pub const DRIVE_SEX: usize = 3;
 pub const FATIGUE_SPEED_THRESHOLD: n_byte = 8;
 pub const THRESHOLD_SEEK_MATE: n_byte = 100;
+pub const BEING_MAX_MASS_G: n_byte2 = 7_000;
+pub const BEING_MAX_MASS_FAT_G: n_byte2 = BEING_MAX_MASS_G >> 2;
+pub const BEING_MAX_HEIGHT_MM: n_byte2 = 2_000;
+pub const BEING_MAX_HEIGHT: n_byte2 = n_byte2::MAX;
+pub const ENERGY_GRASS: n_byte2 = 50;
+pub const FOOD_VEGETABLE: n_byte = 0;
+pub const BODY_HEAD: n_byte = 0;
+pub const BODY_TEETH: n_byte = 1;
+pub const BODY_BACK: n_byte = 2;
+pub const BODY_FRONT: n_byte = 3;
+pub const BODY_LEFT_HAND: n_byte = 4;
+pub const BODY_RIGHT_HAND: n_byte = 5;
+pub const BODY_LEFT_FOOT: n_byte = 6;
+pub const BODY_RIGHT_FOOT: n_byte = 7;
+pub const ATTENTION_EXTERNAL: usize = 0;
+pub const ATTENTION_ACTOR: usize = 1;
+pub const ATTENTION_EPISODE: usize = 2;
+pub const ATTENTION_BODY: usize = 3;
+pub const ATTENTION_RELATIONSHIP: usize = 4;
+pub const ATTENTION_TERRITORY: usize = 5;
+pub const BEING_MEETER: usize = 0;
+pub const BEING_MET: usize = 1;
+pub const RELATIONSHIP_SELF: n_byte = 1;
+pub const SOCIAL_RESPECT_NORMAL: n_byte = 127;
+pub const ENTITY_BEING: n_byte = 0;
 pub const IMMUNE_FIT: n_byte = 5;
 pub const MIN_ANTIBODIES: n_byte = 16;
 pub const PATHOGEN_MUTATION_PROB: n_byte2 = 100;
@@ -455,7 +480,7 @@ pub struct BeingSummary {
     facing: n_byte,
     random_seed: [n_byte2; 2],
     energy: n_byte2,
-    speed: n_byte,
+    velocity: [n_byte; 10],
     macro_state: n_byte2,
     parasites: n_byte,
     honor: n_byte,
@@ -469,6 +494,8 @@ pub struct BeingSummary {
     awake_level: n_byte,
     drives: [n_byte; DRIVES],
     braincode_register: [n_byte; BRAINCODE_PSPACE_REGISTERS],
+    attention: [n_byte; ATTENTION_SIZE],
+    social_memory: [simulated_isocial; SOCIAL_SIZE],
     immune_antigens: [n_byte; IMMUNE_ANTIGENS],
     immune_shape_antigen: [n_byte; IMMUNE_ANTIGENS],
     immune_antibodies: [n_byte; IMMUNE_POPULATION],
@@ -484,7 +511,7 @@ impl BeingSummary {
         date_of_birth: n_byte4,
         genetics: [n_genetics; CHROMOSOMES],
     ) -> Self {
-        Self {
+        let mut being = Self {
             name,
             gender_name,
             family_name,
@@ -496,7 +523,7 @@ impl BeingSummary {
             facing: 0,
             random_seed: [0; 2],
             energy: 0,
-            speed: 0,
+            velocity: [0; 10],
             macro_state: 0,
             parasites: 0,
             honor: 0,
@@ -510,12 +537,16 @@ impl BeingSummary {
             awake_level: FULLY_AWAKE,
             drives: [127; DRIVES],
             braincode_register: [0; BRAINCODE_PSPACE_REGISTERS],
+            attention: [0; ATTENTION_SIZE],
+            social_memory: [simulated_isocial::default(); SOCIAL_SIZE],
             immune_antigens: [0; IMMUNE_ANTIGENS],
             immune_shape_antigen: [0; IMMUNE_ANTIGENS],
             immune_antibodies: [0; IMMUNE_POPULATION],
             immune_shape_antibody: [0; IMMUNE_POPULATION],
             immune_seed: [0; 2],
-        }
+        };
+        being.init_social_memory();
+        being
     }
 
     pub fn initial(index: usize, random: &mut [n_byte2; 2]) -> Self {
@@ -540,7 +571,7 @@ impl BeingSummary {
         math_random3(random);
         being.random_seed = [random[0], random[1]];
         being.energy = BEING_FULL + ((index as n_byte2) % 512);
-        being.speed = (index % 16) as n_byte;
+        being.set_speed((index % 16) as n_byte);
         being.macro_state = BEING_STATE_AWAKE;
         being.awake = true;
         being.awake_level = FULLY_AWAKE;
@@ -588,6 +619,13 @@ impl BeingSummary {
         let generation_max = optional_number_byte2(entries, "generation max")?.unwrap_or(0);
         let genetics = field_genetics4(entries, "genetics")?;
         let awake_level = optional_number_byte(entries, "awake")?.unwrap_or(FULLY_AWAKE);
+        let velocity = if let Some(velocity) = optional_velocity(entries, "velocity")? {
+            velocity
+        } else {
+            optional_number_byte(entries, "speed")?
+                .map(speed_history)
+                .unwrap_or([0; 10])
+        };
         let mut being = Self {
             name,
             gender_name,
@@ -600,7 +638,7 @@ impl BeingSummary {
             facing: optional_number_byte(entries, "facing")?.unwrap_or(0),
             random_seed: optional_array_byte2_2(entries, "random seed")?.unwrap_or([0; 2]),
             energy: optional_number_byte2(entries, "energy")?.unwrap_or(0),
-            speed: optional_number_byte(entries, "speed")?.unwrap_or(0),
+            velocity,
             macro_state: optional_number_byte2(entries, "macro state")?.unwrap_or(0),
             parasites: optional_number_byte(entries, "parasites")?.unwrap_or(0),
             honor: optional_number_byte(entries, "honor")?.unwrap_or(0),
@@ -614,6 +652,8 @@ impl BeingSummary {
             awake_level,
             drives: [127; DRIVES],
             braincode_register: [0; BRAINCODE_PSPACE_REGISTERS],
+            attention: [0; ATTENTION_SIZE],
+            social_memory: [simulated_isocial::default(); SOCIAL_SIZE],
             immune_antigens: [0; IMMUNE_ANTIGENS],
             immune_shape_antigen: [0; IMMUNE_ANTIGENS],
             immune_antibodies: [0; IMMUNE_POPULATION],
@@ -627,6 +667,12 @@ impl BeingSummary {
             optional_array_byte(entries, "braincode register", BRAINCODE_PSPACE_REGISTERS)?
         {
             being.braincode_register.copy_from_slice(&registers);
+        }
+        if let Some(attention) = optional_array_byte(entries, "attention", ATTENTION_SIZE)? {
+            being.attention.copy_from_slice(&attention);
+        }
+        if !being.load_social_memory(entries)? {
+            being.init_social_memory();
         }
         Ok(being)
     }
@@ -650,7 +696,7 @@ impl BeingSummary {
             .or_else(|| identity.map(|identity| identity[1]))
             .unwrap_or(0);
         let energy = optional_number_byte2(delta, "stored_energy")?.unwrap_or(BEING_DEAD);
-        let speed = optional_number_byte(delta, "velocity")?.unwrap_or(0);
+        let velocity = optional_velocity(delta, "velocity")?.unwrap_or([0; 10]);
         let awake_level = optional_number_byte(delta, "awake")?.unwrap_or(if energy > BEING_DEAD {
             FULLY_AWAKE
         } else {
@@ -668,7 +714,7 @@ impl BeingSummary {
             facing: optional_number_byte(delta, "direction_facing")?.unwrap_or(0),
             random_seed: optional_array_byte2_2(delta, "random_seed")?.unwrap_or([0; 2]),
             energy,
-            speed,
+            velocity,
             macro_state: optional_number_byte2(delta, "macro_state")?.unwrap_or(0),
             parasites: optional_number_byte(delta, "parasites")?.unwrap_or(0),
             honor: optional_number_byte(delta, "honor")?.unwrap_or(0),
@@ -682,6 +728,8 @@ impl BeingSummary {
             awake_level,
             drives: [127; DRIVES],
             braincode_register: [0; BRAINCODE_PSPACE_REGISTERS],
+            attention: [0; ATTENTION_SIZE],
+            social_memory: [simulated_isocial::default(); SOCIAL_SIZE],
             immune_antigens: [0; IMMUNE_ANTIGENS],
             immune_shape_antigen: [0; IMMUNE_ANTIGENS],
             immune_antibodies: [0; IMMUNE_POPULATION],
@@ -699,6 +747,9 @@ impl BeingSummary {
                 optional_array_byte(brain, "braincode_register", BRAINCODE_PSPACE_REGISTERS)?
             {
                 being.braincode_register.copy_from_slice(&registers);
+            }
+            if let Some(attention) = optional_array_byte(brain, "attention", ATTENTION_SIZE)? {
+                being.attention.copy_from_slice(&attention);
             }
         }
         if let Some(immune) = optional_object(entries, "immune_system")? {
@@ -718,6 +769,10 @@ impl BeingSummary {
             }
         }
 
+        if !being.load_social_memory(entries)? {
+            being.init_social_memory();
+        }
+
         Ok(being)
     }
 
@@ -726,6 +781,7 @@ impl BeingSummary {
         object_string(&mut object, "name", &self.name);
         object_object(&mut object, "delta", self.native_delta_object());
         object_object(&mut object, "constant", self.native_constant_object());
+        object_object(&mut object, "events", self.native_events_object());
         object_object(&mut object, "changes", self.native_changes_object());
         object_object(&mut object, "braindata", self.native_brain_object());
         object_object(&mut object, "immune_system", self.native_immune_object());
@@ -744,7 +800,7 @@ impl BeingSummary {
         object_number(&mut object, "facing", self.facing.into());
         object_array_byte2(&mut object, "random seed", &self.random_seed);
         object_number(&mut object, "energy", self.energy.into());
-        object_number(&mut object, "speed", self.speed.into());
+        object_number(&mut object, "speed", self.speed().into());
         object_number(&mut object, "macro state", self.macro_state.into());
         object_number(&mut object, "parasites", self.parasites.into());
         object_number(&mut object, "honor", self.honor.into());
@@ -774,7 +830,7 @@ impl BeingSummary {
         let mut delta = Vec::new();
         object_number(&mut delta, "direction_facing", self.facing.into());
         object_array_byte2(&mut delta, "location", &self.location);
-        object_number(&mut delta, "velocity", self.speed.into());
+        object_array_byte(&mut delta, "velocity", &self.velocity);
         object_number(&mut delta, "stored_energy", self.energy.into());
         object_array_byte2(&mut delta, "random_seed", &self.random_seed);
         object_number(&mut delta, "macro_state", self.macro_state.into());
@@ -813,9 +869,16 @@ impl BeingSummary {
         changes
     }
 
+    fn native_events_object(&self) -> Vec<ObjectEntry> {
+        let mut events = Vec::new();
+        object_array(&mut events, "social", self.native_social_array());
+        events
+    }
+
     fn native_brain_object(&self) -> Vec<ObjectEntry> {
         let mut brain = Vec::new();
         object_array_byte(&mut brain, "braincode_register", &self.braincode_register);
+        object_array_byte(&mut brain, "attention", &self.attention);
         brain
     }
 
@@ -829,6 +892,37 @@ impl BeingSummary {
         immune
     }
 
+    fn native_social_array(&self) -> Vec<ObjectValue> {
+        self.social_memory
+            .iter()
+            .map(|entry| ObjectValue::Object(social_entry_to_object(entry)))
+            .collect()
+    }
+
+    fn load_social_memory(&mut self, entries: &[ObjectEntry]) -> Result<bool, &'static str> {
+        let social = if let Some(events) = optional_object(entries, "events")? {
+            optional_field(events, "social")
+        } else {
+            optional_field(entries, "social")
+        };
+
+        let Some(social) = social else {
+            return Ok(false);
+        };
+
+        let ObjectValue::Array(values) = social else {
+            return Err("social array expected");
+        };
+
+        for (index, value) in values.iter().take(SOCIAL_SIZE).enumerate() {
+            let ObjectValue::Object(entries) = value else {
+                return Err("social entry object expected");
+            };
+            self.social_memory[index] = social_entry_from_object(entries)?;
+        }
+        Ok(true)
+    }
+
     pub fn to_simulated_being(&self) -> simulated_being {
         let mut being = simulated_being::default();
         being.constant.date_of_birth = self.date_of_birth;
@@ -838,7 +932,7 @@ impl BeingSummary {
         being.constant.genetics = self.genetics;
         being.delta.location = self.location;
         being.delta.direction_facing = self.facing;
-        being.delta.velocity[0] = self.speed;
+        being.delta.velocity = self.velocity;
         being.delta.stored_energy = self.energy;
         being.delta.random_seed = self.random_seed;
         being.delta.macro_state = self.macro_state;
@@ -854,8 +948,10 @@ impl BeingSummary {
         being.delta.social_coord_nx = self.social_coord[2];
         being.delta.social_coord_ny = self.social_coord[3];
         being.delta.awake = self.awake_level;
+        being.events.social = self.social_memory;
         being.changes.drives = self.drives;
         being.braindata.braincode_register = self.braincode_register;
+        being.braindata.attention = self.attention;
         being.immune_system.antigens = self.immune_antigens;
         being.immune_system.shape_antigen = self.immune_shape_antigen;
         being.immune_system.antibodies = self.immune_antibodies;
@@ -877,7 +973,7 @@ impl BeingSummary {
             facing: native.delta.direction_facing,
             random_seed: native.delta.random_seed,
             energy: native.delta.stored_energy,
-            speed: native.delta.velocity[0],
+            velocity: native.delta.velocity,
             macro_state: native.delta.macro_state,
             parasites: native.delta.parasites,
             honor: native.delta.honor,
@@ -896,6 +992,8 @@ impl BeingSummary {
             awake_level: native.delta.awake,
             drives: native.changes.drives,
             braincode_register: native.braindata.braincode_register,
+            attention: native.braindata.attention,
+            social_memory: native.events.social,
             immune_antigens: native.immune_system.antigens,
             immune_shape_antigen: native.immune_system.shape_antigen,
             immune_antibodies: native.immune_system.antibodies,
@@ -941,7 +1039,15 @@ impl BeingSummary {
     }
 
     pub const fn speed(&self) -> n_byte {
-        self.speed
+        self.velocity[0]
+    }
+
+    pub const fn velocity(&self) -> [n_byte; 10] {
+        self.velocity
+    }
+
+    pub fn ten_minute_distance(&self) -> n_int {
+        self.velocity.iter().map(|speed| n_int::from(*speed)).sum()
     }
 
     pub const fn macro_state(&self) -> n_byte2 {
@@ -996,6 +1102,26 @@ impl BeingSummary {
         self.braincode_register
     }
 
+    pub const fn attention(&self) -> [n_byte; ATTENTION_SIZE] {
+        self.attention
+    }
+
+    pub const fn body_attention(&self) -> n_byte {
+        self.attention[ATTENTION_BODY]
+    }
+
+    pub fn body_attention_description(&self) -> &'static str {
+        body_inventory_description(self.body_attention())
+    }
+
+    pub const fn social_memory(&self) -> [simulated_isocial; SOCIAL_SIZE] {
+        self.social_memory
+    }
+
+    pub fn social_memory_mut(&mut self) -> &mut [simulated_isocial; SOCIAL_SIZE] {
+        &mut self.social_memory
+    }
+
     pub const fn immune_seed(&self) -> [n_byte2; 2] {
         self.immune_seed
     }
@@ -1026,6 +1152,42 @@ impl BeingSummary {
 
     pub fn drive_description(&self) -> &'static str {
         drive_description(self.drives)
+    }
+
+    pub fn real_height_mm(&self) -> n_byte2 {
+        ((n_uint::from(self.height) * n_uint::from(BEING_MAX_HEIGHT_MM))
+            / n_uint::from(BEING_MAX_HEIGHT)) as n_byte2
+    }
+
+    pub fn body_frame(&self) -> n_byte {
+        gene_frame(self.genetics)
+    }
+
+    pub fn body_fat(&self) -> n_byte2 {
+        body_fat(self.genetics, self.energy)
+    }
+
+    pub fn facing_vector(&self, divisor: n_int) -> n_vect2 {
+        let divisor = divisor.max(1) * 32;
+        vect2_direction(n_int::from(self.facing), divisor)
+    }
+
+    pub fn set_facing_towards(&mut self, vector: n_vect2) {
+        self.facing = (math_tan(vector) & 255) as n_byte;
+    }
+
+    pub fn wander(&mut self, wander: n_int) {
+        self.facing = ((n_int::from(self.facing) + 256 + wander) & 255) as n_byte;
+    }
+
+    pub fn set_speed(&mut self, speed: n_byte) {
+        self.velocity[0] = speed;
+    }
+
+    pub fn speed_advance(&mut self) {
+        for index in (1..self.velocity.len()).rev() {
+            self.velocity[index] = self.velocity[index - 1];
+        }
     }
 
     pub fn energy_less_than(&self, less_than: n_byte2) -> bool {
@@ -1059,31 +1221,13 @@ impl BeingSummary {
         self.cycle_universal();
 
         if self.energy == BEING_DEAD || self.awake_level == FULLY_ASLEEP {
-            self.speed = 0;
+            self.set_speed(0);
             return;
         }
 
-        math_random3(&mut self.random_seed);
-        let turn = ((math_random(&mut self.random_seed) & 7) as i16) - 3;
-        self.facing = self.facing.wrapping_add(turn as n_byte);
-
-        let pace = 1 + (math_random(&mut self.random_seed) & 7) as n_byte;
-        self.speed = pace.min(39);
-        let [dx, dy] = facing_delta(self.facing);
-        self.location[0] = wrap_apespace(self.location[0] as i32 + dx * i32::from(self.speed));
-        self.location[1] = wrap_apespace(self.location[1] as i32 + dy * i32::from(self.speed));
-
-        let energy_cost = 1 + n_byte2::from(self.speed >> 2);
-        self.energy_delta(-i32::from(energy_cost));
-        self.macro_state = BEING_STATE_AWAKE;
-        if self.energy_less_than(BEING_HUNGRY + 1) {
-            self.macro_state |= BEING_STATE_HUNGRY;
-        }
-        if self.speed > 0 {
-            self.macro_state |= BEING_STATE_MOVING;
-        }
-
+        self.cycle_awake(land_date);
         self.cycle_drives(land_date);
+        self.speed_advance();
 
         if land_time == 0 {
             self.honor = self.honor.saturating_add(1);
@@ -1097,7 +1241,7 @@ impl BeingSummary {
         if !is_night(land_time) {
             return FULLY_AWAKE;
         }
-        if self.energy_less_than(BEING_HUNGRY + 1) || self.speed > 0 {
+        if self.energy_less_than(BEING_HUNGRY + 1) || self.speed() > 0 {
             return SLIGHTLY_AWAKE;
         }
         FULLY_ASLEEP
@@ -1116,8 +1260,118 @@ impl BeingSummary {
             self.awake_level = FULLY_ASLEEP;
             self.awake = false;
             self.macro_state = BEING_STATE_ASLEEP;
-            self.speed = 0;
+            self.set_speed(0);
         }
+    }
+
+    fn cycle_awake(&mut self, land_date: n_byte4) {
+        let mut state = BEING_STATE_AWAKE;
+        if self.energy_less_than(BEING_HUNGRY + 1) {
+            state |= BEING_STATE_HUNGRY;
+        }
+
+        let mut target_speed = self.temporary_speed();
+        if state & BEING_STATE_HUNGRY != 0 {
+            if self.speed() == 0 {
+                let food_energy = self.food_energy();
+                if food_energy > 0 {
+                    self.energy_delta(i32::from(food_energy));
+                    self.reset_drive(DRIVE_HUNGER);
+                    state |= BEING_STATE_EATING;
+                    if age_days_at(land_date, self.date_of_birth) < AGE_OF_MATURITY
+                        && self.height < BEING_MAX_HEIGHT
+                    {
+                        self.height = self
+                            .height
+                            .saturating_add(energy_to_growth(food_energy))
+                            .min(BEING_MAX_HEIGHT);
+                    }
+                } else {
+                    state |= BEING_STATE_NO_FOOD;
+                }
+            } else {
+                target_speed = 0;
+            }
+        } else if self.speed() == 0 {
+            target_speed = target_speed.max(10);
+        }
+
+        self.calculate_speed(target_speed, state);
+        self.move_forward();
+        let energy_cost = self.move_energy();
+        if energy_cost > 0 {
+            self.energy_delta(-energy_cost);
+        }
+        if self.speed() > 0 {
+            state |= BEING_STATE_MOVING;
+        }
+        self.macro_state = state;
+        self.mass = self.calculated_mass();
+    }
+
+    fn temporary_speed(&mut self) -> n_int {
+        math_random3(&mut self.random_seed);
+        let turn = ((math_random(&mut self.random_seed) & 7) as n_int) - 3;
+        self.wander(turn);
+        1 + (math_random(&mut self.random_seed) & 39) as n_int
+    }
+
+    fn calculate_speed(&mut self, target_speed: n_int, state: n_byte2) {
+        let mut target_speed = target_speed.clamp(0, 39);
+        let mut speed = n_int::from(self.speed());
+        if self.awake_level != FULLY_AWAKE
+            || ((state & (BEING_STATE_HUNGRY | BEING_STATE_NO_FOOD)) == BEING_STATE_HUNGRY)
+        {
+            if state & BEING_STATE_NO_FOOD == 0 {
+                target_speed = 0;
+            }
+        }
+
+        if target_speed > speed {
+            speed += 1;
+        }
+        for _ in 0..3 {
+            if target_speed < speed {
+                speed -= 1;
+            }
+        }
+        self.set_speed(speed.clamp(0, 39) as n_byte);
+    }
+
+    fn move_forward(&mut self) {
+        let speed = n_int::from(self.speed());
+        if speed == 0 {
+            return;
+        }
+        let facing_vector = self.facing_vector(1);
+        let dx = (facing_vector.x * speed) / 512;
+        let dy = (facing_vector.y * speed) / 512;
+        self.location[0] = wrap_apespace(n_int::from(self.location[0]) + dx);
+        self.location[1] = wrap_apespace(n_int::from(self.location[1]) + dy);
+    }
+
+    fn move_energy(&self) -> i32 {
+        let speed = i32::from(self.speed());
+        let delta_energy = (512 * speed) / 80;
+        let delta_energy = (delta_energy * delta_energy) >> 9;
+        (delta_energy + 4 + ((i32::from(self.mass) * 5) / i32::from(BEING_MAX_MASS_G))) >> 2
+    }
+
+    fn food_energy(&self) -> n_byte2 {
+        let vegetable = gene_energy_from_vegetables(self.genetics);
+        let fruit = gene_energy_from_fruits(self.genetics);
+        let seaweed = gene_energy_from_seaweed(self.genetics);
+        let bird_eggs = gene_energy_from_bird_eggs(self.genetics);
+        let lizard_eggs = gene_energy_from_lizard_eggs(self.genetics);
+        let denominator = 1 + vegetable + fruit + seaweed + bird_eggs + lizard_eggs;
+        let absorbed = (vegetable << 4) / denominator;
+        ((n_uint::from(ENERGY_GRASS) * n_uint::from(1 + absorbed)) >> 3).min(320) as n_byte2
+    }
+
+    fn calculated_mass(&self) -> n_byte2 {
+        let lean_mass = (n_uint::from(BEING_MAX_MASS_G) * n_uint::from(self.height))
+            / n_uint::from(BEING_MAX_HEIGHT);
+        (lean_mass + n_uint::from(self.body_fat())).min(n_uint::from(n_byte2::MAX)) as n_byte2
     }
 
     fn cycle_drives(&mut self, land_date: n_byte4) {
@@ -1147,7 +1401,7 @@ impl BeingSummary {
             }
         }
 
-        if self.speed > FATIGUE_SPEED_THRESHOLD {
+        if self.speed() > FATIGUE_SPEED_THRESHOLD {
             self.inc_drive(DRIVE_FATIGUE);
             if self.macro_state & BEING_STATE_SWIMMING != 0 {
                 self.inc_drive(DRIVE_FATIGUE);
@@ -1156,6 +1410,15 @@ impl BeingSummary {
         } else {
             self.dec_drive(DRIVE_FATIGUE);
         }
+    }
+
+    fn init_social_memory(&mut self) {
+        self.social_memory = [simulated_isocial::default(); SOCIAL_SIZE];
+        for entry in &mut self.social_memory {
+            entry.entity_type = ENTITY_BEING;
+            entry.friend_foe = SOCIAL_RESPECT_NORMAL;
+        }
+        self.social_memory[0].relationship = RELATIONSHIP_SELF;
     }
 
     fn init_immune(&mut self) {
@@ -1306,31 +1569,9 @@ fn age_days_at(current_date: n_byte4, date_of_birth: n_byte4) -> n_byte4 {
     current_date.saturating_sub(date_of_birth)
 }
 
-fn wrap_apespace(value: i32) -> n_byte2 {
-    let bounds = i32::from(APESPACE_BOUNDS);
+fn wrap_apespace(value: n_int) -> n_byte2 {
+    let bounds = n_int::from(APESPACE_BOUNDS);
     value.rem_euclid(bounds + 1) as n_byte2
-}
-
-fn facing_delta(facing: n_byte) -> [i32; 2] {
-    const DELTAS: [[i32; 2]; 16] = [
-        [1, 0],
-        [1, 1],
-        [1, 1],
-        [0, 1],
-        [0, 1],
-        [-1, 1],
-        [-1, 1],
-        [-1, 0],
-        [-1, 0],
-        [-1, -1],
-        [-1, -1],
-        [0, -1],
-        [0, -1],
-        [1, -1],
-        [1, -1],
-        [1, 0],
-    ];
-    DELTAS[((facing.wrapping_add(7) >> 4) & 15) as usize]
 }
 
 pub fn is_night(time: n_byte4) -> bool {
@@ -1396,6 +1637,123 @@ pub fn drive_description(drives: [n_byte; DRIVES]) -> &'static str {
         Some(DRIVE_FATIGUE) => "Find rest",
         _ => "No Drive",
     }
+}
+
+pub fn body_inventory_description(index: n_byte) -> &'static str {
+    const DESCRIPTIONS: [&str; INVENTORY_SIZE] = [
+        "Head",
+        "Teeth",
+        "Back",
+        "Front",
+        "Left hand",
+        "Right hand",
+        "Left foot",
+        "Right foot",
+    ];
+    DESCRIPTIONS[index as usize % INVENTORY_SIZE]
+}
+
+pub fn relationship_description(index: n_byte) -> &'static str {
+    const DESCRIPTIONS: [&str; 26] = [
+        "Associate",
+        "Self",
+        "Mother",
+        "Father",
+        "Daughter",
+        "Son",
+        "Granddaughter",
+        "Grandson",
+        "Sister",
+        "Brother",
+        "Maternal Grandmother",
+        "Maternal Grandfather",
+        "Paternal Grandmother",
+        "Paternal Grandson",
+        "Mother",
+        "Father",
+        "Daughter",
+        "Son",
+        "Granddaughter",
+        "Grandson",
+        "Sister",
+        "Brother",
+        "Maternal Grandmother",
+        "Maternal Grandfather",
+        "Paternal Grandmother",
+        "Paternal Grandson",
+    ];
+    DESCRIPTIONS
+        .get(index as usize)
+        .copied()
+        .unwrap_or("Associate")
+}
+
+fn energy_to_growth(energy: n_byte2) -> n_byte2 {
+    (energy >> 3) * 3
+}
+
+fn speed_history(speed: n_byte) -> [n_byte; 10] {
+    let mut velocity = [0; 10];
+    velocity[0] = speed;
+    velocity
+}
+
+fn get_nucleotide(genetics: [n_genetics; CHROMOSOMES], number: usize) -> n_byte {
+    ((genetics[(number >> 3) & 3] >> ((number & 7) * 2)) & 3) as n_byte
+}
+
+fn gene_val(genetics: [n_genetics; CHROMOSOMES], number0: usize, number1: usize) -> n_byte {
+    (get_nucleotide(genetics, number0) << 2) | get_nucleotide(genetics, number1)
+}
+
+fn gene_regulator(genetics: [n_genetics; CHROMOSOMES], a: usize, b: usize) -> usize {
+    usize::from(1 + gene_val(genetics, 15 + a, 15 + b))
+}
+
+fn gene_val_reg(
+    genetics: [n_genetics; CHROMOSOMES],
+    a: usize,
+    b: usize,
+    c: usize,
+    d: usize,
+) -> n_byte {
+    gene_val(
+        genetics,
+        gene_regulator(genetics, a, b),
+        gene_regulator(genetics, c, d),
+    )
+}
+
+fn gene_frame(genetics: [n_genetics; CHROMOSOMES]) -> n_byte {
+    gene_val_reg(genetics, 10, 11, 1, 6)
+}
+
+fn gene_energy_from_vegetables(genetics: [n_genetics; CHROMOSOMES]) -> n_byte {
+    gene_val_reg(genetics, 3, 13, 15, 3)
+}
+
+fn gene_energy_from_fruits(genetics: [n_genetics; CHROMOSOMES]) -> n_byte {
+    gene_val_reg(genetics, 14, 7, 6, 4)
+}
+
+fn gene_energy_from_seaweed(genetics: [n_genetics; CHROMOSOMES]) -> n_byte {
+    gene_val_reg(genetics, 0, 9, 11, 12)
+}
+
+fn gene_energy_from_bird_eggs(genetics: [n_genetics; CHROMOSOMES]) -> n_byte {
+    gene_val_reg(genetics, 7, 1, 9, 5)
+}
+
+fn gene_energy_from_lizard_eggs(genetics: [n_genetics; CHROMOSOMES]) -> n_byte {
+    gene_val_reg(genetics, 15, 3, 12, 8)
+}
+
+fn body_fat(genetics: [n_genetics; CHROMOSOMES], energy: n_byte2) -> n_byte2 {
+    let fat = (n_uint::from(BEING_MAX_MASS_FAT_G)
+        * n_uint::from(energy)
+        * n_uint::from(gene_frame(genetics)))
+        >> 16;
+    fat.min(n_uint::from(BEING_MAX_MASS_FAT_G)) as n_byte2
 }
 
 fn pathogen_severity(pathogen: n_byte) -> n_byte {
@@ -1876,6 +2234,20 @@ fn optional_number_byte2(
     }
 }
 
+fn optional_number_byte4(
+    entries: &[ObjectEntry],
+    name: &str,
+) -> Result<Option<n_byte4>, &'static str> {
+    match optional_field(entries, name) {
+        Some(ObjectValue::Number(number)) if (0..=n_byte4::MAX.into()).contains(number) => {
+            Ok(Some(*number as n_byte4))
+        }
+        Some(ObjectValue::Number(_)) => Err("json number outside n_byte4 range"),
+        Some(_) => Err("json number expected"),
+        None => Ok(None),
+    }
+}
+
 fn optional_number_byte(
     entries: &[ObjectEntry],
     name: &str,
@@ -1934,6 +2306,28 @@ fn optional_array_byte(
             .map(Some),
         Some(ObjectValue::Array(_)) => Err("array length mismatch"),
         Some(_) => Err("json array expected"),
+        None => Ok(None),
+    }
+}
+
+fn optional_velocity(
+    entries: &[ObjectEntry],
+    name: &str,
+) -> Result<Option<[n_byte; 10]>, &'static str> {
+    match optional_field(entries, name) {
+        Some(ObjectValue::Number(number)) if (0..=n_byte::MAX.into()).contains(number) => {
+            Ok(Some(speed_history(*number as n_byte)))
+        }
+        Some(ObjectValue::Number(_)) => Err("json number outside n_byte range"),
+        Some(ObjectValue::Array(values)) if values.len() == 10 => {
+            let mut velocity = [0; 10];
+            for (index, value) in values.iter().enumerate() {
+                velocity[index] = array_byte(value)?;
+            }
+            Ok(Some(velocity))
+        }
+        Some(ObjectValue::Array(_)) => Err("velocity array should have ten values"),
+        Some(_) => Err("velocity number or array expected"),
         None => Ok(None),
     }
 }
@@ -2018,6 +2412,68 @@ fn array_byte4(value: &ObjectValue) -> Result<n_byte4, &'static str> {
         ObjectValue::Number(_) => Err("json number outside n_byte4 range"),
         _ => Err("json number expected"),
     }
+}
+
+fn social_entry_from_object(entries: &[ObjectEntry]) -> Result<simulated_isocial, &'static str> {
+    let mut entry = simulated_isocial::default();
+    if let Some(space_time) = optional_object(entries, "space_time")? {
+        entry.space_time.date = optional_number_byte4(space_time, "date")?.unwrap_or(0);
+        entry.space_time.location =
+            optional_array_byte2_2(space_time, "location")?.unwrap_or([0; 2]);
+        entry.space_time.time = optional_number_byte4(space_time, "time")?.unwrap_or(0);
+    }
+    entry.first_name = optional_array_byte2_2(entries, "first_name")?.unwrap_or([0; 2]);
+    entry.family_name = optional_array_byte2_2(entries, "family_name")?.unwrap_or([0; 2]);
+    entry.attraction = optional_number_byte(entries, "attraction")?.unwrap_or(0);
+    entry.friend_foe =
+        optional_number_byte(entries, "friend_foe")?.unwrap_or(SOCIAL_RESPECT_NORMAL);
+    entry.belief = optional_number_byte2(entries, "belief")?.unwrap_or(0);
+    entry.familiarity = optional_number_byte2(entries, "familiarity")?.unwrap_or(0);
+    entry.relationship = optional_number_byte(entries, "relationship")?.unwrap_or(0);
+    entry.entity_type = optional_number_byte(entries, "entity_type")?.unwrap_or(ENTITY_BEING);
+    if let Some(classification) = optional_object(entries, "classification")? {
+        entry.classification.feature_number =
+            optional_number_byte2(classification, "feature_number")?.unwrap_or(0);
+        entry.classification.observations =
+            optional_number_byte2(classification, "observations")?.unwrap_or(0);
+    }
+    if let Some(braincode) = optional_array_byte(entries, "braincode", BRAINCODE_SIZE)? {
+        entry.braincode.copy_from_slice(&braincode);
+    }
+    Ok(entry)
+}
+
+fn social_entry_to_object(entry: &simulated_isocial) -> Vec<ObjectEntry> {
+    let mut object = Vec::new();
+    let mut space_time = Vec::new();
+    object_number(&mut space_time, "date", entry.space_time.date.into());
+    object_array_byte2(&mut space_time, "location", &entry.space_time.location);
+    object_number(&mut space_time, "time", entry.space_time.time.into());
+    object_object(&mut object, "space_time", space_time);
+    object_array_byte2(&mut object, "first_name", &entry.first_name);
+    object_array_byte2(&mut object, "family_name", &entry.family_name);
+    object_number(&mut object, "attraction", entry.attraction.into());
+    object_number(&mut object, "friend_foe", entry.friend_foe.into());
+    object_number(&mut object, "belief", entry.belief.into());
+    object_number(&mut object, "familiarity", entry.familiarity.into());
+    object_number(&mut object, "relationship", entry.relationship.into());
+    object_number(&mut object, "entity_type", entry.entity_type.into());
+    let mut classification = Vec::new();
+    object_number(
+        &mut classification,
+        "feature_number",
+        entry.classification.feature_number.into(),
+    );
+    object_number(
+        &mut classification,
+        "observations",
+        entry.classification.observations.into(),
+    );
+    object_object(&mut object, "classification", classification);
+    if entry.braincode.iter().any(|byte| *byte != 0) {
+        object_array_byte(&mut object, "braincode", &entry.braincode);
+    }
+    object
 }
 
 #[cfg(test)]
@@ -2455,9 +2911,9 @@ mod tests {
         being.energy_delta(i32::from(BEING_FULL));
         assert_eq!(being.awake_level_for_time(0), FULLY_ASLEEP);
         assert_eq!(being.awake_level_for_time(400), FULLY_AWAKE);
-        being.speed = 1;
+        being.set_speed(1);
         assert_eq!(being.awake_level_for_time(0), SLIGHTLY_AWAKE);
-        being.speed = 0;
+        being.set_speed(0);
         being.energy = BEING_HUNGRY;
         assert_eq!(being.awake_level_for_time(0), SLIGHTLY_AWAKE);
         being.energy = BEING_DEAD;
@@ -2486,7 +2942,7 @@ mod tests {
     fn drive_cycle_updates_hunger_fatigue_social_and_maturity() {
         let mut being = BeingSummary::new("Driven".to_string(), 512, 258, 0, [2, 3, 4, 5]);
         being.energy = BEING_HUNGRY - 1;
-        being.speed = FATIGUE_SPEED_THRESHOLD + 1;
+        being.set_speed(FATIGUE_SPEED_THRESHOLD + 1);
         being.awake_level = FULLY_AWAKE;
         being.drives = [0; DRIVES];
         being.cycle_drives(AGE_OF_MATURITY + 1);
@@ -2494,6 +2950,99 @@ mod tests {
         assert_eq!(being.drive(DRIVE_SOCIAL), 1);
         assert_eq!(being.drive(DRIVE_FATIGUE), 1);
         assert_eq!(being.drive(DRIVE_SEX), 0);
+    }
+
+    #[test]
+    fn facing_vectors_wander_and_towards_match_toolkit_helpers() {
+        let mut being = BeingSummary::new("Facing".to_string(), 512, 258, 0, [2, 3, 4, 5]);
+        being.facing = 0;
+        assert_eq!(being.facing_vector(1), vect2_direction(0, 32));
+        assert_eq!(being.facing_vector(4), vect2_direction(0, 128));
+
+        being.set_facing_towards(n_vect2::new(0, 10));
+        assert_eq!(being.facing(), 64);
+        being.wander(-65);
+        assert_eq!(being.facing(), 255);
+        being.wander(2);
+        assert_eq!(being.facing(), 1);
+    }
+
+    #[test]
+    fn speed_history_advance_and_move_energy_follow_native_shape() {
+        let mut being = BeingSummary::new("Speedy".to_string(), 512, 258, 0, [2, 3, 4, 5]);
+        being.set_speed(5);
+        being.speed_advance();
+        being.set_speed(7);
+        assert_eq!(being.velocity()[0], 7);
+        assert_eq!(being.velocity()[1], 5);
+        assert_eq!(being.ten_minute_distance(), 12);
+
+        being.set_speed(0);
+        let resting = being.move_energy();
+        being.set_speed(20);
+        assert!(being.move_energy() > resting);
+    }
+
+    #[test]
+    fn awake_cycle_eats_grows_recalculates_mass_and_sets_state() {
+        let mut being = BeingSummary::new(
+            "Hungry".to_string(),
+            512,
+            258,
+            0,
+            [n_genetics::MAX; CHROMOSOMES],
+        );
+        being.energy = BEING_HUNGRY - 1;
+        being.random_seed = [1, 2];
+        let before_energy = being.energy();
+        let before_height = being.height();
+
+        being.cycle_awake(0);
+
+        assert!(being.energy() > before_energy);
+        assert!(being.height() > before_height);
+        assert!(being.macro_state() & BEING_STATE_EATING != 0);
+        assert!(being.mass() >= being.calculated_mass());
+    }
+
+    #[test]
+    fn body_and_social_native_state_initializes_and_roundtrips() {
+        let mut state = SimState::start_up(0x5261_f726);
+        state.reset_new_simulation_from_land_seed();
+        let first = &state.beings()[0];
+        assert_eq!(body_inventory_description(BODY_HEAD), "Head");
+        assert_eq!(first.body_attention_description(), "Head");
+        assert_eq!(first.social_memory()[0].relationship, RELATIONSHIP_SELF);
+        assert_eq!(first.social_memory()[0].friend_foe, SOCIAL_RESPECT_NORMAL);
+        assert_eq!(first.social_memory()[0].entity_type, ENTITY_BEING);
+
+        let saved = state.tranfer_startup_out_json();
+        let saved_json =
+            std::str::from_utf8(saved.written_data()).expect("startup transfer should be utf8");
+        assert!(saved_json.contains("\"events\":{\"social\""));
+        assert!(saved_json.contains("\"attention\""));
+
+        let loaded =
+            SimState::load_startup_json(saved.written_data()).expect("saved JSON should reload");
+        assert_eq!(loaded.beings()[0].social_memory(), first.social_memory());
+        assert_eq!(loaded.beings()[0].attention(), first.attention());
+    }
+
+    #[test]
+    fn native_social_memory_loads_c_shaped_summary_fields() {
+        let state = SimState::load_startup_json(
+            b"{\"information\":{\"signature\":20033,\"version number\":708},\"land\":{\"date\":0,\"genetics\":[1,2],\"time\":0},\"beings\":[{\"name\":\"Social Ape\",\"delta\":{\"stored_energy\":3840},\"constant\":{\"date_of_birth\":0,\"genetics\":[2,3,4,5]},\"events\":{\"social\":[{\"relationship\":1,\"entity_type\":0,\"friend_foe\":127},{\"first_name\":[0,111],\"family_name\":[0,222],\"friend_foe\":127,\"familiarity\":42,\"relationship\":2,\"entity_type\":0,\"attraction\":1,\"belief\":9,\"classification\":{\"feature_number\":3,\"observations\":4}}]}}]}",
+        )
+        .unwrap();
+        let entry = &state.beings()[0].social_memory()[1];
+        assert_eq!(entry.first_name, [0, 111]);
+        assert_eq!(entry.family_name, [0, 222]);
+        assert_eq!(entry.familiarity, 42);
+        assert_eq!(entry.relationship, 2);
+        assert_eq!(entry.attraction, 1);
+        assert_eq!(entry.belief, 9);
+        assert_eq!(entry.classification.feature_number, 3);
+        assert_eq!(entry.classification.observations, 4);
     }
 
     #[test]
