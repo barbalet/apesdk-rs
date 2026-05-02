@@ -1,0 +1,1 @@
+TRACE fixture=immune_transmission gate=rust-unit scope=air,touch,sex,food,antibody_mutation,severity,energy_cost status=covered_by_sim_tests

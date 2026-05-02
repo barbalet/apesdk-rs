@@ -1,0 +1,13 @@
+reset
+run 2 minutes
+save /private/tmp/simape_matrix.json
+save /private/tmp/simape_matrix.native
+save /private/tmp/simape_matrix.bin
+open /private/tmp/simape_matrix.json
+sim
+open /private/tmp/simape_matrix.native
+sim
+open /private/tmp/simape_matrix.bin
+sim
+open /private/tmp/simape_missing.nope
+quit

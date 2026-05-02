@@ -1141,6 +1141,165 @@ fn binary_save_path(path: &str) -> bool {
     path.ends_with(".bin") || path.ends_with(".binary") || path.ends_with(".nab")
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TraceDiff {
+    pub line: usize,
+    pub expected: String,
+    pub actual: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FixtureManifestEntry {
+    pub kind: String,
+    pub name: String,
+    pub path: String,
+    pub gate: String,
+    pub normalizer: String,
+}
+
+pub fn normalize_cli_transcript(input: &str) -> String {
+    let line_normalized = input.replace("\r\n", "\n").replace('\r', "\n");
+    let mut output = String::new();
+    for line in line_normalized.lines() {
+        if let Some(length) = line.strip_prefix("String length : ") {
+            if length.chars().all(|ch| ch.is_ascii_digit()) {
+                output.push_str("String length : <N>\n");
+                continue;
+            }
+        }
+        output.push_str(&normalize_temp_paths(&normalize_repo_paths(line)));
+        output.push('\n');
+    }
+    output
+}
+
+fn normalize_repo_paths(line: &str) -> String {
+    let mut output = line.to_string();
+    while let Some(marker) = output.find("/apesdk-rs/") {
+        let start = output[..marker]
+            .rfind(char::is_whitespace)
+            .map(|index| index + 1)
+            .unwrap_or(0);
+        let suffix = output[marker + "/apesdk-rs/".len()..].to_string();
+        output.replace_range(start..marker + "/apesdk-rs/".len(), "./");
+        if suffix.is_empty() {
+            break;
+        }
+    }
+    output
+}
+
+fn normalize_temp_paths(line: &str) -> String {
+    let mut output = String::new();
+    let bytes = line.as_bytes();
+    let mut index = 0;
+    while index < bytes.len() {
+        if bytes[index..].starts_with(b"/private/tmp/") || bytes[index..].starts_with(b"/tmp/") {
+            output.push_str("<TMP>");
+            while index < bytes.len()
+                && !bytes[index].is_ascii_whitespace()
+                && bytes[index] != b'"'
+                && bytes[index] != b'\''
+            {
+                index += 1;
+            }
+        } else {
+            output.push(bytes[index] as char);
+            index += 1;
+        }
+    }
+    output
+}
+
+pub fn trace_state_line(label: &str, state: &SimState) -> String {
+    let land = state.land_snapshot();
+    let selected = state.selected_being();
+    let selected_name = selected.map(BeingSummary::name).unwrap_or("<none>");
+    let location = selected.map(BeingSummary::location).unwrap_or([0; 2]);
+    let drives = selected.map(BeingSummary::drives).unwrap_or([0; 4]);
+    let brain = selected
+        .map(BeingSummary::braincode_register)
+        .unwrap_or([0; 3]);
+    let social = selected
+        .map(|being| being.social_memory()[0].familiarity)
+        .unwrap_or(0);
+    let territory = selected
+        .map(|being| being.territory_memory()[0].familiarity)
+        .unwrap_or(0);
+    let conception = selected.map(BeingSummary::date_of_conception).unwrap_or(0);
+    format!(
+        "TRACE label={label} date={} time={} genetics={}:{} population={} adults={} juveniles={} selected={} energy={} loc={}:{} drives={}:{}:{}:{} brain={}:{}:{} social0={} territory0={} conception={}",
+        land.date,
+        land.time,
+        land.genetics[0],
+        land.genetics[1],
+        state.population(),
+        state.adult_count(),
+        state.juvenile_count(),
+        selected_name,
+        selected.map(BeingSummary::energy).unwrap_or(0),
+        location[0],
+        location[1],
+        drives[0],
+        drives[1],
+        drives[2],
+        drives[3],
+        brain[0],
+        brain[1],
+        brain[2],
+        social,
+        territory,
+        conception
+    )
+}
+
+pub fn diff_trace_text(expected: &str, actual: &str) -> Result<(), TraceDiff> {
+    let expected_lines = expected.lines().collect::<Vec<_>>();
+    let actual_lines = actual.lines().collect::<Vec<_>>();
+    let max = expected_lines.len().max(actual_lines.len());
+    for index in 0..max {
+        let expected = expected_lines.get(index).copied().unwrap_or("<missing>");
+        let actual = actual_lines.get(index).copied().unwrap_or("<missing>");
+        if expected != actual {
+            return Err(TraceDiff {
+                line: index + 1,
+                expected: expected.to_string(),
+                actual: actual.to_string(),
+            });
+        }
+    }
+    Ok(())
+}
+
+pub fn parse_fixture_manifest(input: &str) -> Result<Vec<FixtureManifestEntry>, &'static str> {
+    let mut entries = Vec::new();
+    for (line_number, line) in input.lines().enumerate() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            continue;
+        }
+        let parts = trimmed.split('|').map(str::trim).collect::<Vec<_>>();
+        if parts.len() != 5 {
+            return Err(if line_number == 0 {
+                "manifest header malformed"
+            } else {
+                "manifest entry malformed"
+            });
+        }
+        if parts[0] == "kind" {
+            continue;
+        }
+        entries.push(FixtureManifestEntry {
+            kind: parts[0].to_string(),
+            name: parts[1].to_string(),
+            path: parts[2].to_string(),
+            gate: parts[3].to_string(),
+            normalizer: parts[4].to_string(),
+        });
+    }
+    Ok(entries)
+}
+
 fn parse_on_off(response: Option<&str>) -> Option<bool> {
     let response = response?;
     let length = response.len();
@@ -1677,6 +1836,64 @@ mod tests {
             std::process::id(),
             nanos
         ))
+    }
+
+    #[test]
+    fn transcript_normalization_masks_only_known_volatile_text() {
+        let input = "open /private/tmp/simape_123.json\r\nString length : 456\r\nERROR: Command @ /Users/barbalet/github/apesdk-rs/sim/console.c 119\r\nPopulation: 128\r\n";
+
+        let normalized = normalize_cli_transcript(input);
+
+        assert_eq!(
+            normalized,
+            "open <TMP>\nString length : <N>\nERROR: Command @ ./sim/console.c 119\nPopulation: 128\n"
+        );
+    }
+
+    #[test]
+    fn state_trace_line_captures_runtime_and_selected_being_fields() {
+        let mut state = SimState::start_up(DEFAULT_RANDOMISE);
+        state.reset_new_simulation_from_land_seed();
+        state.advance_minutes(1);
+
+        let trace = trace_state_line("one_minute", &state);
+
+        assert!(trace.starts_with("TRACE label=one_minute date=0 time=1"));
+        assert!(trace.contains("population=128"));
+        assert!(trace.contains("selected=Ape 001"));
+        assert!(trace.contains("drives="));
+        assert!(trace.contains("brain="));
+        assert!(trace.contains("social0="));
+        assert!(trace.contains("territory0="));
+    }
+
+    #[test]
+    fn trace_diff_reports_first_mismatch() {
+        let diff = diff_trace_text("TRACE a\nTRACE b\n", "TRACE a\nTRACE c\n").unwrap_err();
+
+        assert_eq!(diff.line, 2);
+        assert_eq!(diff.expected, "TRACE b");
+        assert_eq!(diff.actual, "TRACE c");
+    }
+
+    #[test]
+    fn fixture_manifest_parses_and_points_to_existing_files() {
+        let manifest = include_str!("../../../golden/fixture_manifest.txt");
+        let entries = parse_fixture_manifest(manifest).unwrap();
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+
+        assert!(entries.iter().any(|entry| entry.name == "runtime_parity"));
+        assert!(entries
+            .iter()
+            .any(|entry| entry.name == "empty_startup_matrix"));
+        assert!(entries
+            .iter()
+            .any(|entry| entry.name == "final_gate_summary"));
+        assert!(entries.iter().any(|entry| entry.kind == "trace"));
+        for entry in entries {
+            let path = root.join(&entry.path);
+            assert!(path.exists(), "fixture path missing: {}", entry.path);
+        }
     }
 
     fn binary_section(kind: u8, payload: Vec<u8>) -> Vec<u8> {
@@ -2432,5 +2649,95 @@ mod tests {
         assert!(actual.contains("ERROR: Failed to read in file @ ./universe/command.c 2394\n"));
         let _ = fs::remove_file(path);
         let _ = fs::remove_file(bad_path);
+    }
+
+    #[test]
+    fn save_open_matrix_covers_json_native_binary_and_malformed_files() {
+        let json_path = temp_save_path("matrix_json");
+        let native_path = temp_save_path("matrix_native").with_extension("native");
+        let binary_path = temp_save_path("matrix_binary").with_extension("bin");
+        let bad_path = temp_save_path("matrix_bad");
+        fs::write(&bad_path, b"{\"information\":true}")
+            .expect("bad matrix fixture should be writable");
+
+        let json = json_path.to_string_lossy();
+        let native = native_path.to_string_lossy();
+        let binary = binary_path.to_string_lossy();
+        let bad = bad_path.to_string_lossy();
+
+        let mut console = Console::default();
+        let actual = console.run_script(
+            &format!(
+                "reset\nrun 2 minutes\nsave {json}\nsave {native}\nsave {binary}\nopen {json}\nsim\nopen {native}\nsim\nopen {binary}\nsim\nopen {bad}\nquit\n"
+            ),
+            true,
+        );
+
+        assert_eq!(actual.matches("Population: 128\n").count(), 3);
+        assert_eq!(actual.matches("Simulation file ").count(), 6);
+        assert!(actual.contains("ERROR: Failed to read in file @ ./universe/command.c 2394\n"));
+        assert!(fs::read_to_string(&native_path)
+            .expect("native matrix save should be readable")
+            .starts_with("simul{signa=20033;verio=708;};"));
+        assert!(fs::read(&binary_path)
+            .expect("binary matrix save should be readable")
+            .starts_with(NATIVE_BINARY_MAGIC));
+
+        let _ = fs::remove_file(json_path);
+        let _ = fs::remove_file(native_path);
+        let _ = fs::remove_file(binary_path);
+        let _ = fs::remove_file(bad_path);
+    }
+
+    #[test]
+    fn long_seeded_trace_matrix_keeps_day_month_and_population_shape() {
+        let mut populated = SimState::start_up(DEFAULT_RANDOMISE);
+        populated.reset_new_simulation_from_land_seed();
+        populated.advance_minutes((TIME_DAY_MINUTES + 10) as n_uint);
+        let day_trace = trace_state_line("multi_day_seeded", &populated);
+        assert!(day_trace.contains("date=1 time=10"));
+        assert!(day_trace.contains("population=128"));
+        assert!(day_trace.contains("adults="));
+        assert!(day_trace.contains("juveniles="));
+        assert!(day_trace.contains("selected=Ape 001"));
+
+        let mut empty = SimState::start_up(DEFAULT_RANDOMISE);
+        empty.advance_minutes((TIME_MONTH_MINUTES * 2 + 5) as n_uint);
+        let month_trace = trace_state_line("multi_month_empty", &empty);
+        assert!(month_trace.contains("date=56 time=5"));
+        assert!(month_trace.contains("population=0"));
+        assert!(month_trace.contains("selected=<none>"));
+    }
+
+    #[test]
+    fn command_edge_case_matrix_reports_c_compatible_errors_and_aliases() {
+        let mut console = Console::default();
+        let actual = console.run_script(
+            "run\nrun forever\ninterval\ninterval 2 hours\nlogging off\nlogging\nlog yes\nevent social\nwatch\nmonitor off\nfile xxxxx\nhelp nope\nunknown\nquit\n",
+            true,
+        );
+
+        assert!(actual.contains(
+            "ERROR: Time not specified, examples: run 2 days, run 6 hours @ ./universe/command.c 2211\n"
+        ));
+        assert!(actual.contains("ERROR: Run forever not implemented in Rust port yet\n"));
+        assert!(actual.contains("Current time interval is 1 hour(s)\n"));
+        assert!(actual.contains("Logging interval set to 2 hours\n"));
+        assert!(actual.contains("Logging turned off\n"));
+        assert!(actual.contains("Logging turned on\n"));
+        assert!(actual.contains("Event output for social turned on\n"));
+        assert_eq!(
+            actual
+                .matches("No apes selected. Trying (re)running the Simulation\n")
+                .count(),
+            2
+        );
+        assert!(actual.contains("ERROR: String not found @ ./toolkit/file.c 1458\n"));
+        assert!(actual.contains(
+            "ERROR: Command not found, type help for more information @ ./sim/console.c 119\n"
+        ));
+        assert!(actual.contains(
+            "ERROR: Command not found, type help for more information @ ./sim/console.c 211\n"
+        ));
     }
 }

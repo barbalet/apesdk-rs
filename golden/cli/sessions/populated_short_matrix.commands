@@ -1,0 +1,15 @@
+reset
+run 2 minutes
+sim
+stats
+top
+friends
+pathogen
+episodic
+braincode
+probes
+speech
+idea
+next
+previous
+quit

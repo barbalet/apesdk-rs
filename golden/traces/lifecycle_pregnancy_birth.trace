@@ -1,0 +1,1 @@
+TRACE fixture=lifecycle_pregnancy_birth gate=rust-unit scope=conception,fetal_genetics,gestation,birth,population_capacity,child_initialization status=covered_by_sim_tests

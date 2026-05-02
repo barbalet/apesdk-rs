@@ -1,0 +1,1 @@
+TRACE fixture=save_open_continuity gate=rust-unit scope=json,native_text,framed_binary,malformed,cross_load,post_open_state status=covered_by_simape_tests

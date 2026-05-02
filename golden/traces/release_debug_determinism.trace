@@ -1,0 +1,1 @@
+TRACE fixture=release_debug_determinism gate=script scope=debug_release_transcripts,normalized_outputs status=scripts/run_release_debug_gate.sh

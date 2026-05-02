@@ -859,280 +859,564 @@ Create a reproducible local script that builds the native C command-line
 
 Validation: harness builds C and Rust from a clean checkout.
 
-### Cycle 226: C Transcript Runner
+### Cycle 226: C Transcript Runner - Complete
 
 Extend the existing CLI golden runner to execute both C and Rust sessions with
 timeouts, output capture, and normalized line endings.
 
 Validation: help/session transcripts compare through the harness.
 
-### Cycle 227: Transcript Normalization
+### Cycle 227: Transcript Normalization - Complete
 
 Normalize expected volatile fields such as dates, temporary paths, random save
 sizes, and platform-specific line endings without masking behavioral drift.
 
 Validation: normalization unit tests and sample diff.
 
-### Cycle 228: C State Trace Hooks
+### Cycle 228: C State Trace Hooks - Complete
 
 Add optional trace points for C and Rust covering land, population, selected
 being, energy, position, drives, brain, social, territory, and lifecycle state.
 
 Validation: one-minute trace files generated for both implementations.
 
-### Cycle 229: Trace Diff Tool
+### Cycle 229: Trace Diff Tool - Complete
 
 Build a structured diff tool for state traces with clear mismatch categories
 and first-difference reporting.
 
 Validation: intentional mismatch fixture produces readable output.
 
-### Cycle 230: Fixture Manifest
+### Cycle 230: Fixture Manifest - Complete
 
 Create a manifest describing every save, command script, seed, expected gate,
 and normalization rule.
 
 Validation: manifest parser test and fixture existence check.
 
-### Cycle 231: Harness CI Script
+### Cycle 231: Harness CI Script - Complete
 
 Add a local CI-style script that runs Rust tests, C build, C/Rust transcripts,
 binary fixtures, and trace fixtures in a stable order.
 
 Validation: script runs locally and reports pass/fail summary.
 
-### Cycle 232: Harness Documentation
+### Cycle 232: Harness Documentation - Complete
 
 Document how to generate, review, normalize, and update C-derived goldens.
 
 Validation: README walkthrough from clean checkout.
 
-### Cycle 233: Braincode C Trace Fixtures
+### Cycle 233: Braincode C Trace Fixtures - Complete
 
 Generate C traces for representative braincode programs covering data,
 arithmetic, control flow, sensors, actuators, probes, and anecdotes.
 
 Validation: fixture files committed with manifest entries.
 
-### Cycle 234: Braincode Decode Trace Parity
+### Cycle 234: Braincode Decode Trace Parity - Complete
 
 Compare Rust decode, address wrapping, constant flags, and program-counter
 movement against C traces.
 
 Validation: decode trace parity tests.
 
-### Cycle 235: Braincode Arithmetic Trace Parity
+### Cycle 235: Braincode Arithmetic Trace Parity - Complete
 
 Close drift in `DAT`, arithmetic, byte mutation, register, and control
 operators.
 
 Validation: arithmetic trace parity tests.
 
-### Cycle 236: Braincode Sensor Trace Parity
+### Cycle 236: Braincode Sensor Trace Parity - Complete
 
 Close drift in body, drive, social, episodic, terrain, weather, immune, and
 territory sensor values.
 
 Validation: sensor trace parity table.
 
-### Cycle 237: Braincode Actuator Trace Parity
+### Cycle 237: Braincode Actuator Trace Parity - Complete
 
 Close drift in action, goal, friend/foe, attraction, familiarity, probes,
 shout, posture, preferences, intentions, and anecdotes.
 
 Validation: actuator trace parity tests.
 
-### Cycle 238: Braincode Scheduling Trace Parity
+### Cycle 238: Braincode Scheduling Trace Parity - Complete
 
 Match C dialogue iteration counts, internal/external scheduling, probe
 frequency, offset, and state update timing.
 
 Validation: scheduling trace parity tests.
 
-### Cycle 239: Braincode Social Hook Parity
+### Cycle 239: Braincode Social Hook Parity - Complete
 
 Match social braincode initialization and per-social-entry braincode behavior
 for newly met beings and chat interactions.
 
 Validation: social braincode fixture traces.
 
-### Cycle 240: Braincode Long-Run Freeze
+### Cycle 240: Braincode Long-Run Freeze - Complete
 
 Run long seeded braincode-enabled simulations and fix remaining VM drift.
 
 Validation: long braincode trace parity.
 
-### Cycle 241: Social Action Drift Pass
+### Cycle 241: Social Action Drift Pass - Complete
 
 Close drift in social actions, body inventory actions, giving, pickup/drop,
 brandish, drag, bash, chew, fish, and shout-visible states.
 
 Validation: social/body action trace fixtures.
 
-### Cycle 242: Groom/Squabble Drift Pass
+### Cycle 242: Groom/Squabble Drift Pass - Complete
 
 Close drift in grooming selection, wounds, parasites, honor, squabble force,
 attack, flee, and episodic side effects.
 
 Validation: grooming/squabble trace parity.
 
-### Cycle 243: Mate/Preference Drift Pass
+### Cycle 243: Mate/Preference Drift Pass - Complete
 
 Close drift in attraction, mate bond, mate preference learning, sex drive, mate
 goals, and conception trigger behavior.
 
 Validation: mate/preference fixture parity.
 
-### Cycle 244: Territory Drift Pass
+### Cycle 244: Territory Drift Pass - Complete
 
 Close drift in territory familiarity indexing, rescaling, naming, chat-based
 agreement, and territory-focused attention.
 
 Validation: territory trace parity.
 
-### Cycle 245: Family Relationship Drift Pass
+### Cycle 245: Family Relationship Drift Pass - Complete
 
 Close drift in mother/father/child/grandparent/sibling relationship inference
 and social graph storage rules.
 
 Validation: controlled family-tree fixtures.
 
-### Cycle 246: Pregnancy And Birth Drift Pass
+### Cycle 246: Pregnancy And Birth Drift Pass - Complete
 
 Close drift in conception date, fetal genetics, gestation, birth creation,
 population capacity, and child initialization.
 
 Validation: pregnancy/birth trace fixtures.
 
-### Cycle 247: Carrying/Suckling Drift Pass
+### Cycle 247: Carrying/Suckling Drift Pass - Complete
 
 Close drift in carrying, suckling, weaning, mother/child energy transfer,
 immunity seeding, and post-birth episodic events.
 
 Validation: mother/child lifecycle trace fixtures.
 
-### Cycle 248: Immune Transmission Drift Pass
+### Cycle 248: Immune Transmission Drift Pass - Complete
 
 Close drift in air, touch, sex, and food pathogen transmission, antibody
 mutation, antigen severity, and energy cost.
 
 Validation: immune trace parity.
 
-### Cycle 249: Movement/Body Drift Pass
+### Cycle 249: Movement/Body Drift Pass - Complete
 
 Close drift in walking, swimming, water avoidance, slope energy, mass, height,
 fat, posture, fatigue, and velocity history.
 
 Validation: movement/body trace parity.
 
-### Cycle 250: Food/Terrain Drift Pass
+### Cycle 250: Food/Terrain Drift Pass - Complete
 
 Close drift in terrain sampling, tide, weather, food choice, depletion,
 regrowth, absorption, and pathogen ingestion.
 
 Validation: terrain/food trace parity.
 
-### Cycle 251: Empty Startup Transcript Matrix
+### Cycle 251: Empty Startup Transcript Matrix - Complete
 
 Compare C and Rust for empty startup, help, memory, file, save/open, errors,
 and no-population detail commands.
 
 Validation: empty transcript matrix passes.
 
-### Cycle 252: Populated Short Transcript Matrix
+### Cycle 252: Populated Short Transcript Matrix - Complete
 
 Compare reset, run, stats, top, social, pathogen, episodic, braincode, probes,
 speech, idea, and navigation commands after short runs.
 
 Validation: populated short transcript matrix passes.
 
-### Cycle 253: Save/Open Continuity Matrix
+### Cycle 253: Save/Open Continuity Matrix - Complete
 
 Compare save/open loops across JSON, native text, raw binary, malformed files,
 and cross-loaded files.
 
 Validation: save/open transcript and state matrix passes.
 
-### Cycle 254: Multi-Day Seeded Matrix
+### Cycle 254: Multi-Day Seeded Matrix - Complete
 
 Run multi-day seeded simulations with trace and transcript comparison.
 
 Validation: multi-day C/Rust parity report.
 
-### Cycle 255: Multi-Month Seeded Matrix
+### Cycle 255: Multi-Month Seeded Matrix - Complete
 
 Run multi-month seeded simulations with save/open continuity and drift
 triage.
 
 Validation: multi-month C/Rust parity report.
 
-### Cycle 256: Population Stress Matrix
+### Cycle 256: Population Stress Matrix - Complete
 
 Run near-maximum and maximum population scenarios through command, trace, and
 save/load gates.
 
 Validation: stress parity report.
 
-### Cycle 257: Command Edge Case Sweep
+### Cycle 257: Command Edge Case Sweep - Complete
 
 Match parsing, aliases, missing arguments, malformed commands, command ordering,
 and C error text/file-line behavior.
 
 Validation: command edge-case golden suite.
 
-### Cycle 258: Release/Debug Determinism
+### Cycle 258: Release/Debug Determinism - Complete
 
 Verify debug and release Rust builds produce identical observable transcripts,
 traces, and saves for approved fixtures.
 
 Validation: debug/release diff gate.
 
-### Cycle 259: Cross-Platform Determinism
+### Cycle 259: Cross-Platform Determinism - Complete
 
 Audit macOS/Linux newline, path, integer, filesystem, and locale behavior for
 stable fixture output.
 
 Validation: platform notes and normalized transcript tests.
 
-### Cycle 260: Performance Baseline And Corrections
+### Cycle 260: Performance Baseline And Corrections - Complete
 
 Measure Rust versus C on common runs, optimize hot paths only where trace
 output remains unchanged, and document any accepted performance gap.
 
 Validation: benchmark report plus parity tests.
 
-### Cycle 261: Public API Cleanup
+### Cycle 261: Public API Cleanup - Complete
 
 Clean up internal Rust APIs introduced during parity work while preserving CLI,
 fixture, and transfer behavior.
 
 Validation: full tests and docs check.
 
-### Cycle 262: Final Documentation Pass
+### Cycle 262: Final Documentation Pass - Complete
 
 Finalize architecture, command behavior, save/load compatibility, fixture
 generation, drift categories, and release notes.
 
 Validation: documentation review against implemented behavior.
 
-### Cycle 263: Known Drift Zero Gate
+### Cycle 263: Known Drift Zero Gate - Complete
 
 Ensure every known drift item is fixed, fixture-proven unobservable, or
 explicitly accepted with rationale.
 
 Validation: zero untriaged drift list.
 
-### Cycle 264: Final Parity Gates
+### Cycle 264: Final Parity Gates - Complete
 
 Run final binary byte diff, transcript diff, state trace diff, release/debug,
 and stress gates together.
 
 Validation: all final gates pass repeatedly without flakes.
 
-### Cycle 265: Native C Parity Signoff
+### Cycle 265: Native C Parity Signoff - Complete
 
 Freeze Rust `simape` as byte-for-byte save compatible and transcript-level
 native C compatible for the approved corpus.
 
 Validation: signed final parity report with fixture manifest, gate outputs,
 and any explicitly accepted non-observable differences.
+
+## Absolute Native C Parity Extension: Cycles 266-300
+
+The 246-265 signoff closed the approved Rust fixture corpus, but it still
+contained documented differences from a stricter native C oracle. These 35
+cycles remove every accepted/documented difference and replace the current
+approved-corpus signoff with absolute native C parity: no transcript
+normalization beyond platform-invisible transport cleanup, no Rust-only framed
+binary substitute, no JSON save/open behavior drift, and no undocumented
+fixture gaps.
+
+### Cycle 266: Accepted Drift Triage Freeze
+
+Convert every accepted item in `rust_port/final_drift_register.md` into a
+blocking work item with an owner, fixture, expected native C behavior, and
+removal condition.
+
+Validation: drift register contains no "accepted" category, only open blocking
+items.
+
+### Cycle 267: C Save/Open Oracle Capture
+
+Capture native C save/open behavior for startup, populated, JSON extension,
+native-text extension, binary extension, malformed, missing, and cross-loaded
+files without Rust normalization.
+
+Validation: raw C transcript and artifact corpus checked into a reviewed
+golden directory.
+
+### Cycle 268: Rust Save/Open Behavior Match
+
+Change Rust `simape` save/open behavior to match native C exactly for every
+captured extension and file-content case, including native C's JSON reopen
+failure if that remains the observed C command behavior.
+
+Validation: C/Rust save/open transcript diff is empty without behavioral
+normalization.
+
+### Cycle 269: Save/Open Compatibility Escape Hatch
+
+If Rust still needs non-C compatibility for developer workflows, move it behind
+an explicit non-default command or feature so default `simape` remains native
+C-identical.
+
+Validation: default CLI transcripts match C; compatibility mode has separate
+tests and is excluded from native parity gates.
+
+### Cycle 270: Raw C Binary Artifact Generator
+
+Add a native C harness target that writes raw binary saves for empty, startup,
+single-being, normal, maximum, old-version, social-heavy, immune-heavy,
+terrain-heavy, and pregnant/lifecycle states.
+
+Validation: generated artifacts are reproducible and content-addressed.
+
+### Cycle 271: Raw Binary Layout Byte Map
+
+Derive the exact C byte layout for every raw save block from generated
+artifacts plus C `sizeof`, `offsetof`, endian, padding, and array-count probes.
+
+Validation: byte map explains every byte in the approved raw binary corpus.
+
+### Cycle 272: Rust Raw Binary Reader Replacement
+
+Replace or bypass the framed Rust binary transfer reader with the exact raw C
+reader on default CLI paths.
+
+Validation: every C raw binary artifact loads into Rust with matching state
+trace.
+
+### Cycle 273: Rust Raw Binary Writer Replacement
+
+Write default Rust binary saves in native C raw byte order instead of the Rust
+framed transfer substitute.
+
+Validation: Rust-written raw saves are byte-for-byte identical to matching C
+artifacts for stable fixtures.
+
+### Cycle 274: Binary Cross-Load Behavioral Gate
+
+Run C-loaded Rust saves and Rust-loaded C saves for one minute, one day, and one
+month, comparing state traces after each interval.
+
+Validation: cross-load traces are identical at every checkpoint.
+
+### Cycle 275: Binary Legacy And Error Parity
+
+Match C behavior for old versions, unsupported versions, truncated files,
+unknown sections, garbage bytes, empty files, and extension/content mismatches.
+
+Validation: malformed binary transcript and error-location diff is empty.
+
+### Cycle 276: Build Metadata Parity Policy
+
+Eliminate banner/build-date drift by either matching C's build metadata exactly
+or deriving both C and Rust fixture builds from one pinned metadata source.
+
+Validation: no banner/date normalization is needed for C/Rust transcript diffs.
+
+### Cycle 277: Path And Error Location Parity
+
+Make Rust file/line error output match native C path formatting exactly under
+the parity harness, including relative/absolute prefixes and source locations.
+
+Validation: command and malformed-file transcripts diff without path
+normalization.
+
+### Cycle 278: Transcript Normalizer Removal Pass
+
+Remove every transcript normalizer that can hide behavior: lengths, paths,
+dates, line ordering, save sizes, names, state values, and error locations.
+Keep only CRLF-to-LF transport cleanup if required by the runner.
+
+Validation: raw or transport-only-normalized transcript diff is empty.
+
+### Cycle 279: Deterministic Seed Injection For C And Rust
+
+Add a shared seed injection mechanism to the C and Rust harnesses so startup,
+reset, random names, land seeds, social actions, and save contents are
+reproducible from the same test vector.
+
+Validation: repeated C and Rust runs produce byte-identical artifacts and
+transcripts.
+
+### Cycle 280: Native C State Trace Emitter
+
+Add C-side trace emitters for land, tide, weather, food tiles, population,
+selected being, body, energy, drives, braincode, social, episodic, territory,
+immune, lifecycle, and save/load state.
+
+Validation: C trace corpus is generated directly from native execution.
+
+### Cycle 281: Rust State Trace Emitter Exactness
+
+Align Rust trace emission field order, formatting, widths, signedness, and
+sampling points with the native C trace emitter.
+
+Validation: one-minute C/Rust trace diff is empty.
+
+### Cycle 282: Per-Minute Engine Order Closure
+
+Compare C and Rust for land, population, brain, body, immune, social,
+territory, lifecycle, cleanup, and save-visible state at every minute boundary.
+
+Validation: one-day per-minute trace diff is empty.
+
+### Cycle 283: Long Seeded Transcript Closure
+
+Run C and Rust through identical multi-day, multi-month, and one-year command
+scripts with no behavioral normalization.
+
+Validation: long seeded transcript diff is empty.
+
+### Cycle 284: Terrain/Food Byte Oracle Closure
+
+Generate C byte or numeric fixtures for terrain tiles, high-definition maps,
+weather, tide, food depletion, food regrowth, and food-pathogen ingestion.
+
+Validation: Rust values match C fixtures byte-for-byte or exactly numerically.
+
+### Cycle 285: Braincode Byte Oracle Closure
+
+Generate C traces for opcode decode, arithmetic, sensors, actuators, probes,
+scheduling, social hooks, anecdote hooks, and persistence.
+
+Validation: Rust braincode traces match C at every instruction boundary.
+
+### Cycle 286: Social And Episodic Oracle Closure
+
+Generate dense C traces for meeting, attraction, chat, grooming, squabble,
+mate, preference learning, stereotypes, episodic storage, and anecdote
+mutation.
+
+Validation: Rust social/episodic traces match C event-for-event.
+
+### Cycle 287: Territory And Family Oracle Closure
+
+Generate C traces for territory familiarity, naming, relationship inference,
+mother/father/child/sibling/grandparent mapping, and social graph storage.
+
+Validation: Rust territory/family traces match C field-for-field.
+
+### Cycle 288: Lifecycle And Immune Oracle Closure
+
+Generate C traces for conception, fetal genetics, gestation, birth, carrying,
+suckling, weaning, death, immune mutation, pathogen spread, and immune energy
+cost.
+
+Validation: Rust lifecycle/immune traces match C field-for-field.
+
+### Cycle 289: Movement And Body Oracle Closure
+
+Generate C traces for walking, swimming, slope cost, water avoidance, facing,
+velocity history, height, mass, fat, posture, fatigue, wounds, parasites, and
+inventory.
+
+Validation: Rust movement/body traces match C field-for-field.
+
+### Cycle 290: Command Surface Exhaustive Matrix
+
+Build an exhaustive C/Rust matrix for every command, alias, missing argument,
+bad argument, command ordering case, quiet command, and stop/quit path.
+
+Validation: command matrix transcript diff is empty.
+
+### Cycle 291: Interactive Timing And EOF Parity
+
+Match C console behavior for prompts, EOF, closed stdin, delayed output,
+threaded output ordering, `stop`, and long-running commands.
+
+Validation: PTY harness transcript diff is empty across timing scenarios.
+
+### Cycle 292: Platform Absolute Parity Gate
+
+Run the no-normalization parity suite on macOS and Linux with pinned compilers,
+integer widths, locale, timezone, filesystem behavior, and newline policy.
+
+Validation: platform transcripts, traces, and save bytes match the same native
+C oracle.
+
+### Cycle 293: Release/Debug/Cross-Compiler Parity
+
+Compare Rust debug, Rust release, native C debug, native C release, and
+supported compiler variants for identical observable output.
+
+Validation: all profile/compiler transcript, trace, and save-byte diffs are
+empty.
+
+### Cycle 294: Corpus Completeness Audit
+
+Audit the fixture corpus against every native C module reachable from
+`longterm.c` command-line execution and add missing fixtures for uncovered
+branches.
+
+Validation: coverage map shows no reachable native branch without a fixture or
+proof of unreachability.
+
+### Cycle 295: Fuzzed Native Parity Closure
+
+Run fuzzed commands, malformed saves, binary byte mutations, random seeds, and
+edge populations through C and Rust, converting every mismatch into a fixture.
+
+Validation: fuzz corpus has zero unresolved C/Rust behavioral mismatches.
+
+### Cycle 296: Performance Without Drift
+
+Remove any Rust slow paths introduced for raw parity while proving each
+optimization leaves transcripts, traces, and save bytes unchanged.
+
+Validation: benchmark report plus full no-normalization parity suite.
+
+### Cycle 297: CI Absolute Parity Pipeline
+
+Replace the current local parity CI with a required absolute parity pipeline
+that builds C/Rust, regenerates fixtures, diffs raw transcripts, diffs traces,
+diffs raw saves, and fails on any undocumented output.
+
+Validation: CI script exits nonzero on any single-byte or single-line drift.
+
+### Cycle 298: Documentation Rewrite For No-Caveat Parity
+
+Rewrite final parity, save/load, fixture, and harness documentation to remove
+accepted-drift language and describe the exact no-caveat native C oracle.
+
+Validation: docs mention no accepted differences, substitutes, or manual
+normalization allowances.
+
+### Cycle 299: Drift Register Deletion Gate
+
+Delete the accepted-drift register or replace it with an empty historical note
+after all formerly accepted differences are fixed and fixture-proven.
+
+Validation: repository search finds no "accepted drift" or "known difference"
+language in current parity docs.
+
+### Cycle 300: Absolute Native C Parity Signoff
+
+Freeze Rust `simape` as absolutely native C-identical for command-line
+execution: byte-for-byte raw saves, raw transcript parity, exact state trace
+parity, no accepted/documented differences, and no behavior-hiding
+normalization.
+
+Validation: absolute parity CI passes repeatedly from a clean checkout and the
+final signoff records zero differences.

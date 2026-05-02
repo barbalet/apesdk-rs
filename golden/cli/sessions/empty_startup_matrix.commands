@@ -1,0 +1,9 @@
+help
+sim
+memory
+file landd
+save /private/tmp/simape_empty_matrix.json
+open /private/tmp/simape_empty_matrix.json
+friends
+braincode
+quit

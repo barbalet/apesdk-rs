@@ -1,0 +1,12 @@
+run
+interval
+interval 2 hours
+logging off
+logging
+event social
+watch
+monitor off
+file xxxxx
+help nope
+unknown
+quit

@@ -1,0 +1,1 @@
+TRACE fixture=movement_body gate=rust-unit scope=walking,swimming,water_avoidance,slope_energy,mass,height,fat,posture,fatigue,velocity status=covered_by_sim_tests

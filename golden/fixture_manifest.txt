@@ -1,0 +1,27 @@
+# kind | name | path | gate | normalizer
+session | help | golden/cli/sessions/help.commands | transcript | cli
+session | help_errors | golden/cli/sessions/help_errors.commands | transcript | cli
+session | runtime_parity | golden/cli/sessions/runtime_parity.commands | transcript | cli
+session | state_save_load | golden/cli/sessions/state_save_load.commands | transcript | cli
+session | empty_startup_matrix | golden/cli/sessions/empty_startup_matrix.commands | transcript | cli
+session | populated_short_matrix | golden/cli/sessions/populated_short_matrix.commands | transcript | cli
+session | save_open_matrix | golden/cli/sessions/save_open_matrix.commands | transcript | cli-volatile
+session | command_edges | golden/cli/sessions/command_edges.commands | transcript | cli
+transcript | help | golden/cli/transcripts/help.txt | rust-unit | cli
+transcript | help_errors | golden/cli/transcripts/help_errors.txt | rust-unit | cli
+transcript | runtime_parity | golden/cli/transcripts/runtime_parity.txt | rust-unit | cli
+transcript | state_save_load | golden/cli/transcripts/state_save_load.txt | smoke | cli-volatile
+trace | braincode_decode | golden/traces/braincode_decode.trace | rust-unit | trace
+trace | braincode_arithmetic | golden/traces/braincode_arithmetic.trace | rust-unit | trace
+trace | braincode_sensor_actuator | golden/traces/braincode_sensor_actuator.trace | rust-unit | trace
+trace | braincode_social_hook | golden/traces/braincode_social_hook.trace | rust-unit | trace
+trace | social_family | golden/traces/social_family.trace | rust-unit | trace
+trace | lifecycle_pregnancy_birth | golden/traces/lifecycle_pregnancy_birth.trace | rust-unit | trace
+trace | lifecycle_carrying_suckling | golden/traces/lifecycle_carrying_suckling.trace | rust-unit | trace
+trace | immune_transmission | golden/traces/immune_transmission.trace | rust-unit | trace
+trace | movement_body | golden/traces/movement_body.trace | rust-unit | trace
+trace | terrain_food | golden/traces/terrain_food.trace | rust-unit | trace
+trace | save_open_continuity | golden/traces/save_open_continuity.trace | rust-unit | trace
+trace | population_stress | golden/traces/population_stress.trace | rust-unit | trace
+trace | release_debug_determinism | golden/traces/release_debug_determinism.trace | script | trace
+trace | final_gate_summary | golden/traces/final_gate_summary.trace | manual | trace

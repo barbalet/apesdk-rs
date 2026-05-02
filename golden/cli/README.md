@@ -11,6 +11,16 @@ Rust port to preserve.
   save, and open behavior. It includes random seed and generated file-size
   values, so future automated comparisons should normalize those fields before
   diffing.
+- `empty_startup_matrix.commands` covers startup help, memory, file, save/open,
+  and no-population detail errors.
+- `populated_short_matrix.commands` covers a reset, short run, detail commands,
+  braincode/probe/speech output, idea output, and navigation.
+- `save_open_matrix.commands` covers JSON, native-text, framed-binary, and
+  missing-file continuity.
+- `command_edges.commands` covers missing arguments, aliases, malformed format
+  lookup, targeted help errors, and unknown commands. Rust-only unit tests cover
+  the unsupported `run forever` behavior because native C intentionally keeps
+  running until stopped.
 
 Regenerate them from the repository root with:
 
@@ -38,3 +48,24 @@ Current C behavior: opening the JSON file saved from the startup simulation
 fails in the loader with `Signature not first in file`. The transcript captures
 that behavior as the compatibility target until the Rust port explicitly decides
 to fix or migrate the save/load format.
+
+## Harness
+
+The newer local harness scripts wrap these sessions for C/Rust comparison:
+
+```sh
+scripts/build_native_simape.sh /private/tmp/apesdk_native_harness
+NATIVE_SIMAPE=/private/tmp/apesdk_native_harness/simape \
+RUST_SIMAPE=target/debug/simape \
+scripts/run_cli_transcripts.sh /private/tmp/apesdk_transcripts
+```
+
+Use `scripts/normalize_transcript.sh` for line-ending, temporary-path, and
+known volatile length normalization before reviewing transcript diffs.
+
+For final release-hardening checks:
+
+```sh
+scripts/run_release_debug_gate.sh /private/tmp/apesdk_release_debug_gate
+scripts/performance_smoke.sh /private/tmp/apesdk_performance_smoke
+```

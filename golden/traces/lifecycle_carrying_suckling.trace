@@ -1,0 +1,1 @@
+TRACE fixture=lifecycle_carrying_suckling gate=rust-unit scope=carrying,suckling,weaning,mother_child_energy,immune_seed,episodic_events status=covered_by_sim_tests

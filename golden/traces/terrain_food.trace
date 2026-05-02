@@ -1,0 +1,1 @@
+TRACE fixture=terrain_food gate=rust-unit scope=terrain_sampling,tide,weather,food_choice,depletion,regrowth,absorption,pathogen_ingestion status=covered_by_sim_tests

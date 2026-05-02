@@ -1,0 +1,1 @@
+TRACE fixture=final_gate_summary gate=manual scope=fmt,test,native_build,transcripts,release_debug,trace_diff status=recorded_in_rust_port/final_parity_report.md
