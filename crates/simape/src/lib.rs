@@ -953,7 +953,7 @@ impl Console {
         }
 
         match fs::read(path) {
-            Ok(contents) => match SimState::load_startup_json(&contents) {
+            Ok(contents) => match SimState::load_startup_bytes(&contents) {
                 Ok(state) => {
                     self.state = state;
                     output.push_str("Simulation file ");
@@ -1088,7 +1088,11 @@ impl Console {
 
         self.simulation_running = false;
         let mut output = String::from("Simulation stopped\n");
-        let file = self.state.tranfer_startup_out_json();
+        let file = if path.contains(".native") || path.ends_with(".ape") {
+            self.state.tranfer_startup_out_native()
+        } else {
+            self.state.tranfer_startup_out_json()
+        };
         match fs::write(path, file.written_data()) {
             Ok(()) => {
                 output.push_str("Simulation file ");
@@ -1112,7 +1116,7 @@ impl Console {
         self.simulation_running = false;
         let mut output = String::from("Simulation stopped\n");
         match fs::read(path) {
-            Ok(contents) => match SimState::load_startup_json(&contents) {
+            Ok(contents) => match SimState::load_startup_bytes(&contents) {
                 Ok(state) => {
                     self.state = state;
                     output.push_str("Simulation file ");
@@ -2081,7 +2085,7 @@ mod tests {
     }
 
     #[test]
-    fn open_rejects_binary_native_save_until_binary_parity_is_ported() {
+    fn open_rejects_raw_binary_save_until_byte_struct_parity_is_ported() {
         let path = temp_save_path("binary_reject");
         let path_string = path.to_string_lossy();
         fs::write(&path, b"NA\x02\xc4not-json").expect("binary fixture should be writable");
@@ -2227,6 +2231,47 @@ mod tests {
                 "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\nopen {path_string}\nSimulation stopped\nSimulation file {path_string} open\n\nsim\nMap dimension: 512\nLand seed: 1 2\nPopulation: 0\nAdults: 0   Juveniles: 0\nTide level: 132\n05:00 28/01/0 Simulation not running\nquit\nSimulation stopped\n"
             )
         );
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn open_native_transfer_restores_startup_state() {
+        let path = temp_save_path("open_native_success");
+        let path_string = path.to_string_lossy();
+        fs::write(
+            &path,
+            b"/* Simulated Ape 0.708 */simul{signa=20033;verio=708;};landd{dated=27;timed=300;landg=1,2;};",
+        )
+        .expect("fixture native transfer should be writable");
+
+        let mut console = Console::default();
+        let actual = console.run_script(&format!("open {path_string}\nsim\nquit\n"), true);
+
+        assert_eq!(
+            actual,
+            format!(
+                "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\nopen {path_string}\nSimulation stopped\nSimulation file {path_string} open\n\nsim\nMap dimension: 512\nLand seed: 1 2\nPopulation: 0\nAdults: 0   Juveniles: 0\nTide level: 132\n05:00 28/01/0 Simulation not running\nquit\nSimulation stopped\n"
+            )
+        );
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn save_native_extension_writes_native_transfer_that_open_can_read() {
+        let path = temp_save_path("roundtrip.native");
+        let path_string = path.to_string_lossy();
+        let mut console = Console::default();
+        let saved = console.run_script(&format!("reset\nsave {path_string}\nquit\n"), true);
+        assert!(saved.contains("Simulation file "));
+        let saved_native = fs::read_to_string(&path).expect("native save should exist");
+        assert!(saved_native.starts_with("simul{signa=20033;verio=708;};"));
+        assert!(saved_native.contains("landd{"));
+        assert!(saved_native.contains("being{"));
+
+        let mut console = Console::default();
+        let opened = console.run_script(&format!("open {path_string}\nsim\nquit\n"), true);
+        assert!(opened.contains("Simulation file "));
+        assert!(opened.contains("Population: 128\n"));
         let _ = fs::remove_file(path);
     }
 

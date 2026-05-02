@@ -28,6 +28,9 @@ pub const BRAINCODE_MAX_FREQUENCY: usize = 16;
 pub const BRAINCODE_BYTES_PER_INSTRUCTION: usize = 3;
 pub const BRAINCODE_BLOCK_COPY: usize = 16;
 pub const BRAINCODE_MAX_ADDRESS: usize = BRAINCODE_SIZE * 2;
+pub const BRAINCODE_CONSTANT0_BIT: n_byte = 64;
+pub const BRAINCODE_CONSTANT1_BIT: n_byte = 128;
+pub const BRAINPROBE_NATIVE_BYTES: usize = BRAINCODE_PROBES * 6;
 
 pub const CHROMOSOMES: usize = 4;
 pub const CHROMOSOME_Y: usize = 0;
@@ -40,6 +43,8 @@ pub const EPISODIC_SIZE: usize = 12;
 pub const MAX_FEATURESET_SIZE: usize = 16;
 pub const IMMUNE_ANTIGENS: usize = 8;
 pub const IMMUNE_POPULATION: usize = 16;
+pub const IMMUNE_NATIVE_BYTES: usize =
+    IMMUNE_ANTIGENS + IMMUNE_ANTIGENS + IMMUNE_POPULATION + IMMUNE_POPULATION + 4;
 pub const NUMBER_OF_BODIES: usize = 10;
 pub const INVENTORY_SIZE: usize = 8;
 pub const INVENTORY_CHILD: n_byte2 = 1;
@@ -54,6 +59,12 @@ pub const MAP_BITS: usize = 9;
 pub const MAP_TILES: usize = 1;
 pub const MAP_DIMENSION: usize = 1 << MAP_BITS;
 pub const MAP_AREA: usize = 1 << (2 * MAP_BITS);
+pub const LAND_TOPOGRAPHY_BUFFERS: usize = 2;
+pub const LAND_TOPOGRAPHY_PRIMARY: usize = 0;
+pub const LAND_TOPOGRAPHY_WORKING: usize = 1;
+pub const HI_RES_MAP_BITS: usize = MAP_BITS + 3;
+pub const HI_RES_MAP_DIMENSION: usize = 1 << HI_RES_MAP_BITS;
+pub const HI_RES_MAP_AREA: usize = 1 << (2 * HI_RES_MAP_BITS);
 pub const APE_TO_MAP_BIT_RATIO: usize = 6;
 pub const MAP_TO_TERRITORY_RATIO: usize = 5;
 pub const MAP_APE_RESOLUTION_SIZE: n_byte2 = (MAP_DIMENSION << APE_TO_MAP_BIT_RATIO) as n_byte2;
@@ -67,6 +78,18 @@ pub const TIDE_AMPLITUDE_SOLAR: n_int = 2;
 pub const TIDE_MAX: n_int = WATER_MAP + TIDE_AMPLITUDE_LUNAR + TIDE_AMPLITUDE_SOLAR;
 pub const LUNAR_ORBIT_MINS: n_int = 39_312;
 pub const NEW_SD_MULTIPLE: n_int = 26_880;
+pub const WEATHER_CLOUD: n_int = 32_768 >> 4;
+pub const WEATHER_RAIN: n_int = WEATHER_CLOUD * 3;
+pub const WEATHER_SEVEN_ERROR: n_int = -1;
+pub const WEATHER_SEVEN_SUNNY_DAY: n_int = 0;
+pub const WEATHER_SEVEN_CLOUDY_DAY: n_int = 1;
+pub const WEATHER_SEVEN_RAINY_DAY: n_int = 2;
+pub const WEATHER_SEVEN_CLEAR_NIGHT: n_int = 3;
+pub const WEATHER_SEVEN_CLOUDY_NIGHT: n_int = 4;
+pub const WEATHER_SEVEN_RAINY_NIGHT: n_int = 5;
+pub const WEATHER_SEVEN_DAWN_DUSK: n_int = 6;
+pub const FOOD_QUANTITY_MAX: n_byte = 255;
+pub const FOOD_REGROWTH_INTERVAL_MINUTES: n_uint = (TIME_DAY_MINUTES / 16) as n_uint;
 
 pub const TERRAIN_WINDOW_WIDTH: usize = 4096;
 pub const TERRAIN_WINDOW_HEIGHT: usize = 3072;
@@ -138,6 +161,8 @@ pub const ENERGY_BUSH: n_byte2 = 100;
 pub const ENERGY_FRUIT: n_byte2 = 100;
 pub const ENERGY_SEAWEED: n_byte2 = 30;
 pub const ENERGY_SHELLFISH: n_byte2 = 300;
+pub const ENERGY_NUT: n_byte2 = 200;
+pub const ENERGY_FISH: n_byte2 = 600;
 pub const ENERGY_BIRD_EGGS: n_byte2 = 800;
 pub const ENERGY_LIZARD_EGGS: n_byte2 = 1_000;
 pub const FOOD_VEGETABLE: n_byte = 0;
@@ -154,6 +179,17 @@ pub const BODY_LEFT_HAND: n_byte = 4;
 pub const BODY_RIGHT_HAND: n_byte = 5;
 pub const BODY_LEFT_FOOT: n_byte = 6;
 pub const BODY_RIGHT_FOOT: n_byte = 7;
+pub const INVENTORY_GRASS: n_byte2 = 4;
+pub const INVENTORY_TWIG: n_byte2 = 8;
+pub const INVENTORY_ROCK: n_byte2 = 16;
+pub const INVENTORY_BRANCH: n_byte2 = 32;
+pub const INVENTORY_SPEAR: n_byte2 = 64;
+pub const INVENTORY_NUT: n_byte2 = 128;
+pub const INVENTORY_NUT_CRACKED: n_byte2 = 256;
+pub const INVENTORY_SCRAPER: n_byte2 = 512;
+pub const INVENTORY_FISH: n_byte2 = 4_096;
+pub const INVENTORY_BIRD_EGGS: n_byte2 = 8_192;
+pub const INVENTORY_LIZARD_EGGS: n_byte2 = 16_384;
 pub const ATTENTION_EXTERNAL: usize = 0;
 pub const ATTENTION_ACTOR: usize = 1;
 pub const ATTENTION_EPISODE: usize = 2;
@@ -254,6 +290,37 @@ pub const PATHOGEN_TRANSMISSION_SEX: n_byte = 2;
 pub const PATHOGEN_TRANSMISSION_TOUCH: n_byte = 3;
 pub const PATHOGEN_TRANSMISSION_FOOD_VEGETABLE: n_byte = 4;
 pub const PATHOGEN_TRANSMISSION_TOTAL: n_byte2 = 8;
+pub const BRAINCODE_DAT0: n_byte = 0;
+pub const BRAINCODE_DAT1: n_byte = 1;
+pub const BRAINCODE_ADD: n_byte = 2;
+pub const BRAINCODE_SUB: n_byte = 3;
+pub const BRAINCODE_MUL: n_byte = 4;
+pub const BRAINCODE_DIV: n_byte = 5;
+pub const BRAINCODE_MOD: n_byte = 6;
+pub const BRAINCODE_MVB: n_byte = 7;
+pub const BRAINCODE_MOV: n_byte = 8;
+pub const BRAINCODE_JMP: n_byte = 9;
+pub const BRAINCODE_CTR: n_byte = 10;
+pub const BRAINCODE_SWP: n_byte = 11;
+pub const BRAINCODE_INV: n_byte = 12;
+pub const BRAINCODE_STP: n_byte = 13;
+pub const BRAINCODE_LTP: n_byte = 14;
+pub const BRAINCODE_JMZ: n_byte = 15;
+pub const BRAINCODE_JMN: n_byte = 16;
+pub const BRAINCODE_DJN: n_byte = 17;
+pub const BRAINCODE_AND: n_byte = 18;
+pub const BRAINCODE_OR: n_byte = 19;
+pub const BRAINCODE_SEQ: n_byte = 20;
+pub const BRAINCODE_SNE: n_byte = 21;
+pub const BRAINCODE_SLT: n_byte = 22;
+pub const BRAINCODE_SEN: n_byte = 23;
+pub const BRAINCODE_SEN2: n_byte = 24;
+pub const BRAINCODE_SEN3: n_byte = 25;
+pub const BRAINCODE_ACT: n_byte = 26;
+pub const BRAINCODE_ACT2: n_byte = 27;
+pub const BRAINCODE_ACT3: n_byte = 28;
+pub const BRAINCODE_ANE: n_byte = 29;
+pub const BRAINCODE_INSTRUCTIONS: n_byte = 30;
 
 pub const LARGE_SIM: n_uint = 256;
 pub const INITIAL_POPULATION: usize = (LARGE_SIM as usize) >> 1;
@@ -523,22 +590,359 @@ pub struct FoodSample {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct BraincodeInstruction {
+    pub opcode: n_byte,
+    pub constant0: bool,
+    pub constant1: bool,
+    pub value0: n_byte,
+    pub value1: n_byte,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BraincodeVm {
+    local: [n_byte; BRAINCODE_SIZE],
+    remote: [n_byte; BRAINCODE_SIZE],
+    registers: [n_byte; BRAINCODE_PSPACE_REGISTERS],
+    pc: usize,
+}
+
+impl BraincodeVm {
+    pub const fn new(local: [n_byte; BRAINCODE_SIZE]) -> Self {
+        Self {
+            local,
+            remote: [0; BRAINCODE_SIZE],
+            registers: [0; BRAINCODE_PSPACE_REGISTERS],
+            pc: 0,
+        }
+    }
+
+    pub const fn local(&self) -> &[n_byte; BRAINCODE_SIZE] {
+        &self.local
+    }
+
+    pub const fn registers(&self) -> [n_byte; BRAINCODE_PSPACE_REGISTERS] {
+        self.registers
+    }
+
+    pub const fn pc(&self) -> usize {
+        self.pc
+    }
+
+    pub fn set_registers(&mut self, registers: [n_byte; BRAINCODE_PSPACE_REGISTERS]) {
+        self.registers = registers;
+    }
+
+    pub fn execute_step(&mut self) -> BraincodeInstruction {
+        let instruction = braincode_decode(&self.local, self.pc);
+        let addr0 = braincode_address(self.pc as n_int + n_int::from(instruction.value0));
+        let addr1 = braincode_address(self.pc as n_int + n_int::from(instruction.value1));
+        let read0 = self.read_address(addr0);
+        let read1 = self.read_address(addr1);
+        let value0 = if instruction.constant0 {
+            instruction.value0
+        } else {
+            read0
+        };
+        let value1 = if instruction.constant1 {
+            instruction.value1
+        } else {
+            read1
+        };
+        let comparison0 = if !instruction.constant0 && !instruction.constant1 {
+            read0
+        } else {
+            instruction.value0
+        };
+        let mut next_pc = braincode_pc(self.pc as n_int + BRAINCODE_BYTES_PER_INSTRUCTION as n_int);
+
+        match instruction.opcode {
+            BRAINCODE_AND => {
+                if instruction.constant0 {
+                    self.write_address(addr0, read0 & read1);
+                } else if read0 > 127 && read1 > 127 {
+                    next_pc = braincode_pc(
+                        self.pc as n_int + (BRAINCODE_BYTES_PER_INSTRUCTION * 2) as n_int,
+                    );
+                }
+            }
+            BRAINCODE_OR => {
+                if instruction.constant0 {
+                    self.write_address(addr0, read0 | read1);
+                } else if read0 > 127 || read1 > 127 {
+                    next_pc = braincode_pc(
+                        self.pc as n_int + (BRAINCODE_BYTES_PER_INSTRUCTION * 2) as n_int,
+                    );
+                }
+            }
+            BRAINCODE_MOV => {
+                self.write_address(
+                    addr1,
+                    if !instruction.constant0 && !instruction.constant1 {
+                        read0
+                    } else {
+                        instruction.value0
+                    },
+                );
+            }
+            BRAINCODE_MVB => {
+                let mut source = braincode_address(
+                    self.pc as n_int
+                        + (n_int::from(value0) * BRAINCODE_BYTES_PER_INSTRUCTION as n_int),
+                );
+                let mut destination = braincode_address(
+                    self.pc as n_int
+                        + (n_int::from(value0) * BRAINCODE_BYTES_PER_INSTRUCTION as n_int),
+                );
+                for _ in 0..=usize::from(self.registers[1] % BRAINCODE_BLOCK_COPY as n_byte) {
+                    for offset in 0..BRAINCODE_BYTES_PER_INSTRUCTION {
+                        let byte = self.read_address(braincode_address((source + offset) as n_int));
+                        self.write_address(
+                            braincode_address((destination + offset) as n_int),
+                            byte,
+                        );
+                    }
+                    source = braincode_address(
+                        source as n_int + BRAINCODE_BYTES_PER_INSTRUCTION as n_int,
+                    );
+                    destination = braincode_address(
+                        destination as n_int + BRAINCODE_BYTES_PER_INSTRUCTION as n_int,
+                    );
+                }
+            }
+            BRAINCODE_ADD => self.write_address(
+                addr1,
+                read1.wrapping_add(if !instruction.constant0 && !instruction.constant1 {
+                    read0
+                } else {
+                    instruction.value0
+                }),
+            ),
+            BRAINCODE_SUB => self.write_address(
+                addr1,
+                read1.wrapping_sub(if !instruction.constant0 && !instruction.constant1 {
+                    read0
+                } else {
+                    instruction.value0
+                }),
+            ),
+            BRAINCODE_MUL => self.write_address(
+                addr1,
+                read1.wrapping_mul(if !instruction.constant0 && !instruction.constant1 {
+                    read0
+                } else {
+                    instruction.value0
+                }),
+            ),
+            BRAINCODE_DIV => {
+                let divisor = if !instruction.constant0 && !instruction.constant1 {
+                    read0
+                } else {
+                    instruction.value0
+                };
+                self.write_address(addr1, read1 >> (divisor % 4));
+            }
+            BRAINCODE_MOD => {
+                let divisor = if !instruction.constant0 && !instruction.constant1 {
+                    read0
+                } else {
+                    instruction.value0
+                };
+                if divisor != 0 {
+                    self.write_address(addr1, read1 % divisor);
+                }
+            }
+            BRAINCODE_CTR => {
+                self.write_address(
+                    addr1,
+                    if read0 > 127 {
+                        read1.wrapping_add(1)
+                    } else {
+                        read1.wrapping_sub(1)
+                    },
+                );
+            }
+            BRAINCODE_JMP => {
+                next_pc = self.jump_target(value0, value1);
+            }
+            BRAINCODE_JMZ if value0 == 0 => {
+                next_pc = self.jump_target(0, value1);
+            }
+            BRAINCODE_JMN if value0 != 0 => {
+                next_pc = self.jump_target(0, value1);
+            }
+            BRAINCODE_DJN if read0.wrapping_sub(1) != 0 => {
+                self.write_address(addr0, read0.wrapping_sub(1));
+                next_pc = self.jump_target(0, value1);
+            }
+            BRAINCODE_SEQ if read1 == comparison0 => {
+                next_pc = self.skip_target();
+            }
+            BRAINCODE_SNE if read1 != comparison0 => {
+                next_pc = self.skip_target();
+            }
+            BRAINCODE_SLT if read1 < comparison0 => {
+                next_pc = self.skip_target();
+            }
+            BRAINCODE_SWP => {
+                self.write_address(addr0, read1);
+                self.write_address(addr1, read0);
+            }
+            BRAINCODE_INV => {
+                if instruction.constant0 {
+                    self.write_address(addr0, 255 - read0);
+                } else {
+                    self.write_address(addr1, 255 - read1);
+                }
+            }
+            BRAINCODE_STP => {
+                self.registers[usize::from(value0) % BRAINCODE_PSPACE_REGISTERS] = value1;
+            }
+            BRAINCODE_LTP => {
+                self.write_address(
+                    addr1,
+                    self.registers[usize::from(value0) % BRAINCODE_PSPACE_REGISTERS],
+                );
+            }
+            _ => {}
+        }
+
+        self.pc = next_pc;
+        instruction
+    }
+
+    fn read_address(&self, address: usize) -> n_byte {
+        if address < BRAINCODE_SIZE {
+            self.local[address]
+        } else {
+            self.remote[address - BRAINCODE_SIZE]
+        }
+    }
+
+    fn write_address(&mut self, address: usize, value: n_byte) {
+        if address < BRAINCODE_SIZE {
+            self.local[address] = value;
+        } else {
+            self.remote[address - BRAINCODE_SIZE] = value;
+        }
+    }
+
+    fn jump_target(&self, high: n_byte, low: n_byte) -> usize {
+        let mut target = braincode_pc(
+            self.pc as n_int
+                + (n_int::from((n_byte2::from(high) << 8) | n_byte2::from(low))
+                    * BRAINCODE_BYTES_PER_INSTRUCTION as n_int),
+        );
+        if target <= self.pc && self.pc - target < (8 * BRAINCODE_BYTES_PER_INSTRUCTION) {
+            target =
+                braincode_pc(self.pc as n_int - (8 * BRAINCODE_BYTES_PER_INSTRUCTION) as n_int);
+        }
+        target
+    }
+
+    fn skip_target(&self) -> usize {
+        braincode_pc(
+            self.pc as n_int
+                + (BRAINCODE_BYTES_PER_INSTRUCTION * (2 + usize::from(self.registers[0]))) as n_int,
+        )
+    }
+}
+
+pub fn braincode_decode(braincode: &[n_byte; BRAINCODE_SIZE], pc: usize) -> BraincodeInstruction {
+    let command = braincode[pc % BRAINCODE_SIZE];
+    BraincodeInstruction {
+        opcode: (command & (BRAINCODE_CONSTANT0_BIT - 1)) % BRAINCODE_INSTRUCTIONS,
+        constant0: command & BRAINCODE_CONSTANT0_BIT != 0,
+        constant1: command & BRAINCODE_CONSTANT1_BIT != 0,
+        value0: braincode[(pc + 1) % BRAINCODE_SIZE],
+        value1: braincode[(pc + 2) % BRAINCODE_SIZE],
+    }
+}
+
+fn braincode_address(value: n_int) -> usize {
+    value.rem_euclid(BRAINCODE_MAX_ADDRESS as n_int) as usize
+}
+
+fn braincode_pc(value: n_int) -> usize {
+    value.rem_euclid(BRAINCODE_SIZE as n_int) as usize
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct TerrainFoodFixtureSample {
+    pub location: [n_byte2; 2],
+    pub height: n_int,
+    pub grass: n_int,
+    pub trees: n_int,
+    pub bush: n_int,
+    pub seaweed: n_int,
+    pub rockpool: n_int,
+    pub beach: n_int,
+    pub food_type: n_byte,
+    pub max_energy: n_byte2,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct LandTile {
+    genetics: [n_byte2; 2],
+    topography: Vec<n_byte>,
+}
+
+impl LandTile {
+    fn new() -> Self {
+        Self {
+            genetics: [0; 2],
+            topography: vec![WATER_MAP as n_byte; LAND_TOPOGRAPHY_BUFFERS * MAP_AREA],
+        }
+    }
+
+    pub fn genetics(&self) -> [n_byte2; 2] {
+        self.genetics
+    }
+
+    pub fn topography_buffer(&self, buffer: usize) -> Option<&[n_byte]> {
+        let start = buffer.checked_mul(MAP_AREA)?;
+        let end = start.checked_add(MAP_AREA)?;
+        self.topography.get(start..end)
+    }
+
+    fn topography_offset(buffer: usize, map_x: n_int, map_y: n_int) -> usize {
+        (buffer * MAP_AREA) + map_index(map_x, map_y)
+    }
+
+    fn topography_at(&self, buffer: usize, map_x: n_int, map_y: n_int) -> n_byte {
+        self.topography[Self::topography_offset(buffer, map_x, map_y)]
+    }
+
+    fn set_topography(&mut self, buffer: usize, map_x: n_int, map_y: n_int, value: n_byte) {
+        let offset = Self::topography_offset(buffer, map_x, map_y);
+        self.topography[offset] = value;
+    }
+
+    fn pack_topography(&mut self) {
+        self.topography.fill(WATER_MAP as n_byte);
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LandState {
     date: n_byte4,
     time: n_byte4,
-    tile_genetics: [[n_byte2; 2]; MAP_TILES],
+    tiles: [LandTile; MAP_TILES],
     genetics: [n_byte2; 2],
     tide_level: n_byte,
+    food_quantity: Vec<n_byte>,
+    food_regrowth_minutes: n_uint,
 }
 
 impl LandState {
-    pub const fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             date: 0,
             time: 0,
-            tile_genetics: [[0; 2]; MAP_TILES],
+            tiles: std::array::from_fn(|_| LandTile::new()),
             genetics: [0; 2],
             tide_level: 0,
+            food_quantity: vec![FOOD_QUANTITY_MAX; MAP_AREA],
+            food_regrowth_minutes: 0,
         }
     }
 
@@ -546,8 +950,9 @@ impl LandState {
         let mut state = Self::new();
         state.date = snapshot.date;
         state.time = snapshot.time;
-        state.tile_genetics[0] = snapshot.genetics;
+        state.tiles[0].genetics = snapshot.genetics;
         state.genetics = snapshot.genetics;
+        state.regenerate_tiles();
         state.update_tide();
         state
     }
@@ -564,22 +969,27 @@ impl LandState {
         self.tide_level
     }
 
-    pub const fn genetics(&self) -> [n_byte2; 2] {
-        self.tile_genetics[0]
+    pub fn genetics(&self) -> [n_byte2; 2] {
+        self.tiles[0].genetics
     }
 
     pub const fn planet_genetics(&self) -> [n_byte2; 2] {
         self.genetics
     }
 
-    pub const fn snapshot(&self) -> LandSnapshot {
+    pub fn snapshot(&self) -> LandSnapshot {
         LandSnapshot::new(self.date, self.genetics(), self.time)
     }
 
     pub fn clear(&mut self, kind: KIND_OF_USE, start: n_byte4) {
-        let tile_genetics = self.tile_genetics;
+        let tile_genetics = self.tile_genetics();
         *self = Self::new();
-        self.tile_genetics = tile_genetics;
+        for (tile, genetics) in self.tiles.iter_mut().zip(tile_genetics) {
+            tile.genetics = genetics;
+            tile.pack_topography();
+        }
+        self.regenerate_tiles();
+        self.reset_food_quantities();
         if kind != KIND_OF_USE::KIND_LOAD_FILE {
             self.time = (5 * TIME_HOUR_MINUTES) as n_byte4;
             self.date = start;
@@ -594,6 +1004,7 @@ impl LandState {
             self.date += 1;
         }
         self.update_tide();
+        self.regrow_food_quantities(1);
     }
 
     pub fn advance_minutes(&mut self, minutes: n_uint) {
@@ -605,17 +1016,20 @@ impl LandState {
         self.time = (total_minutes % day_minutes) as n_byte4;
         if minutes != 0 {
             self.update_tide();
+            self.regrow_food_quantities(minutes);
         }
     }
 
     pub fn seed_genetics(&mut self, random: &mut [n_byte2; 2]) {
-        for tile in &mut self.tile_genetics {
-            tile[0] = random_byte2(random);
-            tile[1] = random_byte2(random);
+        for tile in &mut self.tiles {
+            tile.genetics[0] = random_byte2(random);
+            tile.genetics[1] = random_byte2(random);
             math_random3(random);
         }
         self.genetics[0] = random_byte2(random);
         self.genetics[1] = random_byte2(random);
+        self.regenerate_tiles();
+        self.reset_food_quantities();
     }
 
     pub fn update_tide(&mut self) {
@@ -679,20 +1093,185 @@ impl LandState {
         };
         FoodSample {
             food_type,
-            max_energy,
+            max_energy: scale_food_energy(max_energy, self.food_quantity_at(location)),
             energy: 0,
         }
     }
 
+    pub fn terrain_food_fixture_sample(&self, location: [n_byte2; 2]) -> TerrainFoodFixtureSample {
+        let (grass, trees, bush) = self.food_values(location);
+        let seaweed = self.biology_at(location, BIOLOGY_OPERATOR_SEAWEED);
+        let rockpool = self.biology_at(location, BIOLOGY_OPERATOR_ROCKPOOL);
+        let mut beach = self.biology_at(location, BIOLOGY_OPERATOR_BEACH);
+        beach += land_dither(seaweed, rockpool, beach);
+        let food = self.food_source_at(location);
+        TerrainFoodFixtureSample {
+            location,
+            height: self.height_at(location),
+            grass,
+            trees,
+            bush,
+            seaweed,
+            rockpool,
+            beach,
+            food_type: food.food_type,
+            max_energy: food.max_energy,
+        }
+    }
+
+    pub fn tile(&self, tile: usize) -> Option<&LandTile> {
+        self.tiles.get(tile)
+    }
+
+    pub fn topography_buffer(&self, tile: usize, buffer: usize) -> Option<&[n_byte]> {
+        self.tiles
+            .get(tile)
+            .and_then(|tile| tile.topography_buffer(buffer))
+    }
+
+    pub fn topography_at_map(&self, map_x: n_int, map_y: n_int) -> n_byte {
+        self.tiles[0].topography_at(LAND_TOPOGRAPHY_PRIMARY, map_x, map_y)
+    }
+
+    pub fn topography_highdef_at(&self, hires_x: n_int, hires_y: n_int) -> n_byte {
+        let hires_x = positive_hires_coord(hires_x);
+        let hires_y = positive_hires_coord(hires_y);
+        let mic_x = hires_x & 7;
+        let mic_y = hires_y & 7;
+        let mac_x = hires_x >> 3;
+        let mac_y = hires_y >> 3;
+
+        let z00 = n_int::from(self.topography_at_map(mac_x, mac_y));
+        let z01_raw = n_int::from(self.topography_at_map(mac_x + 1, mac_y));
+        let z10_raw = n_int::from(self.topography_at_map(mac_x, mac_y + 1));
+        let mut z10 = z10_raw - z00;
+        let z11 = n_int::from(self.topography_at_map(mac_x + 1, mac_y + 1)) - z01_raw - z10;
+        let z01 = (z01_raw - z00) << 3;
+        z10 <<= 3;
+
+        (z00 + (((z01 * mic_x) + (z10 * mic_y) + (z11 * mic_x * mic_y)) >> 6)) as n_byte
+    }
+
+    pub fn highres_tide_at(&self, hires_x: n_int, hires_y: n_int) -> bool {
+        let topography = self.topography_highdef_at(hires_x, hires_y);
+        topography > 105 && topography < 151
+    }
+
+    pub fn weather_pressure_at_map(&self, map_x: n_int, map_y: n_int) -> n_int {
+        let center = self.land_location_map(map_x, map_y);
+        let east = self.land_location_map(map_x + 1, map_y);
+        let west = self.land_location_map(map_x - 1, map_y);
+        let north = self.land_location_map(map_x, map_y - 1);
+        let south = self.land_location_map(map_x, map_y + 1);
+        let relief = (east - west).abs() + (south - north).abs() + (center - WATER_MAP).abs();
+        let drift = math_sine(
+            (map_x * 5 + map_y * 3 + n_int::from(self.time >> 4) + n_int::from(self.date)) & 255,
+            512,
+        ) + 512;
+        (relief * 96 + drift).max(0)
+    }
+
+    pub fn weather_seven_at(&self, location: [n_byte2; 2]) -> n_int {
+        self.weather_seven_at_map(
+            apespace_to_mapspace(n_int::from(location[0])),
+            apespace_to_mapspace(n_int::from(location[1])),
+        )
+    }
+
+    pub fn weather_seven_at_map(&self, map_x: n_int, map_y: n_int) -> n_int {
+        if is_dawndusk(self.time) {
+            return WEATHER_SEVEN_DAWN_DUSK;
+        }
+        let ret_val = if is_night(self.time) {
+            WEATHER_SEVEN_CLEAR_NIGHT
+        } else {
+            WEATHER_SEVEN_SUNNY_DAY
+        };
+        let pressure = self.weather_pressure_at_map(map_x, map_y);
+        if pressure > WEATHER_RAIN {
+            ret_val + 2
+        } else if pressure > WEATHER_CLOUD {
+            ret_val + 1
+        } else {
+            ret_val
+        }
+    }
+
+    pub fn food_quantity_at(&self, location: [n_byte2; 2]) -> n_byte {
+        let map_x = apespace_to_mapspace(n_int::from(location[0]));
+        let map_y = apespace_to_mapspace(n_int::from(location[1]));
+        self.food_quantity_at_map(map_x, map_y)
+    }
+
+    pub fn food_quantity_at_map(&self, map_x: n_int, map_y: n_int) -> n_byte {
+        self.food_quantity[map_index(map_x, map_y)]
+    }
+
+    pub fn consume_food_at(&mut self, location: [n_byte2; 2], energy: n_byte2) -> n_byte {
+        let map_x = apespace_to_mapspace(n_int::from(location[0]));
+        let map_y = apespace_to_mapspace(n_int::from(location[1]));
+        let index = map_index(map_x, map_y);
+        if energy == BEING_DEAD {
+            return self.food_quantity[index];
+        }
+        let depletion =
+            ((n_uint::from(energy) + 31) / 32).clamp(1, n_uint::from(FOOD_QUANTITY_MAX)) as n_byte;
+        self.food_quantity[index] = self.food_quantity[index].saturating_sub(depletion);
+        self.food_quantity[index]
+    }
+
     fn land_location_map(&self, map_x: n_int, map_y: n_int) -> n_int {
+        n_int::from(self.topography_at_map(map_x, map_y))
+    }
+
+    fn regenerate_tiles(&mut self) {
+        for tile_index in 0..MAP_TILES {
+            let genetics = self.tiles[tile_index].genetics;
+            let tile = &mut self.tiles[tile_index];
+            for y in 0..MAP_DIMENSION {
+                for x in 0..MAP_DIMENSION {
+                    let value = Self::generated_topography_value(genetics, x as n_int, y as n_int);
+                    tile.set_topography(LAND_TOPOGRAPHY_PRIMARY, x as n_int, y as n_int, value);
+                    tile.set_topography(LAND_TOPOGRAPHY_WORKING, x as n_int, y as n_int, value);
+                }
+            }
+        }
+    }
+
+    fn generated_topography_value(genetics: [n_byte2; 2], map_x: n_int, map_y: n_int) -> n_byte {
         let x = positive_map_coord(map_x);
         let y = positive_map_coord(map_y);
-        let seed0 = n_int::from(self.genetics[0]);
-        let seed1 = n_int::from(self.genetics[1]);
+        let seed0 = n_int::from(genetics[0]);
+        let seed1 = n_int::from(genetics[1]);
         let broad = math_sine((x * 3 + y * 5 + seed0) & 255, 512);
         let ridge = math_sine((x * 11 - y * 7 + seed1) & 255, 1_024);
         let dither = (((x * 37) ^ (y * 53) ^ seed0 ^ (seed1 << 1)) & 31) - 15;
-        (WATER_MAP + broad + ridge + dither).clamp(0, 255)
+        (WATER_MAP + broad + ridge + dither).clamp(0, 255) as n_byte
+    }
+
+    fn tile_genetics(&self) -> [[n_byte2; 2]; MAP_TILES] {
+        std::array::from_fn(|index| self.tiles[index].genetics)
+    }
+
+    fn reset_food_quantities(&mut self) {
+        self.food_quantity.fill(FOOD_QUANTITY_MAX);
+        self.food_regrowth_minutes = 0;
+    }
+
+    fn regrow_food_quantities(&mut self, minutes: n_uint) {
+        if minutes == 0 {
+            return;
+        }
+        self.food_regrowth_minutes = self.food_regrowth_minutes.saturating_add(minutes);
+        let regrowth = self.food_regrowth_minutes / FOOD_REGROWTH_INTERVAL_MINUTES;
+        if regrowth == 0 {
+            return;
+        }
+        self.food_regrowth_minutes %= FOOD_REGROWTH_INTERVAL_MINUTES;
+        let regrowth = regrowth.min(n_uint::from(FOOD_QUANTITY_MAX)) as n_byte;
+        for quantity in &mut self.food_quantity {
+            *quantity = quantity.saturating_add(regrowth);
+        }
     }
 
     fn land_operator_interpolated(&self, loc_x: n_int, loc_y: n_int, kind: &[u8; 6]) -> n_int {
@@ -737,8 +1316,17 @@ impl LandState {
                         continue;
                     }
                     let hour_angle = (((self.time << 6) as n_int / 180) + 32) & 255;
-                    let time_weather = vect2_direction(hour_angle, 105 * 32);
-                    operator_sun(fg, dfg, fdg, time_weather.x + 8, time_weather.y + 8)
+                    let weather = self.weather_seven_at_map(loc_x, loc_y).max(0) % 3;
+                    let weather_divide = 105 + (weather * 30);
+                    let time_weather = vect2_direction(hour_angle, weather_divide * 32);
+                    let weather_offset = 840 / weather_divide;
+                    operator_sun(
+                        fg,
+                        dfg,
+                        fdg,
+                        time_weather.x + weather_offset,
+                        time_weather.y + weather_offset,
+                    )
                 }
                 4 => operator_sun(fg, dfg, fdg, 11, 11),
                 5 => {
@@ -1758,7 +2346,7 @@ impl BeingSummary {
         self.drives[drive] = 0;
     }
 
-    fn advance_minute(&mut self, land: &LandState) {
+    fn advance_minute(&mut self, land: &mut LandState) {
         let land_date = land.date();
         let land_time = land.time();
         self.awake_level = self.awake_level_for_time(land_time);
@@ -1810,7 +2398,7 @@ impl BeingSummary {
         }
     }
 
-    fn cycle_awake(&mut self, land: &LandState) {
+    fn cycle_awake(&mut self, land: &mut LandState) {
         let land_date = land.date();
         let land_time = land.time();
         let terrain = land.terrain_sample(self.location);
@@ -1946,10 +2534,29 @@ impl BeingSummary {
         }
     }
 
-    fn eat_food(&mut self, land: &LandState) -> FoodSample {
+    fn eat_food(&mut self, land: &mut LandState) -> FoodSample {
+        if let Some(source) = self.consume_inventory_food() {
+            return source;
+        }
         let source = land.food_source_at(self.location);
         let energy = self.food_absorption(source.max_energy, source.food_type);
+        if energy > BEING_DEAD {
+            land.consume_food_at(self.location, energy);
+        }
         FoodSample { energy, ..source }
+    }
+
+    fn consume_inventory_food(&mut self) -> Option<FoodSample> {
+        let slot = self
+            .inventory
+            .iter()
+            .position(|item| inventory_food_source(*item).is_some())?;
+        let source = inventory_food_source(self.inventory[slot])?;
+        let energy = self.food_absorption(source.max_energy, source.food_type);
+        if energy > BEING_DEAD {
+            self.inventory[slot] = 0;
+        }
+        Some(FoodSample { energy, ..source })
     }
 
     fn food_absorption(&mut self, max_energy: n_byte2, food_type: n_byte) -> n_byte2 {
@@ -2611,8 +3218,46 @@ fn positive_map_coord(value: n_int) -> n_int {
     value.rem_euclid(MAP_DIMENSION as n_int)
 }
 
+fn positive_hires_coord(value: n_int) -> n_int {
+    value.rem_euclid(HI_RES_MAP_DIMENSION as n_int)
+}
+
+fn map_index(map_x: n_int, map_y: n_int) -> usize {
+    usize::try_from(positive_map_coord(map_x)).unwrap_or(0)
+        + (usize::try_from(positive_map_coord(map_y)).unwrap_or(0) << MAP_BITS)
+}
+
 fn water_test(height: n_int, tide: n_byte) -> bool {
     height < n_int::from(tide)
+}
+
+fn scale_food_energy(max_energy: n_byte2, quantity: n_byte) -> n_byte2 {
+    if max_energy == BEING_DEAD {
+        return BEING_DEAD;
+    }
+    ((n_uint::from(max_energy) * n_uint::from(quantity)) / n_uint::from(FOOD_QUANTITY_MAX))
+        as n_byte2
+}
+
+fn inventory_food_source(item: n_byte2) -> Option<FoodSample> {
+    let (food_type, max_energy) = if item & INVENTORY_FISH != 0 {
+        (FOOD_SHELLFISH, ENERGY_FISH)
+    } else if item & INVENTORY_NUT_CRACKED != 0 {
+        (FOOD_VEGETABLE, ENERGY_NUT)
+    } else if item & INVENTORY_BIRD_EGGS != 0 {
+        (FOOD_BIRD_EGGS, ENERGY_BIRD_EGGS)
+    } else if item & INVENTORY_LIZARD_EGGS != 0 {
+        (FOOD_LIZARD_EGGS, ENERGY_LIZARD_EGGS)
+    } else if item & INVENTORY_GRASS != 0 {
+        (FOOD_VEGETABLE, ENERGY_GRASS)
+    } else {
+        return None;
+    };
+    Some(FoodSample {
+        food_type,
+        max_energy,
+        energy: 0,
+    })
 }
 
 fn operator_sun(fg: n_int, dfg: n_int, _fdg: n_int, ct: n_int, st: n_int) -> n_int {
@@ -2778,6 +3423,11 @@ fn affect_distance(affect: n_byte2) -> n_byte2 {
 pub fn is_night(time: n_byte4) -> bool {
     let hourish = time >> 5;
     !(11..=36).contains(&hourish)
+}
+
+pub fn is_dawndusk(time: n_byte4) -> bool {
+    let hourish = time >> 5;
+    hourish == 11 || hourish == 36
 }
 
 pub fn being_state_description(state: n_byte2) -> String {
@@ -3148,7 +3798,7 @@ impl PopulationState {
         });
     }
 
-    fn advance_minute(&mut self, land: &LandState) {
+    fn advance_minute(&mut self, land: &mut LandState) {
         let land_date = land.date();
         let land_time = land.time();
         for being in &mut self.beings {
@@ -3612,6 +4262,14 @@ impl SimState {
         startup_transfer_from_json_bytes(input).map(|startup| Self::from_startup_transfer(&startup))
     }
 
+    pub fn load_startup_bytes(input: &[u8]) -> Result<Self, &'static str> {
+        match startup_transfer_from_json_bytes(input) {
+            Ok(startup) => Ok(Self::from_startup_transfer(&startup)),
+            Err(_) => startup_transfer_from_native_bytes(input)
+                .map(|startup| Self::from_startup_transfer(&startup)),
+        }
+    }
+
     pub fn reset_new_simulation_from_land_seed(&mut self) {
         let mut seed = self.land.genetics();
         math_random3(&mut seed);
@@ -3637,7 +4295,7 @@ impl SimState {
 
         for _ in 0..minutes {
             self.land.advance_minutes(1);
-            self.population.advance_minute(&self.land);
+            self.population.advance_minute(&mut self.land);
         }
         self.kind = KIND_OF_USE::KIND_NOTHING_TO_RUN;
     }
@@ -3706,7 +4364,7 @@ impl SimState {
         self.population.select_previous();
     }
 
-    pub const fn land_snapshot(&self) -> LandSnapshot {
+    pub fn land_snapshot(&self) -> LandSnapshot {
         self.land.snapshot()
     }
 
@@ -3724,6 +4382,10 @@ impl SimState {
 
     pub fn tranfer_startup_out_json(&self) -> NFile {
         tranfer_startup_out_json(&self.startup_transfer())
+    }
+
+    pub fn tranfer_startup_out_native(&self) -> NFile {
+        tranfer_startup_out_native(&self.startup_transfer())
     }
 
     pub fn prepare_land_for_first_cycle(&mut self) {
@@ -3817,6 +4479,237 @@ pub fn tranfer_startup_out_json(startup: &StartupTransfer) -> NFile {
     object_top_object(&transfer_startup_obj(startup))
 }
 
+pub fn tranfer_startup_out_native(startup: &StartupTransfer) -> NFile {
+    let mut output = String::new();
+    native_write_version(&mut output);
+    native_write_land(&mut output, startup.land);
+    for entries in &startup.beings {
+        if let Ok(being) = BeingSummary::from_transfer_object(entries) {
+            native_write_being(&mut output, &being);
+        }
+    }
+    let mut file = NFile::new();
+    let _ = file.write(output.as_bytes(), 0);
+    file
+}
+
+fn native_write_version(output: &mut String) {
+    output.push_str("simul{");
+    native_write_field(output, "signa=", &[n_uint::from(SIMULATED_APE_SIGNATURE)]);
+    native_write_field(output, "verio=", &[n_uint::from(VERSION_NUMBER)]);
+    output.push_str("};\n");
+}
+
+fn native_write_land(output: &mut String, land: LandSnapshot) {
+    output.push_str("landd{");
+    native_write_field(output, "dated=", &[n_uint::from(land.date)]);
+    native_write_field(output, "timed=", &[n_uint::from(land.time)]);
+    native_write_field(
+        output,
+        "landg=",
+        &[
+            n_uint::from(land.genetics[0]),
+            n_uint::from(land.genetics[1]),
+        ],
+    );
+    output.push_str("};\n");
+}
+
+fn native_write_being(output: &mut String, being: &BeingSummary) {
+    let native = being.to_simulated_being();
+    let delta = native.delta;
+    let constant = native.constant;
+    let changes = native.changes;
+    let brain = native.braindata;
+    let immune = native.immune_system;
+
+    output.push_str("being{");
+    native_write_field(output, "locat=", &native_uints(&delta.location));
+    native_write_field(output, "facin=", &[n_uint::from(delta.direction_facing)]);
+    native_write_field(output, "speed=", &[n_uint::from(delta.velocity[0])]);
+    native_write_field(output, "energ=", &[n_uint::from(delta.stored_energy)]);
+    native_write_field(output, "datob=", &[n_uint::from(constant.date_of_birth)]);
+    native_write_field(output, "rando=", &native_uints(&delta.random_seed));
+    native_write_field(output, "state=", &[n_uint::from(delta.macro_state)]);
+    native_write_field(output, "brast=", &native_uints(&brain.brain_state));
+    native_write_field(output, "heigt=", &[n_uint::from(delta.height)]);
+    native_write_field(output, "masss=", &[n_uint::from(delta.mass)]);
+    native_write_field(output, "overr=", &[n_uint::from(brain.script_overrides)]);
+    native_write_field(output, "shout=", &native_uints(&changes.shout));
+    native_write_field(output, "crowd=", &[n_uint::from(delta.crowding)]);
+    native_write_field(output, "postu=", &[n_uint::from(delta.posture)]);
+    native_write_field(output, "inven=", &native_uints(&changes.inventory));
+    native_write_field(output, "paras=", &[n_uint::from(delta.parasites)]);
+    native_write_field(output, "honor=", &[n_uint::from(delta.honor)]);
+    native_write_field(
+        output,
+        "conce=",
+        &[n_uint::from(changes.date_of_conception)],
+    );
+    native_write_field(output, "atten=", &native_uints(&brain.attention));
+    native_write_field(output, "genet=", &native_genetics_words(&constant.genetics));
+    native_write_field(
+        output,
+        "fetag=",
+        &native_genetics_words(&changes.fetal_genetics),
+    );
+    native_write_field(
+        output,
+        "fathn=",
+        &[
+            n_uint::from((changes.father_name[0] & 255) as n_byte),
+            n_uint::from((changes.father_name[1] & 255) as n_byte),
+        ],
+    );
+    native_write_field(
+        output,
+        "sosim=",
+        &native_uints(&[
+            delta.social_coord_x,
+            delta.social_coord_y,
+            delta.social_coord_nx,
+            delta.social_coord_ny,
+        ]),
+    );
+    native_write_field(output, "drive=", &native_uints(&changes.drives));
+    native_write_field(output, "goals=", &native_uints(&delta.goal));
+    native_write_field(output, "prefe=", &native_uints(&changes.learned_preference));
+    native_write_field(output, "genex=", &[n_uint::from(constant.generation_max)]);
+    native_write_field(output, "genen=", &[n_uint::from(constant.generation_min)]);
+    native_write_field(
+        output,
+        "chigx=",
+        &[n_uint::from(changes.child_generation_max)],
+    );
+    native_write_field(
+        output,
+        "chign=",
+        &[n_uint::from(changes.child_generation_min)],
+    );
+    native_write_field(output, "immun=", &native_immune_bytes(&immune));
+    native_write_field(output, "brreg=", &native_uints(&brain.braincode_register));
+    native_write_field(
+        output,
+        "brpro=",
+        &native_brainprobe_bytes(&brain.brainprobe),
+    );
+    output.push_str("};\n");
+
+    for social in native
+        .events
+        .social
+        .iter()
+        .filter(|entry| !social_entry_empty(entry))
+    {
+        native_write_social(output, social);
+    }
+    for episodic in native
+        .events
+        .episodic
+        .iter()
+        .filter(|entry| entry.event != 0)
+    {
+        native_write_episodic(output, episodic);
+    }
+}
+
+fn native_write_social(output: &mut String, entry: &simulated_isocial) {
+    output.push_str("sgcia{");
+    native_write_field(output, "sgloc=", &native_uints(&entry.space_time.location));
+    native_write_field(output, "sgtim=", &[n_uint::from(entry.space_time.time)]);
+    native_write_field(output, "sgdat=", &[n_uint::from(entry.space_time.date)]);
+    native_write_field(
+        output,
+        "sgfin=",
+        &[n_uint::from(entry.first_name[BEING_MET])],
+    );
+    native_write_field(
+        output,
+        "sgfan=",
+        &[n_uint::from(entry.family_name[BEING_MET])],
+    );
+    native_write_field(output, "sgatt=", &[n_uint::from(entry.attraction)]);
+    native_write_field(output, "sgfof=", &[n_uint::from(entry.friend_foe)]);
+    native_write_field(output, "sgbel=", &[n_uint::from(entry.belief)]);
+    native_write_field(output, "sgfam=", &[n_uint::from(entry.familiarity)]);
+    native_write_field(output, "sgrel=", &[n_uint::from(entry.relationship)]);
+    native_write_field(output, "sgtyp=", &[n_uint::from(entry.entity_type)]);
+    if entry.braincode.iter().any(|byte| *byte != 0) {
+        native_write_field(output, "sgbrc=", &native_uints(&entry.braincode));
+    }
+    output.push_str("};\n");
+}
+
+fn native_write_episodic(output: &mut String, entry: &simulated_iepisodic) {
+    output.push_str("episo{");
+    native_write_field(output, "eploc=", &native_uints(&entry.space_time.location));
+    native_write_field(output, "eptim=", &[n_uint::from(entry.space_time.time)]);
+    native_write_field(output, "epdat=", &[n_uint::from(entry.space_time.date)]);
+    native_write_field(output, "epfin=", &native_uints(&entry.first_name));
+    native_write_field(output, "epfan=", &native_uints(&entry.family_name));
+    native_write_field(output, "epeve=", &[n_uint::from(entry.event)]);
+    native_write_field(output, "epfoo=", &[n_uint::from(entry.food)]);
+    native_write_field(output, "epafe=", &[n_uint::from(entry.affect)]);
+    native_write_field(output, "eparg=", &[n_uint::from(entry.arg)]);
+    output.push_str("};\n");
+}
+
+fn native_write_field(output: &mut String, token: &str, values: &[n_uint]) {
+    output.push_str(token);
+    for (index, value) in values.iter().enumerate() {
+        if index != 0 {
+            output.push(',');
+        }
+        output.push_str(&value.to_string());
+    }
+    output.push(';');
+}
+
+fn native_uints<T>(values: &[T]) -> Vec<n_uint>
+where
+    T: Copy,
+    n_uint: From<T>,
+{
+    values.iter().copied().map(n_uint::from).collect()
+}
+
+fn native_genetics_words(values: &[n_genetics; CHROMOSOMES]) -> Vec<n_uint> {
+    let mut output = Vec::with_capacity(CHROMOSOMES * 2);
+    for value in values {
+        output.push(n_uint::from((value & 0xffff) as n_byte2));
+        output.push(n_uint::from((value >> 16) as n_byte2));
+    }
+    output
+}
+
+fn native_brainprobe_bytes(values: &[simulated_ibrain_probe; BRAINCODE_PROBES]) -> Vec<n_uint> {
+    let mut output = Vec::with_capacity(BRAINPROBE_NATIVE_BYTES);
+    for probe in values {
+        output.extend([
+            n_uint::from(probe.probe_type),
+            n_uint::from(probe.position),
+            n_uint::from(probe.address),
+            n_uint::from(probe.frequency),
+            n_uint::from(probe.offset),
+            n_uint::from(probe.state),
+        ]);
+    }
+    output
+}
+
+fn native_immune_bytes(immune: &simulated_immune_system) -> Vec<n_uint> {
+    let mut output = Vec::with_capacity(IMMUNE_NATIVE_BYTES);
+    output.extend(native_uints(&immune.antigens));
+    output.extend(native_uints(&immune.shape_antigen));
+    output.extend(native_uints(&immune.antibodies));
+    output.extend(native_uints(&immune.shape_antibody));
+    for seed in immune.random_seed {
+        output.push(n_uint::from((seed & 255) as n_byte));
+        output.push(n_uint::from((seed >> 8) as n_byte));
+    }
+    output
+}
+
 fn object_array_byte2(object: &mut Vec<ObjectEntry>, name: &str, values: &[n_byte2]) {
     let mut array = Vec::new();
     for value in values {
@@ -3875,6 +4768,578 @@ pub fn startup_transfer_from_json_bytes(input: &[u8]) -> Result<StartupTransfer,
     Ok(StartupTransfer {
         land: LandSnapshot::new(date, genetics, time),
         beings,
+    })
+}
+
+pub fn startup_transfer_from_native_bytes(input: &[u8]) -> Result<StartupTransfer, &'static str> {
+    let cleaned = native_strip_comments_and_whitespace(input);
+    if cleaned.is_empty() {
+        return Err("native file empty");
+    }
+
+    let mut parser = NativeFileParser::new(&cleaned);
+    let Some(version_section) = parser.next_section()? else {
+        return Err("signature not first in native file");
+    };
+    if version_section.token != *b"simul{" {
+        return Err("signature not first in native file");
+    }
+    let signature = version_section
+        .field_values(b"signa=")
+        .and_then(|values| values.first())
+        .copied()
+        .ok_or("native signature missing")?;
+    if signature != n_uint::from(SIMULATED_APE_SIGNATURE) {
+        return Err("not a simulated ape native file");
+    }
+    let version = version_section
+        .field_values(b"verio=")
+        .and_then(|values| values.first())
+        .copied()
+        .ok_or("native version missing")?;
+    if version > n_uint::from(VERSION_NUMBER) {
+        return Err("native file newer than simulation");
+    }
+
+    let mut land = LandSnapshot::new(0, [0; 2], 0);
+    let mut land_seen = false;
+    let mut beings = Vec::new();
+    let mut current_being = None;
+    while let Some(section) = parser.next_section()? {
+        match &section.token {
+            b"landd{" => {
+                land = native_land_from_section(&section)?;
+                land_seen = true;
+            }
+            b"being{" => {
+                beings.push(native_being_from_section(beings.len(), &section)?);
+                current_being = Some(beings.len() - 1);
+            }
+            b"sgcia{" => {
+                let Some(index) = current_being else {
+                    return Err("native social section before being");
+                };
+                native_add_social_event(&mut beings[index], native_social_from_section(&section)?);
+            }
+            b"episo{" => {
+                let Some(index) = current_being else {
+                    return Err("native episodic section before being");
+                };
+                native_add_episodic_event(
+                    &mut beings[index],
+                    native_episodic_from_section(&section)?,
+                );
+            }
+            b"weath{" => {
+                return Err("native section not supported yet");
+            }
+            _ => return Err("unknown native file section"),
+        }
+    }
+
+    if !land_seen {
+        return Err("native land section missing");
+    }
+    Ok(StartupTransfer { land, beings })
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NativeFileField {
+    token: [u8; 6],
+    values: Vec<n_uint>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NativeFileSection {
+    token: [u8; 6],
+    fields: Vec<NativeFileField>,
+}
+
+impl NativeFileSection {
+    pub fn token_string(&self) -> String {
+        String::from_utf8_lossy(&self.token).into_owned()
+    }
+
+    pub fn field_values(&self, token: &[u8; 6]) -> Option<&[n_uint]> {
+        self.fields
+            .iter()
+            .find(|field| &field.token == token)
+            .map(|field| field.values.as_slice())
+    }
+}
+
+pub fn native_transfer_sections(input: &[u8]) -> Result<Vec<NativeFileSection>, &'static str> {
+    let cleaned = native_strip_comments_and_whitespace(input);
+    let mut parser = NativeFileParser::new(&cleaned);
+    let mut sections = Vec::new();
+    while let Some(section) = parser.next_section()? {
+        sections.push(section);
+    }
+    Ok(sections)
+}
+
+struct NativeFileParser<'a> {
+    input: &'a [u8],
+    position: usize,
+}
+
+impl<'a> NativeFileParser<'a> {
+    fn new(input: &'a [u8]) -> Self {
+        Self { input, position: 0 }
+    }
+
+    fn next_section(&mut self) -> Result<Option<NativeFileSection>, &'static str> {
+        if self.position >= self.input.len() {
+            return Ok(None);
+        }
+        let token = self.read_token()?;
+        if token[5] != b'{' {
+            return Err("native section start expected");
+        }
+
+        let mut fields = Vec::new();
+        loop {
+            if self.consume_section_end() {
+                break;
+            }
+            let field_token = self.read_token()?;
+            if field_token[5] != b'=' {
+                return Err("native field assignment expected");
+            }
+            let values = self.read_values()?;
+            fields.push(NativeFileField {
+                token: field_token,
+                values,
+            });
+        }
+
+        Ok(Some(NativeFileSection { token, fields }))
+    }
+
+    fn read_token(&mut self) -> Result<[u8; 6], &'static str> {
+        let end = self
+            .position
+            .checked_add(6)
+            .ok_or("native token overflow")?;
+        if end > self.input.len() {
+            return Err("native token truncated");
+        }
+        let mut token = [0; 6];
+        token.copy_from_slice(&self.input[self.position..end]);
+        self.position = end;
+        Ok(token)
+    }
+
+    fn consume_section_end(&mut self) -> bool {
+        if self.input.get(self.position..self.position + 2) == Some(b"};") {
+            self.position += 2;
+            true
+        } else {
+            false
+        }
+    }
+
+    fn read_values(&mut self) -> Result<Vec<n_uint>, &'static str> {
+        let mut values = Vec::new();
+        loop {
+            let value_start = self.position;
+            let mut value: n_uint = 0;
+            while let Some(byte) = self.input.get(self.position).copied() {
+                if !byte.is_ascii_digit() {
+                    break;
+                }
+                value = value
+                    .checked_mul(10)
+                    .and_then(|acc| acc.checked_add(n_uint::from(byte - b'0')))
+                    .ok_or("native number too large")?;
+                self.position += 1;
+            }
+            if self.position == value_start {
+                return Err("native number expected");
+            }
+            values.push(value);
+            match self.input.get(self.position).copied() {
+                Some(b',') => self.position += 1,
+                Some(b';') => {
+                    self.position += 1;
+                    return Ok(values);
+                }
+                _ => return Err("native number terminator expected"),
+            }
+        }
+    }
+}
+
+fn native_strip_comments_and_whitespace(input: &[u8]) -> Vec<u8> {
+    let mut output = Vec::with_capacity(input.len());
+    let mut index = 0;
+    while index < input.len() {
+        let byte = input[index];
+        if byte == b'/' && input.get(index + 1) == Some(&b'*') {
+            index += 2;
+            while index + 1 < input.len() && !(input[index] == b'*' && input[index + 1] == b'/') {
+                index += 1;
+            }
+            index = (index + 2).min(input.len());
+        } else if matches!(byte, b'\t' | b'\n' | b'\r' | b'\x0b' | b'\x0c' | b' ') {
+            index += 1;
+        } else {
+            output.push(byte);
+            index += 1;
+        }
+    }
+    output
+}
+
+fn native_land_from_section(section: &NativeFileSection) -> Result<LandSnapshot, &'static str> {
+    let date = native_first_byte4(section, b"dated=")?.unwrap_or(0);
+    let time = native_first_byte4(section, b"timed=")?.unwrap_or(0);
+    let genetics = native_byte2_array::<2>(section, b"landg=")?.unwrap_or([0; 2]);
+    Ok(LandSnapshot::new(date, genetics, time))
+}
+
+fn native_being_from_section(
+    index: usize,
+    section: &NativeFileSection,
+) -> Result<Vec<ObjectEntry>, &'static str> {
+    let location = native_byte2_array::<2>(section, b"locat=")?.unwrap_or([0; 2]);
+    let facing = native_first_byte(section, b"facin=")?.unwrap_or(0);
+    let speed = native_first_byte(section, b"speed=")?.unwrap_or(0);
+    let energy = native_first_byte2(section, b"energ=")?.unwrap_or(BEING_DEAD);
+    let date_of_birth = native_first_byte4(section, b"datob=")?.unwrap_or(0);
+    let random_seed = native_byte2_array::<2>(section, b"rando=")?.unwrap_or([0; 2]);
+    let macro_state = native_first_byte2(section, b"state=")?.unwrap_or(0);
+    let brain_state = native_byte2_array::<6>(section, b"brast=")?.unwrap_or([0; 6]);
+    let height = native_first_byte2(section, b"heigt=")?.unwrap_or(BIRTH_HEIGHT);
+    let mass = native_first_byte2(section, b"masss=")?.unwrap_or(BIRTH_MASS);
+    let script_overrides = native_first_byte2(section, b"overr=")?.unwrap_or(0);
+    let shout = native_byte_array::<SHOUT_BYTES>(section, b"shout=")?.unwrap_or([0; SHOUT_BYTES]);
+    let crowding = native_first_byte(section, b"crowd=")?.unwrap_or(MIN_CROWDING);
+    let posture = native_first_byte(section, b"postu=")?.unwrap_or(0);
+    let inventory =
+        native_byte2_array::<INVENTORY_SIZE>(section, b"inven=")?.unwrap_or([0; INVENTORY_SIZE]);
+    let parasites = native_first_byte(section, b"paras=")?.unwrap_or(0);
+    let honor = native_first_byte(section, b"honor=")?.unwrap_or(0);
+    let date_of_conception = native_first_byte4(section, b"conce=")?.unwrap_or(0);
+    let attention =
+        native_byte_array::<ATTENTION_SIZE>(section, b"atten=")?.unwrap_or([0; ATTENTION_SIZE]);
+    let genetics_words = native_byte2_array::<{ CHROMOSOMES * 2 }>(section, b"genet=")?
+        .unwrap_or([0; CHROMOSOMES * 2]);
+    let fetal_words = native_byte2_array::<{ CHROMOSOMES * 2 }>(section, b"fetag=")?
+        .unwrap_or([0; CHROMOSOMES * 2]);
+    let father_bytes = native_byte_array::<2>(section, b"fathn=")?.unwrap_or([0; 2]);
+    let social_coord = native_byte2_array::<4>(section, b"sosim=")?.unwrap_or([0; 4]);
+    let drives = native_byte_array::<DRIVES>(section, b"drive=")?.unwrap_or([127; DRIVES]);
+    let goal = native_byte2_array::<4>(section, b"goals=")?.unwrap_or([0; 4]);
+    let preferences =
+        native_byte_array::<PREFERENCES>(section, b"prefe=")?.unwrap_or([0; PREFERENCES]);
+    let generation_max = native_first_byte2(section, b"genex=")?.unwrap_or(0);
+    let generation_min = native_first_byte2(section, b"genen=")?.unwrap_or(0);
+    let child_generation_max = native_first_byte2(section, b"chigx=")?.unwrap_or(0);
+    let child_generation_min = native_first_byte2(section, b"chign=")?.unwrap_or(0);
+    let braincode_register = native_byte_array::<BRAINCODE_PSPACE_REGISTERS>(section, b"brreg=")?
+        .unwrap_or([0; BRAINCODE_PSPACE_REGISTERS]);
+    let brainprobe = native_byte_array::<BRAINPROBE_NATIVE_BYTES>(section, b"brpro=")?
+        .map(native_brainprobes_from_bytes)
+        .unwrap_or([simulated_ibrain_probe::default(); BRAINCODE_PROBES]);
+    let immune = native_byte_array::<IMMUNE_NATIVE_BYTES>(section, b"immun=")?
+        .map(native_immune_from_bytes)
+        .unwrap_or_default();
+
+    let mut object = Vec::new();
+    object_string(&mut object, "name", &format!("Ape {:03}", index + 1));
+
+    let mut delta = Vec::new();
+    object_number(&mut delta, "direction_facing", facing.into());
+    object_array_byte2(&mut delta, "location", &location);
+    object_number(&mut delta, "velocity", speed.into());
+    object_number(&mut delta, "stored_energy", energy.into());
+    object_array_byte2(&mut delta, "random_seed", &random_seed);
+    object_number(&mut delta, "macro_state", macro_state.into());
+    object_number(&mut delta, "parasites", parasites.into());
+    object_number(&mut delta, "honor", honor.into());
+    object_number(&mut delta, "crowding", crowding.into());
+    object_number(&mut delta, "height", height.into());
+    object_number(&mut delta, "mass", mass.into());
+    object_number(&mut delta, "posture", posture.into());
+    object_array_byte2(&mut delta, "goal", &goal);
+    object_array_byte2(&mut delta, "social_coord", &social_coord);
+    object_number(&mut delta, "awake", FULLY_AWAKE.into());
+    object_object(&mut object, "delta", delta);
+
+    let mut constant = Vec::new();
+    object_number(&mut constant, "date_of_birth", date_of_birth.into());
+    object_array_genetics(
+        &mut constant,
+        "genetics",
+        &native_genetics_from_words(genetics_words),
+    );
+    object_array_byte2(
+        &mut constant,
+        "generation_range",
+        &[generation_min, generation_max],
+    );
+    object_array_byte2(&mut constant, "name", &[0, 0]);
+    object_object(&mut object, "constant", constant);
+
+    let mut changes = Vec::new();
+    object_array_byte(&mut changes, "drives", &drives);
+    object_array_byte(&mut changes, "shout", &shout);
+    object_array_byte2(&mut changes, "inventory", &inventory);
+    object_array_byte(&mut changes, "learned_preference", &preferences);
+    object_number(
+        &mut changes,
+        "date_of_conception",
+        date_of_conception.into(),
+    );
+    object_array_genetics(
+        &mut changes,
+        "fetal_genetics",
+        &native_genetics_from_words(fetal_words),
+    );
+    object_array_byte2(
+        &mut changes,
+        "father_name",
+        &[
+            n_byte2::from(father_bytes[0]),
+            n_byte2::from(father_bytes[1]),
+        ],
+    );
+    object_array_byte2(&mut changes, "mother_name", &[0, 0]);
+    object_array_byte2(
+        &mut changes,
+        "child_generation_range",
+        &[child_generation_min, child_generation_max],
+    );
+    object_object(&mut object, "changes", changes);
+
+    let mut brain = Vec::new();
+    object_array_byte(&mut brain, "braincode_register", &braincode_register);
+    object_array_byte2(&mut brain, "brain_state", &brain_state);
+    object_number(&mut brain, "script_overrides", script_overrides.into());
+    object_array_byte(&mut brain, "attention", &attention);
+    object_array(
+        &mut brain,
+        "brainprobe",
+        brainprobe
+            .iter()
+            .map(|probe| ObjectValue::Object(brainprobe_entry_to_object(probe)))
+            .collect(),
+    );
+    object_object(&mut object, "braindata", brain);
+
+    object_object(&mut object, "immune_system", native_immune_object(&immune));
+
+    Ok(object)
+}
+
+fn native_social_from_section(
+    section: &NativeFileSection,
+) -> Result<simulated_isocial, &'static str> {
+    let mut entry = simulated_isocial::default();
+    entry.space_time.location = native_byte2_array::<2>(section, b"sgloc=")?.unwrap_or([0; 2]);
+    entry.space_time.time = n_byte4::from(native_first_byte2(section, b"sgtim=")?.unwrap_or(0));
+    entry.space_time.date = native_first_byte4(section, b"sgdat=")?.unwrap_or(0);
+    entry.first_name[BEING_MET] = native_first_byte2(section, b"sgfin=")?.unwrap_or(0);
+    entry.family_name[BEING_MET] = native_first_byte2(section, b"sgfan=")?.unwrap_or(0);
+    entry.attraction = native_first_byte(section, b"sgatt=")?.unwrap_or(0);
+    entry.friend_foe = native_first_byte(section, b"sgfof=")?.unwrap_or(0);
+    entry.belief = native_first_byte2(section, b"sgbel=")?.unwrap_or(0);
+    entry.familiarity = native_first_byte2(section, b"sgfam=")?.unwrap_or(0);
+    entry.relationship = native_first_byte(section, b"sgrel=")?.unwrap_or(0);
+    entry.entity_type = native_first_byte(section, b"sgtyp=")?.unwrap_or(0);
+    if let Some(braincode) = native_byte_array::<BRAINCODE_SIZE>(section, b"sgbrc=")? {
+        entry.braincode = braincode;
+    }
+    Ok(entry)
+}
+
+fn native_episodic_from_section(
+    section: &NativeFileSection,
+) -> Result<simulated_iepisodic, &'static str> {
+    let mut entry = simulated_iepisodic::default();
+    entry.affect = EPISODIC_AFFECT_ZERO;
+    entry.space_time.location = native_byte2_array::<2>(section, b"eploc=")?.unwrap_or([0; 2]);
+    entry.space_time.time = n_byte4::from(native_first_byte2(section, b"eptim=")?.unwrap_or(0));
+    entry.space_time.date = native_first_byte4(section, b"epdat=")?.unwrap_or(0);
+    entry.first_name = native_byte2_array::<2>(section, b"epfin=")?.unwrap_or([0; 2]);
+    entry.family_name = native_byte2_array::<2>(section, b"epfan=")?.unwrap_or([0; 2]);
+    entry.event = native_first_byte(section, b"epeve=")?.unwrap_or(0);
+    entry.food = native_first_byte(section, b"epfoo=")?.unwrap_or(0);
+    entry.affect = native_first_byte2(section, b"epafe=")?.unwrap_or(EPISODIC_AFFECT_ZERO);
+    entry.arg = native_first_byte2(section, b"eparg=")?.unwrap_or(0);
+    Ok(entry)
+}
+
+fn native_add_social_event(being: &mut Vec<ObjectEntry>, entry: simulated_isocial) {
+    native_push_event_object(being, "social", social_entry_to_object(&entry));
+}
+
+fn native_add_episodic_event(being: &mut Vec<ObjectEntry>, entry: simulated_iepisodic) {
+    native_push_event_object(being, "episodic", episodic_entry_to_object(&entry));
+}
+
+fn native_push_event_object(
+    being: &mut Vec<ObjectEntry>,
+    array_name: &str,
+    value: Vec<ObjectEntry>,
+) {
+    let events_index = if let Some(index) = being.iter().position(|entry| entry.name == "events") {
+        index
+    } else {
+        being.push(ObjectEntry::new("events", ObjectValue::Object(Vec::new())));
+        being.len() - 1
+    };
+
+    let ObjectValue::Object(events) = &mut being[events_index].value else {
+        return;
+    };
+    let array_index = if let Some(index) = events.iter().position(|entry| entry.name == array_name)
+    {
+        index
+    } else {
+        events.push(ObjectEntry::new(array_name, ObjectValue::Array(Vec::new())));
+        events.len() - 1
+    };
+    if let ObjectValue::Array(values) = &mut events[array_index].value {
+        values.push(ObjectValue::Object(value));
+    }
+}
+
+fn native_brainprobes_from_bytes(
+    bytes: [n_byte; BRAINPROBE_NATIVE_BYTES],
+) -> [simulated_ibrain_probe; BRAINCODE_PROBES] {
+    std::array::from_fn(|index| {
+        let offset = index * 6;
+        simulated_ibrain_probe {
+            probe_type: bytes[offset],
+            position: bytes[offset + 1],
+            address: bytes[offset + 2],
+            frequency: bytes[offset + 3],
+            offset: bytes[offset + 4],
+            state: bytes[offset + 5],
+        }
+    })
+}
+
+fn native_immune_from_bytes(bytes: [n_byte; IMMUNE_NATIVE_BYTES]) -> simulated_immune_system {
+    let mut immune = simulated_immune_system::default();
+    let mut offset = 0;
+    immune
+        .antigens
+        .copy_from_slice(&bytes[offset..offset + IMMUNE_ANTIGENS]);
+    offset += IMMUNE_ANTIGENS;
+    immune
+        .shape_antigen
+        .copy_from_slice(&bytes[offset..offset + IMMUNE_ANTIGENS]);
+    offset += IMMUNE_ANTIGENS;
+    immune
+        .antibodies
+        .copy_from_slice(&bytes[offset..offset + IMMUNE_POPULATION]);
+    offset += IMMUNE_POPULATION;
+    immune
+        .shape_antibody
+        .copy_from_slice(&bytes[offset..offset + IMMUNE_POPULATION]);
+    offset += IMMUNE_POPULATION;
+    immune.random_seed = [
+        n_byte2::from(bytes[offset]) | (n_byte2::from(bytes[offset + 1]) << 8),
+        n_byte2::from(bytes[offset + 2]) | (n_byte2::from(bytes[offset + 3]) << 8),
+    ];
+    immune
+}
+
+fn native_immune_object(immune: &simulated_immune_system) -> Vec<ObjectEntry> {
+    let mut object = Vec::new();
+    object_array_byte(&mut object, "antigens", &immune.antigens);
+    object_array_byte(&mut object, "shape_antigen", &immune.shape_antigen);
+    object_array_byte(&mut object, "antibodies", &immune.antibodies);
+    object_array_byte(&mut object, "shape_antibody", &immune.shape_antibody);
+    object_array_byte2(&mut object, "random_seed", &immune.random_seed);
+    object
+}
+
+fn native_first_byte(
+    section: &NativeFileSection,
+    token: &[u8; 6],
+) -> Result<Option<n_byte>, &'static str> {
+    let Some(value) = section
+        .field_values(token)
+        .and_then(|values| values.first())
+    else {
+        return Ok(None);
+    };
+    n_byte::try_from(*value)
+        .map(Some)
+        .map_err(|_| "native byte value too large")
+}
+
+fn native_first_byte2(
+    section: &NativeFileSection,
+    token: &[u8; 6],
+) -> Result<Option<n_byte2>, &'static str> {
+    let Some(value) = section
+        .field_values(token)
+        .and_then(|values| values.first())
+    else {
+        return Ok(None);
+    };
+    n_byte2::try_from(*value)
+        .map(Some)
+        .map_err(|_| "native byte2 value too large")
+}
+
+fn native_first_byte4(
+    section: &NativeFileSection,
+    token: &[u8; 6],
+) -> Result<Option<n_byte4>, &'static str> {
+    let Some(value) = section
+        .field_values(token)
+        .and_then(|values| values.first())
+    else {
+        return Ok(None);
+    };
+    n_byte4::try_from(*value)
+        .map(Some)
+        .map_err(|_| "native byte4 value too large")
+}
+
+fn native_byte_array<const N: usize>(
+    section: &NativeFileSection,
+    token: &[u8; 6],
+) -> Result<Option<[n_byte; N]>, &'static str> {
+    let Some(values) = section.field_values(token) else {
+        return Ok(None);
+    };
+    if values.len() != N {
+        return Err("native byte array length mismatch");
+    }
+    let mut output = [0; N];
+    for (slot, value) in output.iter_mut().zip(values.iter().copied()) {
+        *slot = n_byte::try_from(value).map_err(|_| "native byte value too large")?;
+    }
+    Ok(Some(output))
+}
+
+fn native_byte2_array<const N: usize>(
+    section: &NativeFileSection,
+    token: &[u8; 6],
+) -> Result<Option<[n_byte2; N]>, &'static str> {
+    let Some(values) = section.field_values(token) else {
+        return Ok(None);
+    };
+    if values.len() != N {
+        return Err("native byte2 array length mismatch");
+    }
+    let mut output = [0; N];
+    for (slot, value) in output.iter_mut().zip(values.iter().copied()) {
+        *slot = n_byte2::try_from(value).map_err(|_| "native byte2 value too large")?;
+    }
+    Ok(Some(output))
+}
+
+fn native_genetics_from_words(words: [n_byte2; CHROMOSOMES * 2]) -> [n_genetics; CHROMOSOMES] {
+    std::array::from_fn(|index| {
+        n_genetics::from(words[index * 2]) | (n_genetics::from(words[(index * 2) + 1]) << 16)
     })
 }
 
@@ -4385,6 +5850,97 @@ mod tests {
         assert_eq!(BRAINCODE_PROBES, 16);
         assert_eq!(BRAINCODE_PSPACE_REGISTERS, 3);
         assert_eq!(BRAINCODE_MAX_ADDRESS, 256);
+        assert_eq!(BRAINCODE_INSTRUCTIONS, 30);
+        assert_eq!(BRAINCODE_ADD, 2);
+        assert_eq!(BRAINCODE_ANE, 29);
+    }
+
+    #[test]
+    fn braincode_decode_wraps_instruction_arguments() {
+        let mut code = [0; BRAINCODE_SIZE];
+        code[126] = BRAINCODE_ADD | BRAINCODE_CONSTANT0_BIT | BRAINCODE_CONSTANT1_BIT;
+        code[127] = 7;
+        code[0] = 3;
+
+        assert_eq!(
+            braincode_decode(&code, 126),
+            BraincodeInstruction {
+                opcode: BRAINCODE_ADD,
+                constant0: true,
+                constant1: true,
+                value0: 7,
+                value1: 3,
+            }
+        );
+    }
+
+    #[test]
+    fn braincode_vm_executes_data_arithmetic_and_register_ops() {
+        let mut code = [0; BRAINCODE_SIZE];
+        code[0] = BRAINCODE_MOV | BRAINCODE_CONSTANT0_BIT;
+        code[1] = 12;
+        code[2] = 60;
+        code[3] = BRAINCODE_ADD | BRAINCODE_CONSTANT0_BIT;
+        code[4] = 5;
+        code[5] = 57;
+        code[6] = BRAINCODE_SUB | BRAINCODE_CONSTANT0_BIT;
+        code[7] = 4;
+        code[8] = 54;
+        code[9] = BRAINCODE_MUL | BRAINCODE_CONSTANT0_BIT;
+        code[10] = 3;
+        code[11] = 51;
+        code[12] = BRAINCODE_DIV | BRAINCODE_CONSTANT0_BIT;
+        code[13] = 1;
+        code[14] = 48;
+        code[15] = BRAINCODE_MOD | BRAINCODE_CONSTANT0_BIT;
+        code[16] = 5;
+        code[17] = 45;
+        code[18] = BRAINCODE_STP | BRAINCODE_CONSTANT0_BIT | BRAINCODE_CONSTANT1_BIT;
+        code[19] = 1;
+        code[20] = 77;
+        code[21] = BRAINCODE_LTP | BRAINCODE_CONSTANT0_BIT;
+        code[22] = 1;
+        code[23] = 39;
+
+        let mut vm = BraincodeVm::new(code);
+        for _ in 0..6 {
+            vm.execute_step();
+        }
+
+        assert_eq!(vm.local()[60], 4);
+        vm.execute_step();
+        vm.execute_step();
+        assert_eq!(vm.registers()[1], 77);
+        assert_eq!(vm.local()[60], 77);
+        assert_eq!(vm.pc(), 24);
+    }
+
+    #[test]
+    fn braincode_vm_executes_conditionals_and_byte_mutators() {
+        let mut code = [0; BRAINCODE_SIZE];
+        code[0] = BRAINCODE_SEQ | BRAINCODE_CONSTANT0_BIT;
+        code[1] = 42;
+        code[2] = 9;
+        code[9] = 42;
+
+        let mut vm = BraincodeVm::new(code);
+        vm.execute_step();
+        assert_eq!(vm.pc(), 6);
+
+        let mut code = [0; BRAINCODE_SIZE];
+        code[0] = BRAINCODE_CTR;
+        code[1] = 20;
+        code[2] = 21;
+        code[20] = 200;
+        code[21] = 1;
+        code[3] = BRAINCODE_INV;
+        code[4] = 0;
+        code[5] = 18;
+        code[21] = 1;
+        let mut vm = BraincodeVm::new(code);
+        vm.execute_step();
+        vm.execute_step();
+        assert_eq!(vm.local()[21], 253);
     }
 
     #[test]
@@ -4567,6 +6123,226 @@ mod tests {
     }
 
     #[test]
+    fn land_tiles_hold_primary_and_working_topography_buffers() {
+        let land = LandState::from_snapshot(LandSnapshot::new(2, [7633, 53305], 719));
+        let repeat = LandState::from_snapshot(LandSnapshot::new(2, [7633, 53305], 719));
+        let changed = LandState::from_snapshot(LandSnapshot::new(2, [1, 2], 719));
+
+        let tile = land
+            .tile(0)
+            .expect("default command line land has one tile");
+        assert_eq!(tile.genetics(), [7633, 53305]);
+        let primary = land
+            .topography_buffer(0, LAND_TOPOGRAPHY_PRIMARY)
+            .expect("primary topography buffer");
+        let working = land
+            .topography_buffer(0, LAND_TOPOGRAPHY_WORKING)
+            .expect("working topography buffer");
+        assert_eq!(primary.len(), MAP_AREA);
+        assert_eq!(working.len(), MAP_AREA);
+        assert_eq!(primary, working);
+        assert_eq!(
+            primary[map_index(192, 366)],
+            land.topography_at_map(192, 366)
+        );
+        assert_eq!(
+            land.topography_at_map(192, 366),
+            repeat.topography_at_map(192, 366)
+        );
+        assert_ne!(
+            land.topography_at_map(192, 366),
+            changed.topography_at_map(192, 366)
+        );
+    }
+
+    #[test]
+    fn high_definition_topography_samples_match_c_bilinear_grid_shape() {
+        let land = LandState::from_snapshot(LandSnapshot::new(5, [7633, 53305], 400));
+        let map_x = 37;
+        let map_y = 91;
+        let hires_x = map_x << (HI_RES_MAP_BITS - MAP_BITS);
+        let hires_y = map_y << (HI_RES_MAP_BITS - MAP_BITS);
+
+        assert_eq!(
+            land.topography_highdef_at(hires_x, hires_y),
+            land.topography_at_map(map_x, map_y)
+        );
+        assert_eq!(
+            land.topography_highdef_at(-1, -1),
+            land.topography_highdef_at(
+                (HI_RES_MAP_DIMENSION - 1) as n_int,
+                (HI_RES_MAP_DIMENSION - 1) as n_int
+            )
+        );
+        let tide_height = land.topography_highdef_at(hires_x + 3, hires_y + 5);
+        assert_eq!(
+            land.highres_tide_at(hires_x + 3, hires_y + 5),
+            tide_height > 105 && tide_height < 151
+        );
+    }
+
+    #[test]
+    fn weather_seven_values_follow_native_day_night_and_dawndusk_bands() {
+        let day = LandState::from_snapshot(LandSnapshot::new(5, [7633, 53305], 400));
+        let night = LandState::from_snapshot(LandSnapshot::new(5, [7633, 53305], 0));
+        let dawndusk = LandState::from_snapshot(LandSnapshot::new(5, [7633, 53305], 11 * 32));
+        let location = [12_345, 23_456];
+
+        assert!((WEATHER_SEVEN_SUNNY_DAY..=WEATHER_SEVEN_RAINY_DAY)
+            .contains(&day.weather_seven_at(location)));
+        assert!((WEATHER_SEVEN_CLEAR_NIGHT..=WEATHER_SEVEN_RAINY_NIGHT)
+            .contains(&night.weather_seven_at(location)));
+        assert_eq!(dawndusk.weather_seven_at(location), WEATHER_SEVEN_DAWN_DUSK);
+    }
+
+    #[test]
+    fn food_quantity_depletes_local_energy_and_regrows_over_land_time() {
+        let mut land = LandState::from_snapshot(LandSnapshot::new(5, [7633, 53305], 400));
+        let location = (0..MAP_DIMENSION)
+            .step_by(5)
+            .flat_map(|map_x| {
+                (0..MAP_DIMENSION).step_by(5).map(move |map_y| {
+                    [
+                        (map_x << APE_TO_MAP_BIT_RATIO) as n_byte2,
+                        (map_y << APE_TO_MAP_BIT_RATIO) as n_byte2,
+                    ]
+                })
+            })
+            .find(|location| {
+                land.height_at(*location) > TIDE_MAX
+                    && land.food_source_at(*location).max_energy > BEING_DEAD
+            })
+            .expect("seeded land should expose edible food quantity");
+        let before_source = land.food_source_at(location);
+        let before_quantity = land.food_quantity_at(location);
+
+        let depleted_quantity = land.consume_food_at(location, 320);
+
+        assert!(depleted_quantity < before_quantity);
+        assert!(land.food_source_at(location).max_energy < before_source.max_energy);
+        land.advance_minutes(FOOD_REGROWTH_INTERVAL_MINUTES);
+        assert!(land.food_quantity_at(location) > depleted_quantity);
+    }
+
+    #[test]
+    fn repeated_eating_depletes_then_long_regrowth_restores_food_quantity() {
+        let mut land = LandState::from_snapshot(LandSnapshot::new(5, [7633, 53305], 400));
+        let location = (0..MAP_DIMENSION)
+            .step_by(5)
+            .flat_map(|map_x| {
+                (0..MAP_DIMENSION).step_by(5).map(move |map_y| {
+                    [
+                        (map_x << APE_TO_MAP_BIT_RATIO) as n_byte2,
+                        (map_y << APE_TO_MAP_BIT_RATIO) as n_byte2,
+                    ]
+                })
+            })
+            .find(|location| {
+                land.height_at(*location) > TIDE_MAX
+                    && land.food_source_at(*location).max_energy > BEING_DEAD
+            })
+            .expect("seeded land should expose edible food");
+        let mut being = BeingSummary::new(
+            "Repeater".to_string(),
+            512,
+            258,
+            0,
+            [n_genetics::MAX; CHROMOSOMES],
+        );
+        being.location = location;
+
+        let first = being.eat_food(&mut land);
+        let second = being.eat_food(&mut land);
+
+        assert!(first.energy > BEING_DEAD);
+        assert!(second.max_energy < first.max_energy);
+        assert!(land.food_quantity_at(location) < FOOD_QUANTITY_MAX);
+        land.advance_minutes(FOOD_REGROWTH_INTERVAL_MINUTES * n_uint::from(FOOD_QUANTITY_MAX));
+        assert_eq!(land.food_quantity_at(location), FOOD_QUANTITY_MAX);
+        assert_eq!(land.food_source_at(location).max_energy, first.max_energy);
+    }
+
+    #[test]
+    fn inventory_food_hooks_cover_native_chew_foods() {
+        let mut being = BeingSummary::new(
+            "Carrier".to_string(),
+            512,
+            258,
+            0,
+            [n_genetics::MAX; CHROMOSOMES],
+        );
+        for (item, food_type, max_energy) in [
+            (INVENTORY_FISH, FOOD_SHELLFISH, ENERGY_FISH),
+            (INVENTORY_NUT_CRACKED, FOOD_VEGETABLE, ENERGY_NUT),
+            (INVENTORY_BIRD_EGGS, FOOD_BIRD_EGGS, ENERGY_BIRD_EGGS),
+            (INVENTORY_LIZARD_EGGS, FOOD_LIZARD_EGGS, ENERGY_LIZARD_EGGS),
+            (INVENTORY_GRASS, FOOD_VEGETABLE, ENERGY_GRASS),
+        ] {
+            being.inventory = [0; INVENTORY_SIZE];
+            being.inventory[usize::from(BODY_LEFT_HAND)] = item;
+            let food = being
+                .consume_inventory_food()
+                .expect("native chew food should be edible");
+            assert_eq!(food.food_type, food_type);
+            assert_eq!(food.max_energy, max_energy);
+            assert!(food.energy > BEING_DEAD);
+            assert_eq!(being.inventory[usize::from(BODY_LEFT_HAND)], 0);
+        }
+        assert!(inventory_food_source(INVENTORY_TWIG).is_none());
+    }
+
+    #[test]
+    fn terrain_food_fixture_probe_matches_checked_values() {
+        let land = LandState::from_snapshot(LandSnapshot::new(5, [7633, 53305], 400));
+        let probes = [
+            land.terrain_food_fixture_sample([12_345, 23_456]),
+            land.terrain_food_fixture_sample([3_200, 9_600]),
+            land.terrain_food_fixture_sample([28_000, 4_000]),
+        ];
+        assert_eq!(
+            probes,
+            [
+                TerrainFoodFixtureSample {
+                    location: [12_345, 23_456],
+                    height: 174,
+                    grass: 133,
+                    trees: -18,
+                    bush: 122,
+                    seaweed: 0,
+                    rockpool: 0,
+                    beach: 0,
+                    food_type: 0,
+                    max_energy: 50,
+                },
+                TerrainFoodFixtureSample {
+                    location: [3_200, 9_600],
+                    height: 207,
+                    grass: 123,
+                    trees: 86,
+                    bush: 109,
+                    seaweed: 0,
+                    rockpool: 0,
+                    beach: 0,
+                    food_type: 0,
+                    max_energy: 50,
+                },
+                TerrainFoodFixtureSample {
+                    location: [28_000, 4_000],
+                    height: 207,
+                    grass: 116,
+                    trees: 37,
+                    bush: 109,
+                    seaweed: 0,
+                    rockpool: 0,
+                    beach: 0,
+                    food_type: 0,
+                    max_energy: 50,
+                },
+            ]
+        );
+    }
+
+    #[test]
     fn terrain_biology_drives_land_and_intertidal_food_sources() {
         let land = LandState::from_snapshot(LandSnapshot::new(5, [7633, 53305], 400));
         let mut saw_land_food = false;
@@ -4625,6 +6401,165 @@ mod tests {
         .unwrap();
         assert_eq!(startup.land, LandSnapshot::new(27, [1, 65_535], 300));
         assert!(startup.beings.is_empty());
+    }
+
+    #[test]
+    fn native_transfer_sections_parse_version_and_land_blocks() {
+        let native = b"/* Simulated Ape 0.708 */\n\
+            simul{signa=20033;verio=708;};\n\
+            landd{dated=27;timed=300;landg=1,65535;};";
+        let sections = native_transfer_sections(native).unwrap();
+
+        assert_eq!(sections.len(), 2);
+        assert_eq!(sections[0].token_string(), "simul{");
+        assert_eq!(sections[0].field_values(b"signa=").unwrap(), &[20_033]);
+        assert_eq!(sections[1].token_string(), "landd{");
+        assert_eq!(sections[1].field_values(b"landg=").unwrap(), &[1, 65_535]);
+
+        let startup = startup_transfer_from_native_bytes(native).unwrap();
+        assert_eq!(startup.land, LandSnapshot::new(27, [1, 65_535], 300));
+        assert!(startup.beings.is_empty());
+    }
+
+    #[test]
+    fn native_transfer_loads_land_and_being_constant_delta_fields() {
+        let native = b"simul{signa=20033;verio=708;};\
+            landd{dated=9;timed=13;landg=11,12;};\
+            being{\
+            locat=100,200;facin=64;speed=3;energ=1234;datob=8;rando=5,6;state=1;\
+            brast=1,2,3,4,5,6;heigt=2100;masss=120;overr=12;\
+            shout=1,2,3,4,5,6;crowd=1;postu=4;inven=0,4096,0,0,0,0,0,0;\
+            paras=2;honor=77;conce=99;atten=0,1,2,3,4,5;\
+            genet=3,0,10,0,11,0,12,0;fetag=9,0,8,0,7,0,6,0;fathn=5,6;\
+            sosim=10,11,12,13;drive=1,2,3,4;goals=0,1,2,3;\
+            prefe=1,1,1,1,1,1,1,1,2,3,4,5,6,7;\
+            genex=2;genen=1;chigx=4;chign=3;};";
+        let state = SimState::load_startup_bytes(native).unwrap();
+        let being = &state.beings()[0];
+
+        assert_eq!(state.kind(), KIND_OF_USE::KIND_LOAD_FILE);
+        assert_eq!(state.land_snapshot(), LandSnapshot::new(9, [11, 12], 13));
+        assert_eq!(state.population(), 1);
+        assert_eq!(being.name(), "Ape 001");
+        assert_eq!(being.location(), [100, 200]);
+        assert_eq!(being.facing(), 64);
+        assert_eq!(being.speed(), 3);
+        assert_eq!(being.energy(), 1234);
+        assert_eq!(being.date_of_birth(), 8);
+        assert_eq!(being.random_seed(), [5, 6]);
+        assert_eq!(being.macro_state(), 1);
+        assert_eq!(being.brain_state(), [1, 2, 3, 4, 5, 6]);
+        assert_eq!(being.height(), 2100);
+        assert_eq!(being.mass(), 120);
+        assert_eq!(being.script_overrides(), 12);
+        assert_eq!(being.shout(), [1, 2, 3, 4, 5, 6]);
+        assert_eq!(being.inventory()[1], INVENTORY_FISH);
+        assert_eq!(being.parasites(), 2);
+        assert_eq!(being.honor(), 77);
+        assert_eq!(being.attention(), [0, 1, 2, 3, 4, 5]);
+        assert_eq!(being.genetics(), [3, 10, 11, 12]);
+        assert_eq!(being.social_coord(), [10, 11, 12, 13]);
+        assert_eq!(being.drives(), [1, 2, 3, 4]);
+        assert_eq!(being.goal(), [0, 1, 2, 3]);
+        assert_eq!(
+            being.learned_preference(),
+            [1, 1, 1, 1, 1, 1, 1, 1, 2, 3, 4, 5, 6, 7]
+        );
+    }
+
+    #[test]
+    fn native_transfer_loads_events_brain_probes_and_immune_bytes() {
+        let brpro = (0..BRAINPROBE_NATIVE_BYTES)
+            .map(|index| {
+                if index < 6 {
+                    (index + 1).to_string()
+                } else {
+                    "0".to_string()
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(",");
+        let immun = [
+            vec![1, 2, 3, 4, 5, 6, 7, 8],
+            vec![8, 7, 6, 5, 4, 3, 2, 1],
+            vec![1; IMMUNE_POPULATION],
+            vec![16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1],
+            vec![55, 0, 66, 0],
+        ]
+        .concat()
+        .iter()
+        .map(|value| value.to_string())
+        .collect::<Vec<_>>()
+        .join(",");
+        let native = format!(
+            "simul{{signa=20033;verio=708;}};\
+            landd{{dated=0;timed=0;landg=1,2;}};\
+            being{{locat=100,200;facin=64;speed=3;energ=1234;datob=8;rando=5,6;state=1;\
+            brast=1,2,3,4,5,6;heigt=2100;masss=120;overr=12;\
+            shout=1,2,3,4,5,6;crowd=1;postu=4;inven=0,0,0,0,0,0,0,0;\
+            paras=2;honor=77;conce=99;atten=0,1,2,3,4,5;\
+            genet=3,0,10,0,11,0,12,0;fetag=9,0,8,0,7,0,6,0;fathn=5,6;\
+            sosim=10,11,12,13;drive=1,2,3,4;goals=0,1,2,3;\
+            prefe=1,1,1,1,1,1,1,1,2,3,4,5,6,7;\
+            genex=2;genen=1;chigx=4;chign=3;immun={immun};brreg=65,66,67;brpro={brpro};}};\
+            sgcia{{sgloc=10,20;sgtim=30;sgdat=40;sgfin=111;sgfan=222;sgatt=3;sgfof=127;sgbel=9;sgfam=42;sgrel=2;sgtyp=0;}};\
+            episo{{eploc=2,3;eptim=4;epdat=1;epfin=512,0;epfan=258,0;epeve=1;epfoo=0;epafe=16434;eparg=50;}};"
+        );
+        let state = SimState::load_startup_bytes(native.as_bytes()).unwrap();
+        let being = &state.beings()[0];
+        let social = being.social_memory()[0];
+        let episodic = being.episodic_memory()[0];
+
+        assert_eq!(being.braincode_register(), [65, 66, 67]);
+        assert_eq!(being.brainprobe()[0].probe_type, 1);
+        assert_eq!(being.brainprobe()[0].state, 6);
+        assert_eq!(being.immune_antigens(), [1, 2, 3, 4, 5, 6, 7, 8]);
+        assert_eq!(being.immune_shape_antigen(), [8, 7, 6, 5, 4, 3, 2, 1]);
+        assert_eq!(being.immune_antibodies(), [1; IMMUNE_POPULATION]);
+        assert_eq!(being.immune_seed(), [55, 66]);
+        assert_eq!(social.space_time.location, [10, 20]);
+        assert_eq!(social.first_name[BEING_MET], 111);
+        assert_eq!(social.familiarity, 42);
+        assert_eq!(episodic.event, EVENT_EAT);
+        assert_eq!(episodic.arg, 50);
+    }
+
+    #[test]
+    fn native_transfer_writer_roundtrips_land_population_and_events() {
+        let state = SimState::load_startup_json(
+            b"{\"information\":{\"signature\":20033,\"version number\":708},\"land\":{\"date\":7,\"genetics\":[11,12],\"time\":13},\"beings\":[{\"name\":\"Expanded Ape\",\"delta\":{\"location\":[100,200],\"direction_facing\":64,\"velocity\":3,\"stored_energy\":3840,\"random_seed\":[5,6],\"macro_state\":1},\"constant\":{\"date_of_birth\":8,\"name\":[512,258],\"genetics\":[2,3,4,5],\"generation_range\":[1,2]},\"changes\":{\"drives\":[1,2,3,4],\"inventory\":[0,4096,0,0,0,0,0,0],\"learned_preference\":[1,1,1,1,1,1,1,1,2,3,4,5,6,7]},\"braindata\":{\"braincode_register\":[65,66,67],\"brain_state\":[1,2,3,4,5,6],\"script_overrides\":12,\"attention\":[0,1,2,3,4,5],\"brainprobe\":[{\"probe_type\":1,\"position\":2,\"address\":3,\"frequency\":4,\"offset\":5,\"state\":6}]},\"immune_system\":{\"antigens\":[1,2,3,4,5,6,7,8],\"shape_antigen\":[8,7,6,5,4,3,2,1],\"antibodies\":[1,1,1,1,1,1,1,1,2,2,2,2,2,2,2,2],\"shape_antibody\":[16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1],\"random_seed\":[55,66]},\"events\":{\"episodic\":[{\"space_time\":{\"date\":1,\"location\":[2,3],\"time\":4},\"first_name\":[512,0],\"family_name\":[258,0],\"event\":1,\"food\":0,\"affect\":16434,\"arg\":50}]}}]}",
+        )
+        .unwrap();
+        let native = state.tranfer_startup_out_native();
+        let native_text = std::str::from_utf8(native.written_data()).unwrap();
+        assert!(native_text.starts_with("simul{signa=20033;verio=708;};"));
+        assert!(native_text.contains("landd{dated=7;timed=13;landg=11,12;};"));
+        assert!(native_text.contains("being{locat=100,200;"));
+        assert!(native_text.contains("episo{"));
+
+        let loaded = SimState::load_startup_bytes(native.written_data()).unwrap();
+        let being = &loaded.beings()[0];
+        assert_eq!(loaded.land_snapshot(), LandSnapshot::new(7, [11, 12], 13));
+        assert_eq!(being.location(), [100, 200]);
+        assert_eq!(being.braincode_register(), [65, 66, 67]);
+        assert_eq!(being.brainprobe()[0].state, 6);
+        assert_eq!(being.immune_seed(), [55, 66]);
+        assert_eq!(being.episodic_memory()[0].event, EVENT_EAT);
+    }
+
+    #[test]
+    fn native_transfer_rejects_unsupported_sections_and_raw_binary() {
+        assert!(startup_transfer_from_native_bytes(b"NA\x02\xc4not-native").is_err());
+        assert!(startup_transfer_from_native_bytes(
+            b"simul{signa=20033;verio=708;};landd{dated=0;timed=0;landg=1,2;};weath{press=1;};"
+        )
+        .is_err());
+        assert!(startup_transfer_from_native_bytes(b"landd{dated=0;timed=0;landg=1,2;};").is_err());
+        assert!(startup_transfer_from_native_bytes(b"simul{signa=20033;verio=9999;};").is_err());
+        assert!(startup_transfer_from_native_bytes(
+            b"simul{signa=20033;verio=708;};sgcia{sgfin=1;};"
+        )
+        .is_err());
     }
 
     #[test]
@@ -4907,7 +6842,7 @@ mod tests {
 
     #[test]
     fn awake_cycle_eats_grows_recalculates_mass_and_sets_state() {
-        let land = LandState::from_snapshot(LandSnapshot::new(0, [7633, 53305], 400));
+        let mut land = LandState::from_snapshot(LandSnapshot::new(0, [7633, 53305], 400));
         let mut being = BeingSummary::new(
             "Hungry".to_string(),
             512,
@@ -4934,11 +6869,13 @@ mod tests {
             .expect("seeded land should expose edible land food");
         let before_energy = being.energy();
         let before_height = being.height();
+        let before_food_quantity = land.food_quantity_at(being.location);
 
-        being.cycle_awake(&land);
+        being.cycle_awake(&mut land);
 
         assert!(being.energy() > before_energy);
         assert!(being.height() > before_height);
+        assert!(land.food_quantity_at(being.location) < before_food_quantity);
         assert!(being.macro_state() & BEING_STATE_EATING != 0);
         assert!(being.mass() >= being.calculated_mass());
     }

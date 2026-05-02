@@ -32,15 +32,23 @@ being_temporary_speed
 being_move_energy terrain and swimming cost
 ```
 
-The Rust terrain source is still deterministic procedural topography generated
-from the saved land genetics. It does not yet load the full C high-definition
-tile maps, but the operator stack, water tests, tide range, slope shape, and
-food dominance rules now follow the native formulas used by command-line
-movement and eating.
+The Rust terrain source is now stored in native-shaped tile buffers generated
+from saved tile genetics. The exact C `tile_patch`/`tile_round` generator is
+still pending fixture parity, but height, slope, operator, water, tide, and
+food dominance reads now consume tile-backed map bytes. High-definition
+topography is exposed through a lazy C-shaped bilinear accessor.
 
 ## Remaining Gaps
 
-The next terrain/food pass should replace or augment the deterministic Rust
-topography with native tile-map parity, then compare biology operator values
-against C fixtures at fixed map locations. Food depletion/regrowth and deeper
-animal foods are still outside this cycle range.
+The next terrain/food pass should replace the deterministic Rust tile fill with
+exact native `tile_patch`/`tile_round` generation, then compare map bytes,
+high-definition samples, biology operator values, and repeated eating
+transcripts against C fixtures. Deeper animal foods remain outside this cycle
+range.
+
+## Cycle 116-120 Update
+
+Rust now also has repeated-eating depletion tests, long regrowth tests,
+inventory food hooks for fish, cracked nuts, grass, bird eggs, and lizard eggs,
+and a checked `TerrainFoodFixtureSample` probe surface. The remaining terrain
+drift is still exact C tile generation, not the food decision/eating harness.
