@@ -1,9 +1,10 @@
 use apesdk_sim::{
     banner, relationship_description, BeingSummary, SimState, ATTENTION_RELATIONSHIP, BEING_MET,
     ENTITY_BEING, EPISODIC_AFFECT_ZERO, EVENT_CHAT, EVENT_EAT, EVENT_GROOM, EVENT_GROOMED,
-    EVENT_HIT, EVENT_HIT_BY, EVENT_INTENTION, EVENT_SEEK_MATE, FOOD_VEGETABLE, LARGE_SIM,
-    MAP_DIMENSION, RELATIONSHIP_SELF, SOCIAL_RESPECT_NORMAL, SOCIAL_SIZE_BEINGS, TIME_DAY_MINUTES,
-    TIME_HOUR_MINUTES, TIME_MONTH_MINUTES, TIME_YEAR_DAYS, TIME_YEAR_MINUTES,
+    EVENT_HIT, EVENT_HIT_BY, EVENT_INTENTION, EVENT_SEEK_MATE, FOOD_FRUIT, FOOD_SEAWEED,
+    FOOD_SHELLFISH, FOOD_VEGETABLE, LARGE_SIM, MAP_DIMENSION, RELATIONSHIP_SELF,
+    SOCIAL_RESPECT_NORMAL, SOCIAL_SIZE_BEINGS, TIME_DAY_MINUTES, TIME_HOUR_MINUTES,
+    TIME_MONTH_MINUTES, TIME_YEAR_DAYS, TIME_YEAR_MINUTES,
 };
 use apesdk_toolkit::n_uint;
 use std::fs;
@@ -1319,6 +1320,9 @@ fn episodic_description(
             output.push_str("Was eating ");
             output.push_str(match entry.food {
                 FOOD_VEGETABLE => "vegetation",
+                FOOD_FRUIT => "fruit",
+                FOOD_SHELLFISH => "shellfish",
+                FOOD_SEAWEED => "seaweed",
                 _ => "food",
             });
         }
@@ -1623,6 +1627,9 @@ fn spacetime_to_string(time: u32, date: u32) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use apesdk_sim::{
+        LandSnapshot, LandState, APE_TO_MAP_BIT_RATIO, BEING_DEAD, BEING_HUNGRY, TIDE_MAX,
+    };
     use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -2028,6 +2035,48 @@ mod tests {
         assert!(actual.contains("\nEpisodic memory for Episode Ape\n"));
         assert!(actual.contains("<Was eating vegetation now affect:+50>\n"));
         assert!(actual.contains("Groomed *00768-00300*'s Back a minute ago affect:+100\n"));
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn hungry_runtime_records_food_transcript() {
+        let land = LandState::from_snapshot(LandSnapshot::new(0, [7633, 53305], 400));
+        let location = (0..MAP_DIMENSION)
+            .step_by(5)
+            .flat_map(|map_x| {
+                (0..MAP_DIMENSION).step_by(5).map(move |map_y| {
+                    [
+                        (map_x << APE_TO_MAP_BIT_RATIO) as u16,
+                        (map_y << APE_TO_MAP_BIT_RATIO) as u16,
+                    ]
+                })
+            })
+            .find(|location| {
+                land.height_at(*location) > TIDE_MAX
+                    && land.food_source_at(*location).max_energy > BEING_DEAD
+            })
+            .expect("seeded land should expose edible runtime food");
+        let path = temp_save_path("hungry_food_transcript");
+        let path_string = path.to_string_lossy();
+        fs::write(
+            &path,
+            format!(
+                "{{\"information\":{{\"signature\":20033,\"version number\":708}},\"land\":{{\"date\":0,\"genetics\":[7633,53305],\"time\":400}},\"beings\":[{{\"name\":\"Hungry Ape\",\"delta\":{{\"location\":[{},{}],\"velocity\":0,\"stored_energy\":{},\"random_seed\":[1,2],\"awake\":2}},\"constant\":{{\"date_of_birth\":0,\"name\":[512,258],\"genetics\":[4294967295,4294967295,4294967295,4294967295]}}}}]}}",
+                location[0],
+                location[1],
+                BEING_HUNGRY - 1
+            ),
+        )
+        .expect("hungry food fixture should be writable");
+
+        let mut console = Console::default();
+        let actual = console.run_script(
+            &format!("open {path_string}\nrun 1 minute\nepisodic\nquit\n"),
+            true,
+        );
+        assert!(actual.contains("Running for 1 mins\n"));
+        assert!(actual.contains("Episodic memory for Hungry Ape\n"));
+        assert!(actual.contains("Was eating "));
         let _ = fs::remove_file(path);
     }
 

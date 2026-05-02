@@ -3,10 +3,10 @@
 //! Simulator constants and C-compatible public types for the ApeSDK Rust port.
 
 use apesdk_toolkit::{
-    array_add, array_number, math_random, math_random3, math_sine, math_tan, n_byte, n_byte2,
-    n_byte4, n_int, n_spacetime, n_uint, n_vect2, object_array, object_number, object_object,
-    object_parse_json, object_string, object_top_object, vect2_direction, vect2_dot, NFile,
-    ObjectEntry, ObjectValue,
+    array_add, array_number, array_object, math_random, math_random3, math_sine, math_tan, n_byte,
+    n_byte2, n_byte4, n_int, n_spacetime, n_uint, n_vect2, object_array, object_number,
+    object_object, object_parse_json, object_string, object_top_object, vect2_direction, vect2_dot,
+    NFile, ObjectEntry, ObjectValue,
 };
 
 pub const SHORT_VERSION_NAME: &str = "Simulated Ape 0.708 ";
@@ -42,6 +42,9 @@ pub const IMMUNE_ANTIGENS: usize = 8;
 pub const IMMUNE_POPULATION: usize = 16;
 pub const NUMBER_OF_BODIES: usize = 10;
 pub const INVENTORY_SIZE: usize = 8;
+pub const INVENTORY_CHILD: n_byte2 = 1;
+pub const INVENTORY_WOUND: n_byte2 = 2;
+pub const INVENTORY_GROOMED: n_byte2 = 4;
 pub const PREFERENCES: usize = 14;
 pub const ATTENTION_SIZE: usize = 6;
 pub const SHOUT_BYTES: usize = 6;
@@ -110,6 +113,14 @@ pub const DRIVE_HUNGER: usize = 0;
 pub const DRIVE_SOCIAL: usize = 1;
 pub const DRIVE_FATIGUE: usize = 2;
 pub const DRIVE_SEX: usize = 3;
+pub const PREFERENCE_MATE_HEIGHT_MALE: usize = 0;
+pub const PREFERENCE_MATE_HEIGHT_FEMALE: usize = 1;
+pub const PREFERENCE_MATE_PIGMENTATION_MALE: usize = 2;
+pub const PREFERENCE_MATE_PIGMENTATION_FEMALE: usize = 3;
+pub const PREFERENCE_MATE_HAIR_MALE: usize = 4;
+pub const PREFERENCE_MATE_HAIR_FEMALE: usize = 5;
+pub const PREFERENCE_MATE_FRAME_MALE: usize = 6;
+pub const PREFERENCE_MATE_FRAME_FEMALE: usize = 7;
 pub const PREFERENCE_GROOM_MALE: usize = 8;
 pub const PREFERENCE_GROOM_FEMALE: usize = 9;
 pub const PREFERENCE_ANECDOTE_EVENT_MUTATION: usize = 10;
@@ -151,6 +162,9 @@ pub const ATTENTION_RELATIONSHIP: usize = 4;
 pub const ATTENTION_TERRITORY: usize = 5;
 pub const BEING_MEETER: usize = 0;
 pub const BEING_MET: usize = 1;
+pub const GOAL_NONE: n_byte2 = 0;
+pub const GOAL_LOCATION: n_byte2 = 1;
+pub const GOAL_MATE: n_byte2 = 2;
 pub const RELATIONSHIP_SELF: n_byte = 1;
 pub const SOCIAL_RESPECT_NORMAL: n_byte = 127;
 pub const ENTITY_BEING: n_byte = 0;
@@ -204,11 +218,40 @@ pub const AFFECT_GROOM: i32 = 100;
 pub const AFFECT_SEEK_MATE: i32 = 600;
 pub const AFFECT_SQUABBLE_VICTOR: i32 = 1_100;
 pub const AFFECT_SQUABBLE_VANQUISHED: i32 = -800;
+pub const FEATURESET_PIGMENTATION: n_byte = 0;
+pub const FEATURESET_HAIR: n_byte = 1;
+pub const FEATURESET_HEIGHT: n_byte = 2;
+pub const FEATURESET_FAT: n_byte = 3;
+pub const FEATURESET_EYE_SHAPE: n_byte = 4;
+pub const FEATURESET_EYE_COLOR: n_byte = 5;
+pub const FEATURESET_EYE_SEPARATION: n_byte = 6;
+pub const FEATURESET_NOSE_SHAPE: n_byte = 7;
+pub const FEATURESET_EAR_SHAPE: n_byte = 8;
+pub const FEATURESET_EYEBROW_SHAPE: n_byte = 9;
+pub const FEATURESET_MOUTH_SHAPE: n_byte = 10;
+pub const MAX_FEATURE_FREQUENCY: n_byte2 = 2_048;
+pub const MAX_FEATURESET_OBSERVATIONS: n_byte2 = 2_048;
+pub const PAIR_BOND_THRESHOLD: n_byte = 8;
+pub const GROOMING_PROB: n_byte2 = 10_000;
+pub const GROOMING_PROB_HONOR: n_byte2 = 10;
+pub const MAX_SPEED_WHILST_GROOMING: n_byte = 30;
+pub const PARASITES_REMOVED: n_byte = 2;
+pub const SQUABBLE_FLEE_SPEED: n_byte = 20;
+pub const SQUABBLE_ENERGY_SHOWFORCE: i32 = 200;
+pub const SQUABBLE_ENERGY_ATTACK: i32 = 500;
+pub const SQUABBLE_DISRESPECT: n_byte = 20;
+pub const SQUABBLE_HONOR_ADJUST: n_byte = 10;
+pub const SQUABBLE_SHOW_FORCE_DISTANCE: n_int = 10;
+pub const MINIMUM_GENETIC_VARIATION: n_int = 32;
+pub const MATING_PROB: n_byte2 = 12;
 pub const IMMUNE_FIT: n_byte = 5;
 pub const MIN_ANTIBODIES: n_byte = 16;
 pub const PATHOGEN_ENVIRONMENT_PROB: n_byte2 = 100;
 pub const PATHOGEN_MUTATION_PROB: n_byte2 = 100;
 pub const ANTIBODY_DEPLETION_PROB: n_byte2 = 100;
+pub const PATHOGEN_TRANSMISSION_AIR: n_byte = 0;
+pub const PATHOGEN_TRANSMISSION_SEX: n_byte = 2;
+pub const PATHOGEN_TRANSMISSION_TOUCH: n_byte = 3;
 pub const PATHOGEN_TRANSMISSION_FOOD_VEGETABLE: n_byte = 4;
 pub const PATHOGEN_TRANSMISSION_TOTAL: n_byte2 = 8;
 
@@ -2057,6 +2100,85 @@ impl BeingSummary {
             })
     }
 
+    fn initial_friend_foe_for(&self, other: &BeingSummary) -> n_byte {
+        (n_int::from(SOCIAL_RESPECT_NORMAL) - self.social_attraction_pheromone(other)
+            + self.social_attraction_pigmentation(other)
+            + self.social_attraction_height(other)
+            + self.social_attraction_frame(other)
+            + self.social_attraction_hair(other))
+        .clamp(0, 255) as n_byte
+    }
+
+    fn social_attraction_score(&self, other: &BeingSummary) -> n_int {
+        1 + self.social_attraction_pheromone(other)
+            + self.social_attraction_pigmentation(other)
+            + self.social_attraction_height(other)
+            + self.social_attraction_frame(other)
+            + self.social_attraction_hair(other)
+    }
+
+    fn social_attraction_pheromone(&self, other: &BeingSummary) -> n_int {
+        let different = self
+            .genetics
+            .iter()
+            .zip(other.genetics.iter())
+            .map(|(left, right)| (left ^ right).count_ones() as n_int)
+            .sum::<n_int>();
+        if different < MINIMUM_GENETIC_VARIATION {
+            -n_int::from(gene_incest_aversion(self.genetics))
+        } else {
+            1
+        }
+    }
+
+    fn social_attraction_pigmentation(&self, other: &BeingSummary) -> n_int {
+        let offset = usize::from(self.is_female());
+        let preference = nature_nurture(
+            gene_pigmentation_preference(self.genetics),
+            self.learned_preference[PREFERENCE_MATE_PIGMENTATION_MALE + offset],
+        );
+        attraction_from_difference(n_int::from(gene_pigmentation(other.genetics)), preference)
+    }
+
+    fn social_attraction_hair(&self, other: &BeingSummary) -> n_int {
+        let offset = usize::from(self.is_female());
+        let preference = nature_nurture(
+            gene_hair_preference(self.genetics),
+            self.learned_preference[PREFERENCE_MATE_HAIR_MALE + offset],
+        );
+        attraction_from_difference(n_int::from(gene_hair(other.genetics)), preference)
+    }
+
+    fn social_attraction_height(&self, other: &BeingSummary) -> n_int {
+        let offset = usize::from(self.is_female());
+        let preference = nature_nurture(
+            gene_height_preference(self.genetics),
+            self.learned_preference[PREFERENCE_MATE_HEIGHT_MALE + offset],
+        );
+        if preference >= 12 && other.height > self.height {
+            1
+        } else if (8..12).contains(&preference) && other.height < self.height {
+            1
+        } else {
+            0
+        }
+    }
+
+    fn social_attraction_frame(&self, other: &BeingSummary) -> n_int {
+        let offset = usize::from(self.is_female());
+        let preference = nature_nurture(
+            gene_frame_preference(self.genetics),
+            self.learned_preference[PREFERENCE_MATE_FRAME_MALE + offset],
+        );
+        if (7..=11).contains(&preference) && other.body_fat() > self.body_fat() {
+            1
+        } else if preference > 11 && other.body_fat() < self.body_fat() {
+            1
+        } else {
+            0
+        }
+    }
+
     fn meet_being(
         &mut self,
         other: &BeingSummary,
@@ -2067,8 +2189,10 @@ impl BeingSummary {
         let index = self
             .social_index_for(other.gender_name, other.family_name)
             .unwrap_or_else(|| self.social_replacement_index());
+        let initial_friend_foe = self.initial_friend_foe_for(other);
         let entry = &mut self.social_memory[index];
         let newly_met = social_entry_empty(entry);
+        social_observe_features(entry, other);
         entry.entity_type = ENTITY_BEING;
         entry.first_name[BEING_MEETER] = self.gender_name;
         entry.family_name[BEING_MEETER] = self.family_name;
@@ -2080,9 +2204,10 @@ impl BeingSummary {
         entry.belief = other.macro_state;
         entry.familiarity = entry.familiarity.saturating_add(1);
         if newly_met {
-            entry.friend_foe = SOCIAL_RESPECT_NORMAL;
+            entry.friend_foe = initial_friend_foe;
             entry.relationship = 0;
         }
+        entry.friend_foe = entry.friend_foe.saturating_add(1);
         self.attention[ATTENTION_ACTOR] = index as n_byte;
         index
     }
@@ -2119,6 +2244,56 @@ impl BeingSummary {
             clamp_byte2(origin[0] + sum[0] / (count * 20)),
             clamp_byte2(origin[1] + sum[1] / (count * 20)),
         ]
+    }
+
+    fn social_memory_maintenance(&mut self) {
+        self.ensure_social_self();
+        if self
+            .social_memory
+            .iter()
+            .take(SOCIAL_SIZE_BEINGS)
+            .skip(1)
+            .any(|entry| entry.familiarity > 65_534)
+        {
+            for entry in self
+                .social_memory
+                .iter_mut()
+                .take(SOCIAL_SIZE_BEINGS)
+                .skip(1)
+            {
+                entry.familiarity >>= 2;
+            }
+        }
+
+        let respect_mean = self.social_respect_mean();
+        for entry in self
+            .social_memory
+            .iter_mut()
+            .take(SOCIAL_SIZE_BEINGS)
+            .skip(1)
+        {
+            if social_entry_empty(entry) {
+                continue;
+            }
+            if entry.familiarity > 16 && entry.friend_foe < respect_mean {
+                entry.friend_foe = entry.friend_foe.saturating_add(1);
+            } else if entry.familiarity == 0 && entry.friend_foe > SOCIAL_RESPECT_NORMAL {
+                entry.friend_foe = entry.friend_foe.saturating_sub(1);
+            }
+        }
+    }
+
+    fn social_respect_mean(&self) -> n_byte {
+        let mut total = n_uint::from(SOCIAL_RESPECT_NORMAL);
+        let mut count = 1;
+        for entry in self.social_memory.iter().take(SOCIAL_SIZE_BEINGS).skip(1) {
+            if social_entry_empty(entry) {
+                continue;
+            }
+            total += n_uint::from(entry.friend_foe);
+            count += 1;
+        }
+        (total / count).min(255) as n_byte
     }
 
     fn record_episodic_food(
@@ -2452,6 +2627,144 @@ fn clamp_byte2(value: n_int) -> n_byte2 {
     value.clamp(0, n_int::from(n_byte2::MAX)) as n_byte2
 }
 
+fn nature_nurture(nature: n_byte, nurture: n_byte) -> n_byte {
+    ((n_uint::from(nature) + (n_uint::from(nurture) >> 4)) >> 1) as n_byte
+}
+
+fn attraction_from_difference(value: n_int, preference: n_byte) -> n_int {
+    let difference = value - n_int::from(preference);
+    if (-2..=2).contains(&difference) {
+        3 - difference.abs()
+    } else {
+        0
+    }
+}
+
+fn social_observe_features(entry: &mut simulated_isocial, other: &BeingSummary) {
+    featureset_update(
+        &mut entry.classification,
+        FEATURESET_PIGMENTATION,
+        n_byte2::from(gene_pigmentation(other.genetics)),
+    );
+    featureset_update(
+        &mut entry.classification,
+        FEATURESET_HAIR,
+        n_byte2::from(gene_hair(other.genetics)),
+    );
+    featureset_update(&mut entry.classification, FEATURESET_HEIGHT, other.height);
+    featureset_update(&mut entry.classification, FEATURESET_FAT, other.body_fat());
+    featureset_update(
+        &mut entry.classification,
+        FEATURESET_EYE_SHAPE,
+        n_byte2::from(gene_eye_shape(other.genetics)),
+    );
+    featureset_update(
+        &mut entry.classification,
+        FEATURESET_EYE_COLOR,
+        n_byte2::from(gene_eye_color(other.genetics)),
+    );
+    featureset_update(
+        &mut entry.classification,
+        FEATURESET_EYE_SEPARATION,
+        n_byte2::from(gene_eye_separation(other.genetics)),
+    );
+    featureset_update(
+        &mut entry.classification,
+        FEATURESET_NOSE_SHAPE,
+        n_byte2::from(gene_nose_shape(other.genetics)),
+    );
+    featureset_update(
+        &mut entry.classification,
+        FEATURESET_EAR_SHAPE,
+        n_byte2::from(gene_ear_shape(other.genetics)),
+    );
+    featureset_update(
+        &mut entry.classification,
+        FEATURESET_EYEBROW_SHAPE,
+        n_byte2::from(gene_eyebrow_shape(other.genetics)),
+    );
+    featureset_update(
+        &mut entry.classification,
+        FEATURESET_MOUTH_SHAPE,
+        n_byte2::from(gene_mouth_shape(other.genetics)),
+    );
+    entry.classification.observations = entry.classification.observations.saturating_add(1);
+    if entry.classification.observations > MAX_FEATURESET_OBSERVATIONS {
+        entry.classification.observations >>= 1;
+        for feature in entry
+            .classification
+            .features
+            .iter_mut()
+            .take(entry.classification.feature_number as usize)
+        {
+            feature.frequency >>= 1;
+            feature.frequency = feature.frequency.max(1);
+        }
+    }
+}
+
+fn featureset_update(set: &mut simulated_featureset, feature_type: n_byte, value: n_byte2) {
+    let len = set.feature_number as usize;
+    if let Some(index) = set
+        .features
+        .iter()
+        .take(len)
+        .position(|feature| feature.feature_type == feature_type)
+    {
+        set.features[index].value = value;
+        set.features[index].frequency = set.features[index].frequency.saturating_add(1);
+        if set.features[index].frequency > MAX_FEATURE_FREQUENCY {
+            featureset_normalise(set);
+        }
+        return;
+    }
+
+    let insert = set
+        .features
+        .iter()
+        .take(len)
+        .position(|feature| feature.feature_type > feature_type)
+        .unwrap_or(len);
+    if len < MAX_FEATURESET_SIZE {
+        for index in (insert..len).rev() {
+            set.features[index + 1] = set.features[index];
+        }
+        set.feature_number += 1;
+        set.features[insert] = simulated_feature {
+            value,
+            frequency: 1,
+            feature_type,
+        };
+    } else if let Some((replace, _)) = set
+        .features
+        .iter()
+        .enumerate()
+        .min_by_key(|(_, feature)| feature.frequency)
+    {
+        set.features[replace] = simulated_feature {
+            value,
+            frequency: 1,
+            feature_type,
+        };
+        set.features[..len].sort_by_key(|feature| feature.feature_type);
+    }
+}
+
+fn featureset_normalise(set: &mut simulated_featureset) {
+    let len = set.feature_number as usize;
+    let total = set
+        .features
+        .iter()
+        .take(len)
+        .map(|feature| n_uint::from(feature.frequency))
+        .sum::<n_uint>()
+        .max(1);
+    let max = n_uint::from(MAX_FEATURE_FREQUENCY >> 1);
+    for feature in set.features.iter_mut().take(len) {
+        feature.frequency = ((n_uint::from(feature.frequency) * max) / total).max(1) as n_byte2;
+    }
+}
+
 fn social_entry_empty(entry: &simulated_isocial) -> bool {
     entry.first_name[BEING_MET] == 0
         && entry.family_name[BEING_MET] == 0
@@ -2616,6 +2929,42 @@ fn gene_frame(genetics: [n_genetics; CHROMOSOMES]) -> n_byte {
     gene_val_reg(genetics, 10, 11, 1, 6)
 }
 
+fn gene_hair(genetics: [n_genetics; CHROMOSOMES]) -> n_byte {
+    gene_val_reg(genetics, 12, 5, 12, 11)
+}
+
+fn gene_nose_shape(genetics: [n_genetics; CHROMOSOMES]) -> n_byte {
+    gene_val_reg(genetics, 4, 5, 6, 8)
+}
+
+fn gene_mouth_shape(genetics: [n_genetics; CHROMOSOMES]) -> n_byte {
+    gene_val_reg(genetics, 9, 5, 8, 15)
+}
+
+fn gene_pigmentation(genetics: [n_genetics; CHROMOSOMES]) -> n_byte {
+    gene_val_reg(genetics, 8, 9, 8, 3)
+}
+
+fn gene_ear_shape(genetics: [n_genetics; CHROMOSOMES]) -> n_byte {
+    gene_val_reg(genetics, 12, 4, 14, 1)
+}
+
+fn gene_eyebrow_shape(genetics: [n_genetics; CHROMOSOMES]) -> n_byte {
+    gene_val_reg(genetics, 9, 10, 8, 4)
+}
+
+fn gene_eye_shape(genetics: [n_genetics; CHROMOSOMES]) -> n_byte {
+    gene_val_reg(genetics, 9, 12, 1, 5)
+}
+
+fn gene_eye_color(genetics: [n_genetics; CHROMOSOMES]) -> n_byte {
+    gene_val_reg(genetics, 9, 7, 3, 7)
+}
+
+fn gene_eye_separation(genetics: [n_genetics; CHROMOSOMES]) -> n_byte {
+    gene_val_reg(genetics, 3, 2, 0, 14)
+}
+
 fn gene_swim(genetics: [n_genetics; CHROMOSOMES]) -> n_byte {
     gene_val_reg(genetics, 9, 11, 13, 7)
 }
@@ -2630,6 +2979,38 @@ fn gene_stagger(genetics: [n_genetics; CHROMOSOMES]) -> n_byte {
 
 fn gene_hill_climb(genetics: [n_genetics; CHROMOSOMES]) -> n_byte {
     gene_val_reg(genetics, 4, 6, 5, 2)
+}
+
+fn gene_status_preference(genetics: [n_genetics; CHROMOSOMES]) -> n_byte {
+    gene_val_reg(genetics, 15, 12, 10, 1)
+}
+
+fn gene_pigmentation_preference(genetics: [n_genetics; CHROMOSOMES]) -> n_byte {
+    gene_val_reg(genetics, 5, 3, 11, 4)
+}
+
+fn gene_height_preference(genetics: [n_genetics; CHROMOSOMES]) -> n_byte {
+    gene_val_reg(genetics, 9, 8, 14, 10)
+}
+
+fn gene_frame_preference(genetics: [n_genetics; CHROMOSOMES]) -> n_byte {
+    gene_val_reg(genetics, 9, 0, 8, 2)
+}
+
+fn gene_hair_preference(genetics: [n_genetics; CHROMOSOMES]) -> n_byte {
+    gene_val_reg(genetics, 10, 7, 14, 15)
+}
+
+fn gene_groom(genetics: [n_genetics; CHROMOSOMES]) -> n_byte {
+    gene_val_reg(genetics, 14, 2, 5, 10)
+}
+
+fn gene_aggression(genetics: [n_genetics; CHROMOSOMES]) -> n_byte {
+    gene_val_reg(genetics, 11, 3, 5, 0)
+}
+
+fn gene_incest_aversion(genetics: [n_genetics; CHROMOSOMES]) -> n_byte {
+    gene_val_reg(genetics, 10, 8, 4, 9)
 }
 
 fn gene_energy_from_vegetables(genetics: [n_genetics; CHROMOSOMES]) -> n_byte {
@@ -2805,6 +3186,7 @@ impl PopulationState {
 
     fn social_secondary_loop_no_sim(&mut self) {
         for being in &mut self.beings {
+            being.social_memory_maintenance();
             being.social_coord[0] = being.social_coord[2];
             being.social_coord[1] = being.social_coord[3];
         }
@@ -2826,135 +3208,354 @@ fn social_pair_cycle(
 ) {
     let first_index = first.meet_being(second, land_date, land_time);
     let second_index = second.meet_being(first, land_date, land_time);
+    first.immune_acquire_pathogen(PATHOGEN_TRANSMISSION_AIR);
+    second.immune_acquire_pathogen(PATHOGEN_TRANSMISSION_AIR);
+    let distance = social_distance(first, second);
 
     let first_familiarity = first.social_memory[first_index].familiarity;
     let second_familiarity = second.social_memory[second_index].familiarity;
-    if first_familiarity > 16 || second_familiarity > 16 {
-        social_groom_reduced(
+    let groomed = social_groom_native(
+        first,
+        second,
+        first_index,
+        second_index,
+        distance,
+        first_familiarity,
+        land_date,
+        land_time,
+    ) || social_groom_native(
+        second,
+        first,
+        second_index,
+        first_index,
+        distance,
+        second_familiarity,
+        land_date,
+        land_time,
+    );
+
+    if !groomed
+        && !social_squabble_native(
             first,
             second,
             first_index,
             second_index,
+            distance,
             land_date,
             land_time,
-        );
-    } else if first.social_memory[first_index].friend_foe < SOCIAL_RESPECT_NORMAL - 32
-        || second.social_memory[second_index].friend_foe < SOCIAL_RESPECT_NORMAL - 32
+        )
     {
-        social_squabble_reduced(
-            first,
-            second,
-            first_index,
-            second_index,
-            land_date,
-            land_time,
-        );
-    } else if first.drive(DRIVE_SEX) >= THRESHOLD_SEEK_MATE
-        && second.drive(DRIVE_SEX) >= THRESHOLD_SEEK_MATE
-        && first.is_female() != second.is_female()
-        && age_days_at(land_date, first.date_of_birth) >= AGE_OF_MATURITY
-        && age_days_at(land_date, second.date_of_birth) >= AGE_OF_MATURITY
+        social_mate_native(first, second, first_index, distance, land_date, land_time);
+        social_mate_native(second, first, second_index, distance, land_date, land_time);
+        social_chat_native(first, second, first_index, land_date, land_time);
+        social_chat_native(second, first, second_index, land_date, land_time);
+    }
+}
+
+fn social_distance(first: &BeingSummary, second: &BeingSummary) -> n_int {
+    let dx = n_int::from(first.location[0]) - n_int::from(second.location[0]);
+    let dy = n_int::from(first.location[1]) - n_int::from(second.location[1]);
+    ((dx * dx + dy * dy) as f64).sqrt() as n_int
+}
+
+fn social_groom_native(
+    groomer: &mut BeingSummary,
+    groomee: &mut BeingSummary,
+    groomer_index: usize,
+    groomee_index: usize,
+    distance: n_int,
+    familiarity: n_byte2,
+    land_date: n_byte4,
+    land_time: n_byte4,
+) -> bool {
+    if groomer.awake_level == FULLY_ASLEEP
+        || distance > 128
+        || groomer.speed() >= MAX_SPEED_WHILST_GROOMING
     {
-        first.goal = [1, second.gender_name, second.family_name, 0];
-        second.goal = [1, first.gender_name, first.family_name, 0];
+        return false;
+    }
+
+    let familiarity = familiarity.min(16);
+    let preference_index = PREFERENCE_GROOM_MALE + usize::from(groomee.is_female());
+    let preference = nature_nurture(
+        gene_groom(groomer.genetics),
+        groomer.learned_preference[preference_index],
+    );
+    let threshold = n_uint::from(GROOMING_PROB)
+        + n_uint::from(preference)
+            * n_uint::from(1 + familiarity)
+            * n_uint::from(GROOMING_PROB_HONOR)
+            * (n_uint::from(groomee.honor) + 1);
+    let roll = n_uint::from(math_random(&mut groomer.random_seed) & 16_383);
+    if roll >= threshold {
+        return false;
+    }
+
+    groomer.immune_acquire_pathogen(PATHOGEN_TRANSMISSION_TOUCH);
+    groomee.immune_acquire_pathogen(PATHOGEN_TRANSMISSION_TOUCH);
+
+    let mut groomloc = usize::from(groomer.attention[ATTENTION_BODY]) % INVENTORY_SIZE;
+    for _ in 0..4 {
+        if groomee.inventory[groomloc] & INVENTORY_GROOMED == 0 {
+            break;
+        }
+        groomloc = usize::from(math_random(&mut groomer.random_seed) as n_byte) % INVENTORY_SIZE;
+    }
+    if groomee.inventory[groomloc] & INVENTORY_WOUND != 0 {
+        groomee.inventory[groomloc] = INVENTORY_GROOMED;
+    } else {
+        groomee.inventory[groomloc] |= INVENTORY_GROOMED;
+    }
+
+    groomer.social_memory[groomer_index].friend_foe = groomer.social_memory[groomer_index]
+        .friend_foe
+        .saturating_add(1);
+    groomee.social_memory[groomee_index].friend_foe = groomee.social_memory[groomee_index]
+        .friend_foe
+        .saturating_add(1);
+    groomer.macro_state |= BEING_STATE_GROOMING;
+    groomee.macro_state |= BEING_STATE_GROOMING;
+    groomer.honor = groomer.honor.saturating_add(1);
+    groomee.honor = groomee.honor.saturating_sub(1);
+    groomee.parasites = groomee.parasites.saturating_sub(PARASITES_REMOVED);
+    groomer.attention[ATTENTION_BODY] = groomloc as n_byte;
+    groomee.attention[ATTENTION_BODY] = groomloc as n_byte;
+    groomer.record_episodic_interaction(
+        groomee,
+        EVENT_GROOM,
+        AFFECT_GROOM,
+        groomloc as n_byte2,
+        land_date,
+        land_time,
+    );
+    groomee.record_episodic_interaction(
+        groomer,
+        EVENT_GROOMED,
+        AFFECT_GROOM,
+        groomloc as n_byte2,
+        land_date,
+        land_time,
+    );
+    true
+}
+
+fn social_squabble_native(
+    first: &mut BeingSummary,
+    second: &mut BeingSummary,
+    first_index: usize,
+    second_index: usize,
+    distance: n_int,
+    land_date: n_byte4,
+    land_time: n_byte4,
+) -> bool {
+    let forced = first.social_memory[first_index].friend_foe < SOCIAL_RESPECT_NORMAL - 32
+        || second.social_memory[second_index].friend_foe < SOCIAL_RESPECT_NORMAL - 32;
+    let mut aggression = n_uint::from(gene_aggression(first.genetics));
+    if first.is_female() {
+        aggression >>= 3;
+    }
+    let threshold = aggression * 4_096 + aggression * n_uint::from(first.honor) * 10;
+    if !forced && n_uint::from(math_random(&mut first.random_seed)) >= threshold {
+        return false;
+    }
+
+    let first_power =
+        n_uint::from(math_random(&mut first.random_seed) & 7) * n_uint::from(first.energy);
+    let second_power =
+        n_uint::from(math_random(&mut first.random_seed) & 7) * n_uint::from(second.energy);
+    let first_victor = first_power >= second_power;
+    let punchloc = usize::from(math_random(&mut first.random_seed) as n_byte) % INVENTORY_SIZE;
+
+    first.social_memory[first_index].friend_foe = first.social_memory[first_index]
+        .friend_foe
+        .saturating_sub(SQUABBLE_DISRESPECT);
+    second.social_memory[second_index].friend_foe = second.social_memory[second_index]
+        .friend_foe
+        .saturating_sub(SQUABBLE_DISRESPECT);
+
+    let state = if distance > SQUABBLE_SHOW_FORCE_DISTANCE {
+        first.energy_delta(-SQUABBLE_ENERGY_SHOWFORCE);
+        second.energy_delta(-SQUABBLE_ENERGY_SHOWFORCE);
+        BEING_STATE_SHOWFORCE
+    } else {
+        first.energy_delta(-SQUABBLE_ENERGY_ATTACK);
+        second.energy_delta(-SQUABBLE_ENERGY_ATTACK);
+        if first_victor {
+            second.inventory[punchloc] = INVENTORY_WOUND;
+        } else {
+            first.inventory[punchloc] = INVENTORY_WOUND;
+        }
+        BEING_STATE_ATTACK
+    };
+
+    if first_victor {
+        first.honor = first.honor.saturating_add(SQUABBLE_HONOR_ADJUST);
+        second.honor = second.honor.saturating_sub(SQUABBLE_HONOR_ADJUST);
+        second.set_facing_towards(n_vect2::new(
+            n_int::from(second.location[0]) - n_int::from(first.location[0]),
+            n_int::from(second.location[1]) - n_int::from(first.location[1]),
+        ));
+        second.set_speed(SQUABBLE_FLEE_SPEED);
+        first.macro_state |= state;
+        second.macro_state |= state;
         first.record_episodic_interaction(
             second,
-            EVENT_SEEK_MATE,
-            AFFECT_SEEK_MATE,
-            0,
+            EVENT_HIT,
+            AFFECT_SQUABBLE_VICTOR,
+            punchloc as n_byte2,
             land_date,
             land_time,
         );
         second.record_episodic_interaction(
             first,
+            EVENT_HIT_BY,
+            AFFECT_SQUABBLE_VANQUISHED,
+            punchloc as n_byte2,
+            land_date,
+            land_time,
+        );
+    } else {
+        second.honor = second.honor.saturating_add(SQUABBLE_HONOR_ADJUST);
+        first.honor = first.honor.saturating_sub(SQUABBLE_HONOR_ADJUST);
+        first.set_facing_towards(n_vect2::new(
+            n_int::from(first.location[0]) - n_int::from(second.location[0]),
+            n_int::from(first.location[1]) - n_int::from(second.location[1]),
+        ));
+        first.set_speed(SQUABBLE_FLEE_SPEED);
+        first.macro_state |= state;
+        second.macro_state |= state;
+        second.record_episodic_interaction(
+            first,
+            EVENT_HIT,
+            AFFECT_SQUABBLE_VICTOR,
+            punchloc as n_byte2,
+            land_date,
+            land_time,
+        );
+        first.record_episodic_interaction(
+            second,
+            EVENT_HIT_BY,
+            AFFECT_SQUABBLE_VANQUISHED,
+            punchloc as n_byte2,
+            land_date,
+            land_time,
+        );
+    }
+    true
+}
+
+fn social_mate_native(
+    meeter: &mut BeingSummary,
+    met: &mut BeingSummary,
+    being_index: usize,
+    distance: n_int,
+    land_date: n_byte4,
+    land_time: n_byte4,
+) {
+    if age_days_at(land_date, meeter.date_of_birth) < AGE_OF_MATURITY
+        || age_days_at(land_date, met.date_of_birth) < AGE_OF_MATURITY
+        || meeter.drive(DRIVE_SEX) <= THRESHOLD_SEEK_MATE
+        || met.drive(DRIVE_SEX) <= THRESHOLD_SEEK_MATE
+        || meeter.is_female() == met.is_female()
+    {
+        return;
+    }
+
+    let threshold = 32_000
+        + n_uint::from(met.honor)
+            * n_uint::from(gene_status_preference(meeter.genetics))
+            * n_uint::from(MATING_PROB);
+    if n_uint::from(math_random(&mut meeter.random_seed)) >= threshold {
+        return;
+    }
+
+    let mut attraction = meeter.social_attraction_score(met);
+    if meeter.social_memory[being_index].attraction > PAIR_BOND_THRESHOLD {
+        attraction += 1;
+        if distance < 16 {
+            meeter.immune_acquire_pathogen(PATHOGEN_TRANSMISSION_SEX);
+            met.immune_acquire_pathogen(PATHOGEN_TRANSMISSION_SEX);
+        }
+    } else {
+        attraction -= 1;
+    }
+
+    let current = n_int::from(meeter.social_memory[being_index].attraction);
+    let next = if attraction > 0 {
+        if attraction < n_int::from(PAIR_BOND_THRESHOLD) * 4 {
+            current.saturating_add(attraction).min(255)
+        } else {
+            current
+        }
+    } else {
+        (current + attraction).max(0)
+    };
+    meeter.social_memory[being_index].attraction = next as n_byte;
+
+    if attraction > 0 {
+        meeter.goal = [GOAL_MATE, met.gender_name, met.family_name, 0];
+        meeter.record_episodic_interaction(
+            met,
             EVENT_SEEK_MATE,
             AFFECT_SEEK_MATE,
-            0,
+            n_byte2::from(meeter.social_memory[being_index].attraction),
             land_date,
             land_time,
         );
     }
 }
 
-fn social_groom_reduced(
-    first: &mut BeingSummary,
-    second: &mut BeingSummary,
-    first_index: usize,
-    second_index: usize,
+fn social_chat_native(
+    meeter: &mut BeingSummary,
+    met: &BeingSummary,
+    being_index: usize,
     land_date: n_byte4,
     land_time: n_byte4,
 ) {
-    first.social_memory[first_index].friend_foe = first.social_memory[first_index]
-        .friend_foe
-        .saturating_add(1);
-    second.social_memory[second_index].friend_foe = second.social_memory[second_index]
-        .friend_foe
-        .saturating_add(1);
-    first.macro_state |= BEING_STATE_GROOMING;
-    second.macro_state |= BEING_STATE_GROOMING;
-    first.honor = first.honor.saturating_add(1);
-    second.parasites = second.parasites.saturating_sub(1);
-    first.attention[ATTENTION_BODY] = BODY_BACK;
-    second.attention[ATTENTION_BODY] = BODY_BACK;
-    first.record_episodic_interaction(
-        second,
-        EVENT_GROOM,
-        AFFECT_GROOM,
-        n_byte2::from(BODY_BACK),
-        land_date,
-        land_time,
-    );
-    second.record_episodic_interaction(
-        first,
-        EVENT_GROOMED,
-        AFFECT_GROOM,
-        n_byte2::from(BODY_BACK),
-        land_date,
-        land_time,
-    );
-}
-
-fn social_squabble_reduced(
-    first: &mut BeingSummary,
-    second: &mut BeingSummary,
-    first_index: usize,
-    second_index: usize,
-    land_date: n_byte4,
-    land_time: n_byte4,
-) {
-    first.social_memory[first_index].friend_foe = first.social_memory[first_index]
-        .friend_foe
-        .saturating_sub(1);
-    second.social_memory[second_index].friend_foe = second.social_memory[second_index]
-        .friend_foe
-        .saturating_sub(1);
-    first.macro_state |= BEING_STATE_SHOWFORCE;
-    second.macro_state |= BEING_STATE_SHOWFORCE;
-    first.energy_delta(-4);
-    second.energy_delta(-4);
-    if first.energy >= second.energy {
-        first.honor = first.honor.saturating_add(1);
-        second.set_speed(16);
-    } else {
-        second.honor = second.honor.saturating_add(1);
-        first.set_speed(16);
+    if meeter.social_memory[being_index].friend_foe < meeter.social_respect_mean() {
+        return;
     }
-    first.record_episodic_interaction(
-        second,
-        EVENT_HIT,
-        AFFECT_SQUABBLE_VICTOR,
-        0,
-        land_date,
-        land_time,
-    );
-    second.record_episodic_interaction(
-        first,
-        EVENT_HIT_BY,
-        AFFECT_SQUABBLE_VANQUISHED,
-        0,
-        land_date,
-        land_time,
-    );
+
+    meeter.macro_state |= BEING_STATE_SPEAKING;
+    meeter.reset_drive(DRIVE_SOCIAL);
+    meeter.record_episodic_interaction(met, EVENT_CHAT, AFFECT_CHAT, 0, land_date, land_time);
+
+    if let Some(anecdote) = met.episodic_memory.iter().find(|entry| entry.event != 0) {
+        let mut copied = *anecdote;
+        copied.first_name[BEING_MEETER] = meeter.gender_name;
+        copied.family_name[BEING_MEETER] = meeter.family_name;
+        copied.space_time.date = land_date;
+        copied.space_time.time = land_time;
+        copied.space_time.location = meeter.location;
+
+        let event_roll = (math_random(&mut meeter.random_seed) & 255) as n_byte;
+        if event_roll < meeter.learned_preference[PREFERENCE_ANECDOTE_EVENT_MUTATION] {
+            copied.event ^= EVENT_INTENTION;
+        }
+        let affect_roll = (math_random(&mut meeter.random_seed) & 255) as n_byte;
+        if affect_roll < meeter.learned_preference[PREFERENCE_ANECDOTE_AFFECT_MUTATION] {
+            copied.affect = if copied.affect >= EPISODIC_AFFECT_ZERO {
+                copied.affect.saturating_sub(1)
+            } else {
+                copied.affect.saturating_add(1)
+            };
+        }
+        let replace = meeter
+            .episodic_memory
+            .iter()
+            .position(|entry| entry.event == 0)
+            .unwrap_or_else(|| {
+                meeter
+                    .episodic_memory
+                    .iter()
+                    .enumerate()
+                    .min_by_key(|(_, entry)| affect_distance(entry.affect))
+                    .map(|(index, _)| index)
+                    .unwrap_or(0)
+            });
+        meeter.episodic_memory[replace] = copied;
+        meeter.attention[ATTENTION_EPISODE] = replace as n_byte;
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -3595,6 +4196,20 @@ fn social_entry_from_object(entries: &[ObjectEntry]) -> Result<simulated_isocial
             optional_number_byte2(classification, "feature_number")?.unwrap_or(0);
         entry.classification.observations =
             optional_number_byte2(classification, "observations")?.unwrap_or(0);
+        if let Some(ObjectValue::Array(features)) = optional_field(classification, "features") {
+            let mut loaded = [simulated_feature::default(); MAX_FEATURESET_SIZE];
+            for (index, value) in features.iter().take(MAX_FEATURESET_SIZE).enumerate() {
+                let ObjectValue::Object(feature_entries) = value else {
+                    return Err("feature entry object expected");
+                };
+                loaded[index] = feature_entry_from_object(feature_entries)?;
+            }
+            entry.classification.features = loaded;
+            entry.classification.feature_number =
+                features.len().min(MAX_FEATURESET_SIZE) as n_byte2;
+        } else if optional_field(classification, "features").is_some() {
+            return Err("features array expected");
+        }
     }
     if let Some(braincode) = optional_array_byte(entries, "braincode", BRAINCODE_SIZE)? {
         entry.braincode.copy_from_slice(&braincode);
@@ -3628,10 +4243,41 @@ fn social_entry_to_object(entry: &simulated_isocial) -> Vec<ObjectEntry> {
         "observations",
         entry.classification.observations.into(),
     );
+    if entry.classification.feature_number > 0 {
+        object_array(
+            &mut classification,
+            "features",
+            entry
+                .classification
+                .features
+                .iter()
+                .take(entry.classification.feature_number as usize)
+                .map(|feature| array_object(feature_entry_to_object(feature)))
+                .collect(),
+        );
+    }
     object_object(&mut object, "classification", classification);
     if entry.braincode.iter().any(|byte| *byte != 0) {
         object_array_byte(&mut object, "braincode", &entry.braincode);
     }
+    object
+}
+
+fn feature_entry_from_object(entries: &[ObjectEntry]) -> Result<simulated_feature, &'static str> {
+    Ok(simulated_feature {
+        feature_type: optional_number_byte(entries, "type")?
+            .or(optional_number_byte(entries, "feature_type")?)
+            .unwrap_or(0),
+        value: optional_number_byte2(entries, "value")?.unwrap_or(0),
+        frequency: optional_number_byte2(entries, "frequency")?.unwrap_or(0),
+    })
+}
+
+fn feature_entry_to_object(feature: &simulated_feature) -> Vec<ObjectEntry> {
+    let mut object = Vec::new();
+    object_number(&mut object, "type", feature.feature_type.into());
+    object_number(&mut object, "value", feature.value.into());
+    object_number(&mut object, "frequency", feature.frequency.into());
     object
 }
 
@@ -4406,6 +5052,151 @@ mod tests {
             .episodic_memory()
             .iter()
             .any(|entry| entry.event == EVENT_GROOMED));
+    }
+
+    #[test]
+    fn social_meeting_records_feature_classification_and_initial_prejudice() {
+        let mut first = BeingSummary::new("Observer".to_string(), 512, 100, 0, [2, 3, 4, 5]);
+        let second = BeingSummary::new("Observed".to_string(), 768, 200, 0, [9, 8, 7, 6]);
+        let index = first.meet_being(&second, 12, 345);
+        let entry = first.social_memory()[index];
+
+        assert_eq!(entry.first_name[BEING_MET], second.gender_name());
+        assert_eq!(entry.family_name[BEING_MET], second.family_name());
+        assert!(entry.friend_foe > 0);
+        assert_eq!(entry.classification.observations, 1);
+        assert!(entry.classification.feature_number >= 11);
+        assert!(entry
+            .classification
+            .features
+            .iter()
+            .take(entry.classification.feature_number as usize)
+            .any(|feature| feature.feature_type == FEATURESET_HEIGHT
+                && feature.value == second.height()));
+    }
+
+    #[test]
+    fn social_features_load_and_save_full_feature_arrays() {
+        let state = SimState::load_startup_json(
+            b"{\"information\":{\"signature\":20033,\"version number\":708},\"land\":{\"date\":0,\"genetics\":[1,2],\"time\":0},\"beings\":[{\"name\":\"Feature Ape\",\"delta\":{\"stored_energy\":3840},\"constant\":{\"date_of_birth\":0,\"genetics\":[2,3,4,5]},\"events\":{\"social\":[{\"relationship\":1,\"entity_type\":0,\"friend_foe\":127},{\"first_name\":[0,111],\"family_name\":[0,222],\"friend_foe\":127,\"familiarity\":42,\"relationship\":2,\"entity_type\":0,\"classification\":{\"feature_number\":2,\"observations\":3,\"features\":[{\"type\":0,\"value\":9,\"frequency\":2},{\"type\":2,\"value\":2000,\"frequency\":1}]}}]}}]}",
+        )
+        .unwrap();
+        let entry = &state.beings()[0].social_memory()[1];
+        assert_eq!(entry.classification.feature_number, 2);
+        assert_eq!(
+            entry.classification.features[0].feature_type,
+            FEATURESET_PIGMENTATION
+        );
+        assert_eq!(entry.classification.features[1].value, 2000);
+
+        let saved = state.tranfer_startup_out_json();
+        let saved_json = std::str::from_utf8(saved.written_data()).unwrap();
+        assert!(saved_json.contains("\"features\":[{\"type\":0,\"value\":9,\"frequency\":2}"));
+    }
+
+    #[test]
+    fn grooming_marks_body_removes_parasites_and_records_touch_memory() {
+        let mut groomer = BeingSummary::new("Groomer".to_string(), 512, 100, 0, [2, 3, 4, 5]);
+        let mut groomee = BeingSummary::new("Groomee".to_string(), 768, 200, 0, [3, 4, 5, 6]);
+        groomer.learned_preference[PREFERENCE_GROOM_FEMALE] = 255;
+        groomer.attention[ATTENTION_BODY] = BODY_LEFT_HAND;
+        groomer.random_seed = [1, 2];
+        groomee.honor = 255;
+        groomee.parasites = 5;
+        let groomer_index = groomer.meet_being(&groomee, 1, 1);
+        let groomee_index = groomee.meet_being(&groomer, 1, 1);
+
+        assert!(social_groom_native(
+            &mut groomer,
+            &mut groomee,
+            groomer_index,
+            groomee_index,
+            1,
+            16,
+            1,
+            2,
+        ));
+        assert!(groomee.inventory()[usize::from(BODY_LEFT_HAND)] & INVENTORY_GROOMED != 0);
+        assert_eq!(groomee.parasites(), 3);
+        assert!(groomer
+            .episodic_memory()
+            .iter()
+            .any(|entry| entry.event == EVENT_GROOM));
+        assert!(groomee
+            .episodic_memory()
+            .iter()
+            .any(|entry| entry.event == EVENT_GROOMED));
+    }
+
+    #[test]
+    fn squabble_applies_disrespect_wounds_honor_and_fleeing() {
+        let mut first = BeingSummary::new("First".to_string(), 512, 100, 0, [2, 3, 4, 5]);
+        let mut second = BeingSummary::new("Second".to_string(), 768, 200, 0, [3, 4, 5, 6]);
+        first.energy = BEING_FULL;
+        second.energy = BEING_HUNGRY;
+        first.random_seed = [9, 10];
+        let first_index = first.meet_being(&second, 1, 1);
+        let second_index = second.meet_being(&first, 1, 1);
+        first.social_memory[first_index].friend_foe = SOCIAL_RESPECT_NORMAL - 40;
+
+        assert!(social_squabble_native(
+            &mut first,
+            &mut second,
+            first_index,
+            second_index,
+            1,
+            1,
+            2,
+        ));
+        assert!(first.macro_state() & BEING_STATE_ATTACK != 0);
+        assert!(second.speed() == SQUABBLE_FLEE_SPEED || first.speed() == SQUABBLE_FLEE_SPEED);
+        assert!(first
+            .inventory()
+            .iter()
+            .chain(second.inventory().iter())
+            .any(|item| item & INVENTORY_WOUND != 0));
+        assert!(first
+            .episodic_memory()
+            .iter()
+            .chain(second.episodic_memory().iter())
+            .any(|entry| entry.event == EVENT_HIT || entry.event == EVENT_HIT_BY));
+    }
+
+    #[test]
+    fn mate_and_chat_update_attraction_goal_and_anecdotes() {
+        let mut first = BeingSummary::new("Male".to_string(), 512, 100, 0, [2, 3, 4, 5]);
+        let mut second = BeingSummary::new("Female".to_string(), 768, 200, 0, [3, 4, 5, 7]);
+        first.date_of_birth = 0;
+        second.date_of_birth = 0;
+        first.drives[DRIVE_SEX] = THRESHOLD_SEEK_MATE + 1;
+        second.drives[DRIVE_SEX] = THRESHOLD_SEEK_MATE + 1;
+        first.random_seed = [1, 2];
+        let first_index = first.meet_being(&second, AGE_OF_MATURITY + 1, 400);
+        first.social_memory[first_index].attraction = PAIR_BOND_THRESHOLD + 1;
+        second.record_episodic_food(ENERGY_FRUIT, FOOD_FRUIT, AGE_OF_MATURITY + 1, 390);
+
+        social_mate_native(
+            &mut first,
+            &mut second,
+            first_index,
+            1,
+            AGE_OF_MATURITY + 1,
+            400,
+        );
+        assert_eq!(first.goal()[0], GOAL_MATE);
+        assert!(first.social_memory()[first_index].attraction > PAIR_BOND_THRESHOLD);
+
+        first.social_memory[first_index].friend_foe = 255;
+        social_chat_native(&mut first, &second, first_index, AGE_OF_MATURITY + 1, 401);
+        assert!(first.macro_state() & BEING_STATE_SPEAKING != 0);
+        assert!(first
+            .episodic_memory()
+            .iter()
+            .any(|entry| entry.event == EVENT_CHAT));
+        assert!(first
+            .episodic_memory()
+            .iter()
+            .any(|entry| entry.event == EVENT_EAT && entry.food == FOOD_FRUIT));
     }
 
     #[test]
