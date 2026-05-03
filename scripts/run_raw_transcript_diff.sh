@@ -5,8 +5,13 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUT_DIR="${1:-"$ROOT/target/raw-transcript-diff"}"
 shift || true
 
+case "$OUT_DIR" in
+    /*) ;;
+    *) OUT_DIR="$ROOT/$OUT_DIR" ;;
+esac
+
 if [ "$#" -eq 0 ]; then
-    set -- help help_errors command_edges
+    set -- help help_errors command_edges run_forever_empty runtime_edges_empty
 fi
 
 FULL_DATE="${APESDK_FULL_DATE:-May  1 2026}"
@@ -22,10 +27,12 @@ run_one() {
     local binary="$1"
     local commands="$2"
     local output="$3"
+    local run_dir="$output.cwd"
+    mkdir -p "$run_dir"
     if command -v expect >/dev/null 2>&1; then
-        "$ROOT/golden/cli/run_cli_session.expect" "$binary" "$commands" "$output"
+        ( cd "$run_dir" && "$ROOT/golden/cli/run_cli_session.expect" "$binary" "$commands" "$output" )
     else
-        "$binary" < "$commands" > "$output" || true
+        ( cd "$run_dir" && "$binary" < "$commands" > "$output" ) || true
     fi
 }
 
@@ -35,7 +42,7 @@ for name in "$@"; do
         echo "missing session: $name" >&2
         exit 1
     fi
-    if grep -Eiq '^[[:space:]]*run[[:space:]]+forever([[:space:]]|$)' "$commands"; then
+    if [ "$name" != "run_forever_empty" ] && grep -Eiq '^[[:space:]]*run[[:space:]]+forever([[:space:]]|$)' "$commands"; then
         echo "session is unsafe for native raw diff: $name" >&2
         exit 1
     fi

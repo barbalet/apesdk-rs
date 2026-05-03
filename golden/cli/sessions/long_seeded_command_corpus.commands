@@ -1,0 +1,20 @@
+reset
+sim
+run 1 day
+sim
+top
+epic
+stats
+appearance
+genome
+friends
+pathogen
+braincode
+probes
+speech
+next
+previous
+run 1 month
+sim
+save /private/tmp/simape_long_seeded_command_corpus.json
+quit

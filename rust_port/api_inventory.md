@@ -2,7 +2,7 @@
 
 This inventory maps the C command-line ApeSDK surface into the Rust port order.
 It is based on the current trimmed build set documented in
-`RUST_PORT_CYCLE_01.md`.
+cycle 01 of `RUST_PORT_CYCLES.md`.
 
 ## Header Surface
 

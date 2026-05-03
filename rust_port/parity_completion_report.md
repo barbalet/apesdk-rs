@@ -32,8 +32,9 @@ Known observable drift categories that still need C fixture closure:
 
 ```text
 raw binary native save/load byte layout
+direct engine trace runtime value parity beyond the promoted startup/first-cycle terrain and selected-being/runtime-core subset
 braincode attention-similarity trace details
-exact child-genetics crossover and post-birth care timing
+direct C value proof for child-genetics crossover and post-birth care timing
 full social action/body inventory side effects
 long seeded C-vs-Rust state and transcript matrices
 debug-vs-release and cross-platform transcript proof
@@ -41,4 +42,3 @@ debug-vs-release and cross-platform transcript proof
 
 No additional untriaged drift categories were found during this cycle batch;
 the listed items are the remaining explicit gates.
-

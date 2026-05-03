@@ -1,0 +1,6 @@
+sim
+step
+sim
+run forever
+sim
+quit

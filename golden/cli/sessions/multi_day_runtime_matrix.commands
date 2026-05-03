@@ -1,0 +1,9 @@
+reset
+run 1 day
+sim
+run 2 days
+sim
+top juvenile
+epic
+stats
+quit

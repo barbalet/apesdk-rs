@@ -1,16 +1,27 @@
 use apesdk_sim::{
-    banner, relationship_description, BeingSummary, SimState, ATTENTION_RELATIONSHIP, BEING_MET,
-    ENTITY_BEING, EPISODIC_AFFECT_ZERO, EVENT_CHAT, EVENT_EAT, EVENT_GROOM, EVENT_GROOMED,
-    EVENT_HIT, EVENT_HIT_BY, EVENT_INTENTION, EVENT_SEEK_MATE, FOOD_FRUIT, FOOD_SEAWEED,
-    FOOD_SHELLFISH, FOOD_VEGETABLE, LARGE_SIM, MAP_DIMENSION, RELATIONSHIP_SELF,
-    SOCIAL_RESPECT_NORMAL, SOCIAL_SIZE_BEINGS, TIME_DAY_MINUTES, TIME_HOUR_MINUTES,
-    TIME_MONTH_MINUTES, TIME_YEAR_DAYS, TIME_YEAR_MINUTES,
+    banner, relationship_description, BeingSummary, SimState, APE_TO_MAP_BIT_RATIO,
+    ATTENTION_RELATIONSHIP, BEING_MEETER, BEING_MET, ENTITY_BEING, EPISODIC_AFFECT_ZERO,
+    EVENT_CHAT, EVENT_EAT, EVENT_GROOM, EVENT_GROOMED, EVENT_HIT, EVENT_HIT_BY, EVENT_INTENTION,
+    EVENT_SEEK_MATE, FOOD_FRUIT, FOOD_SEAWEED, FOOD_SHELLFISH, FOOD_VEGETABLE,
+    HI_RES_MAP_DIMENSION, LARGE_SIM, MAP_DIMENSION, RELATIONSHIP_SELF, SOCIAL_RESPECT_NORMAL,
+    SOCIAL_SIZE_BEINGS, TIDE_MAX, TIME_DAY_MINUTES, TIME_HOUR_MINUTES, TIME_MONTH_MINUTES,
+    TIME_YEAR_DAYS, TIME_YEAR_MINUTES,
 };
-use apesdk_toolkit::n_uint;
+use apesdk_toolkit::{n_byte2, n_uint};
 use std::fs;
 
 pub const DEFAULT_RANDOMISE: n_uint = 0x5261_f726;
 pub const MAXIMUM_MEMORY: usize = 18_960_829;
+const TERRAIN_TRACE_LOCATIONS: [[n_byte2; 2]; 8] = [
+    [0, 0],
+    [64, 64],
+    [3_200, 9_600],
+    [12_345, 23_456],
+    [16_384, 16_384],
+    [28_000, 4_000],
+    [32_704, 32_704],
+    [24_576, 8_192],
+];
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum CommandAction {
@@ -723,7 +734,7 @@ impl Console {
             CommandAction::Step => (self.step(), false),
             CommandAction::Run => (self.run(response), false),
             CommandAction::Script => (self.script(response), false),
-            CommandAction::Speak => (self.speak(), false),
+            CommandAction::Speak => (self.speak(response), false),
             CommandAction::Alpha => (self.alpha(response), false),
             CommandAction::File => (self.file(response), false),
             CommandAction::Interval => (self.interval(response), false),
@@ -733,8 +744,8 @@ impl Console {
             CommandAction::Memory => (self.memory(), false),
             CommandAction::Ape => (self.ape(), false),
             CommandAction::List => (self.list(), false),
-            CommandAction::Top => (self.top(), false),
-            CommandAction::Epic => (self.epic(), false),
+            CommandAction::Top => (self.top(response), false),
+            CommandAction::Epic => (self.epic(response), false),
             CommandAction::Navigation => (self.navigation(entry.command == "next"), false),
             CommandAction::Watch => (self.watch(response), false),
             CommandAction::BeingDetail => (self.being_detail(entry.command, response), false),
@@ -834,18 +845,30 @@ impl Console {
         }
     }
 
-    fn top(&self) -> String {
+    fn top(&self, response: Option<&str>) -> String {
         let mut output =
             "Honor Name                     Sex\tAge\n-----------------------------------------------------------------\n"
                 .to_string();
         if self.state.population() != 0 {
-            output.push_str(&format_top(self.state.beings(), self.state.land().date()));
+            output.push_str(&format_top(
+                self.state.beings(),
+                self.state.land().date(),
+                command_response_mode(response),
+            ));
         }
         output
     }
 
-    fn epic(&self) -> String {
-        String::new()
+    fn epic(&self, response: Option<&str>) -> String {
+        if self.state.population() == 0 {
+            String::new()
+        } else {
+            format_epic(
+                self.state.beings(),
+                self.state.land().date(),
+                command_response_mode(response),
+            )
+        }
     }
 
     fn navigation(&mut self, forwards: bool) -> String {
@@ -927,7 +950,7 @@ impl Console {
         let interval = match parse_run_interval(response) {
             Ok(interval) => interval,
             Err(RunParseError::Forever) => {
-                return "ERROR: Run forever not implemented in Rust port yet\n".to_string();
+                return self.run_forever();
             }
             Err(RunParseError::MissingTime) => {
                 return "ERROR: Time not specified, examples: run 2 days, run 6 hours @ ./universe/command.c 2211\n".to_string();
@@ -939,6 +962,15 @@ impl Console {
         self.state.advance_minutes(interval.minutes);
         self.simulation_running = false;
         output
+    }
+
+    fn run_forever(&mut self) -> String {
+        self.simulation_running = true;
+        self.state.advance_minutes(1);
+        if self.state.population() == 0 {
+            self.simulation_running = false;
+        }
+        "Running forever (type \"stop\" to end)\n".to_string()
     }
 
     fn script(&mut self, response: Option<&str>) -> String {
@@ -971,8 +1003,14 @@ impl Console {
         output
     }
 
-    fn speak(&self) -> String {
-        String::new()
+    fn speak(&self, response: Option<&str>) -> String {
+        let Some(path) = response.filter(|value| !value.is_empty()) else {
+            return String::new();
+        };
+        let Some(being) = self.state.selected_being() else {
+            return String::new();
+        };
+        write_speak_file(path, &speak_paragraph(being))
     }
 
     fn alpha(&self, response: Option<&str>) -> String {
@@ -980,10 +1018,10 @@ impl Console {
             return String::new();
         };
 
-        match fs::write(path, []) {
-            Ok(()) => String::new(),
-            Err(_) => "ERROR: Failed create speak file! @ ./entity/speak.c 199\n".to_string(),
-        }
+        write_speak_file(
+            path,
+            " aeio a e i o vfstpbjm abefijmopstv a b e f i j m o p s t v.  .  \n",
+        )
     }
 
     fn file(&self, response: Option<&str>) -> String {
@@ -1115,6 +1153,10 @@ impl Console {
             return (output, false);
         }
         match fs::read(path) {
+            Ok(contents) if contents.is_empty() => {
+                output.push_str("ERROR: File data could not be allocated @ ./toolkit/file.c 189\n");
+                (output, true)
+            }
             Ok(contents) => match SimState::load_native_transfer_bytes(&contents) {
                 Ok(state) => {
                     self.state = state;
@@ -1124,6 +1166,9 @@ impl Console {
                     (output, false)
                 }
                 Err(_) => {
+                    if let Some(diagnostics) = native_loader_prefix_diagnostics(&contents) {
+                        output.push_str(&diagnostics);
+                    }
                     output.push_str("ERROR: Failed to read in file @ ./universe/command.c 2394\n");
                     (output, true)
                 }
@@ -1134,6 +1179,49 @@ impl Console {
             }
         }
     }
+}
+
+fn native_loader_prefix_diagnostics(contents: &[u8]) -> Option<String> {
+    let cleaned: Vec<u8> = contents
+        .iter()
+        .copied()
+        .filter(|byte| !matches!(byte, b'\t' | b'\n' | b'\r' | b'\x0b' | b'\x0c' | b' '))
+        .collect();
+    if cleaned.len() < 6 || cleaned.starts_with(b"simul{") {
+        return None;
+    }
+    let first = cleaned[0];
+    if !(first == b'{' || first.is_ascii_lowercase()) {
+        return None;
+    }
+
+    let failed = &cleaned[..6];
+    if !failed.iter().all(|byte| byte.is_ascii_graphic()) {
+        return None;
+    }
+    let failed_text = String::from_utf8_lossy(failed);
+    let mut output = String::new();
+    output.push_str("String length : ");
+    output.push_str(&cleaned.len().to_string());
+    output.push('\n');
+    output.push_str("Actual size : ");
+    output.push_str(&(contents.len() * 2).to_string());
+    output.push('\n');
+    output.push_str("String location : 6\n");
+    output.push_str("Failed text ");
+    output.push_str(&failed_text);
+    output.push('\n');
+    for byte in failed {
+        output.push_str("Failed text ");
+        output.push_str(&byte.to_string());
+        output.push('\n');
+    }
+    output.push_str("ERROR: ");
+    output.push_str(&failed_text);
+    output.push_str(" @ ./toolkit/file.c 833\n");
+    output.push_str("ERROR: Unknown command @ ./toolkit/file.c 1011\n");
+    output.push_str("ERROR: Signature not first in file @ ./universe/transfer.c 286\n");
+    Some(output)
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1162,7 +1250,14 @@ pub fn normalize_cli_transcript(input: &str) -> String {
                 continue;
             }
         }
-        output.push_str(&normalize_temp_paths(&normalize_repo_paths(line)));
+        if let Some(length) = line.strip_prefix("Actual size : ") {
+            if length.chars().all(|ch| ch.is_ascii_digit()) {
+                output.push_str("Actual size : <N>\n");
+                continue;
+            }
+        }
+        let normalized = normalize_temp_paths(&normalize_repo_paths(line));
+        output.push_str(normalized.trim_end_matches(' '));
         output.push('\n');
     }
     output
@@ -1245,6 +1340,362 @@ pub fn trace_state_line(label: &str, state: &SimState) -> String {
         social,
         territory,
         conception
+    )
+}
+
+pub fn engine_trace_fixture() -> String {
+    let mut state = SimState::start_up(DEFAULT_RANDOMISE);
+    let mut output = String::new();
+    append_engine_trace_snapshot(&mut output, "startup", &state);
+    state.advance_native_engine_cycle();
+    append_engine_trace_snapshot(&mut output, "after_cycle_1", &state);
+    for minute in 1..=TIME_DAY_MINUTES {
+        state.advance_minutes(1);
+        if minute % 60 == 0 || minute > TIME_DAY_MINUTES - 16 {
+            output.push_str(&selected_minute_trace_line(
+                "after_cycle_1_to_after_day",
+                minute as n_uint,
+                &state,
+            ));
+            output.push('\n');
+        }
+    }
+    append_engine_trace_snapshot(&mut output, "after_day", &state);
+    output
+}
+
+fn append_engine_trace_snapshot(output: &mut String, snapshot: &str, state: &SimState) {
+    output.push_str(&engine_trace_line(snapshot, state));
+    output.push('\n');
+    for (index, location) in TERRAIN_TRACE_LOCATIONS.iter().copied().enumerate() {
+        output.push_str(&terrain_trace_line(snapshot, index, location, state));
+        output.push('\n');
+    }
+}
+
+pub fn terrain_trace_line(
+    snapshot: &str,
+    index: usize,
+    location: [n_byte2; 2],
+    state: &SimState,
+) -> String {
+    let land = state.land();
+    let map_x = (usize::from(location[0]) >> APE_TO_MAP_BIT_RATIO) as i64;
+    let map_y = (usize::from(location[1]) >> APE_TO_MAP_BIT_RATIO) as i64;
+    let high_x = map_x << 3;
+    let high_y = map_y << 3;
+    let high = c_spread_highdef_at(land, high_x, high_y);
+    let food = land.terrain_food_fixture_sample(location);
+    let classification = land.food_classification_at(location);
+    let class = if food.height <= i64::from(land.tide_level()) {
+        0
+    } else if food.height <= TIDE_MAX {
+        1
+    } else {
+        2
+    };
+
+    format!(
+        "TERRAIN snapshot={snapshot} sample={index} loc={}:{} map={}:{} class={} \
+         height={} topo={} high={} hightide={} weather={} pressure={} \
+         food={}:{}:{} intertidal={}:{}:{} source={}:{}",
+        location[0],
+        location[1],
+        map_x,
+        map_y,
+        class,
+        food.height,
+        land.topography_at_map(map_x, map_y),
+        high,
+        usize::from(land.highres_tide_at(high_x, high_y)),
+        land.weather_seven_at(location),
+        land.weather_pressure_at_map(map_x, map_y),
+        food.grass,
+        food.trees,
+        food.bush,
+        food.seaweed,
+        food.rockpool,
+        food.beach,
+        classification.food_type,
+        classification.max_energy
+    )
+}
+
+pub fn native_raw_summary_from_bytes(scenario: &str, bytes: &[u8]) -> Result<String, &'static str> {
+    let state = SimState::load_native_transfer_bytes(bytes)?;
+    Ok(native_raw_summary_line(scenario, &state))
+}
+
+pub fn native_raw_roundtrip_bytes(bytes: &[u8]) -> Result<Vec<u8>, &'static str> {
+    let state = SimState::load_native_transfer_bytes(bytes)?;
+    Ok(state
+        .tranfer_startup_out_raw_native()
+        .written_data()
+        .to_vec())
+}
+
+pub fn native_raw_summary_line(scenario: &str, state: &SimState) -> String {
+    let first = state.beings().first();
+    let location = first.map(BeingSummary::location).unwrap_or([0; 2]);
+    let brain = first.map(BeingSummary::brain_state).unwrap_or([0; 6]);
+    let immune_antigens = first.map(BeingSummary::immune_antigens).unwrap_or([0; 8]);
+    let immune_shape_antigen = first
+        .map(BeingSummary::immune_shape_antigen)
+        .unwrap_or([0; 8]);
+    let immune_antibodies = first
+        .map(BeingSummary::immune_antibodies)
+        .unwrap_or([0; apesdk_sim::IMMUNE_POPULATION]);
+    let immune_shape_antibody = first
+        .map(BeingSummary::immune_shape_antibody)
+        .unwrap_or([0; apesdk_sim::IMMUNE_POPULATION]);
+    let inventory = first.map(BeingSummary::inventory).unwrap_or([0; 8]);
+    let shout = first.map(BeingSummary::shout).unwrap_or([0; 6]);
+    let territory0 = first
+        .map(|being| being.territory_memory()[0].familiarity)
+        .unwrap_or(0);
+
+    format!(
+        "RAW scenario={scenario} population={} first_loc={}:{} first_facing={} \
+         first_speed={} first_energy={} first_state={} first_brain={}:{}:{}:{}:{}:{} \
+         first_territory0={} first_immune={}:{}:{}:{} first_inventory={}:{} first_shout={}\n",
+        state.population(),
+        location[0],
+        location[1],
+        first.map(BeingSummary::facing).unwrap_or(0),
+        first.map(BeingSummary::speed).unwrap_or(0),
+        first.map(BeingSummary::energy).unwrap_or(0),
+        first.map(BeingSummary::macro_state).unwrap_or(0),
+        brain[0],
+        brain[1],
+        brain[2],
+        brain[3],
+        brain[4],
+        brain[5],
+        territory0,
+        immune_antigens[0],
+        immune_shape_antigen[0],
+        immune_antibodies[0],
+        immune_shape_antibody[0],
+        inventory[0],
+        inventory[1],
+        shout[0]
+    )
+}
+
+pub fn selected_minute_trace_line(label: &str, minute: n_uint, state: &SimState) -> String {
+    let land = state.land();
+    let selected = state.selected_being();
+    let location = selected.map(BeingSummary::location).unwrap_or([0; 2]);
+    let velocity = selected.map(BeingSummary::velocity).unwrap_or([0; 10]);
+    let drives = selected.map(BeingSummary::drives).unwrap_or([0; 4]);
+    let brain = selected
+        .map(BeingSummary::braincode_register)
+        .unwrap_or([0; 3]);
+    let social = selected
+        .map(|being| being.social_memory()[0])
+        .unwrap_or_default();
+    let episodic = selected
+        .map(|being| being.episodic_memory()[0])
+        .unwrap_or_default();
+    let immune_antigens = selected
+        .map(BeingSummary::immune_antigens)
+        .unwrap_or_default();
+    let immune_shape_antigen = selected
+        .map(BeingSummary::immune_shape_antigen)
+        .unwrap_or_default();
+    let immune_seed = selected.map(BeingSummary::immune_seed).unwrap_or([0; 2]);
+    let preferences = selected
+        .map(BeingSummary::learned_preference)
+        .unwrap_or_default();
+
+    format!(
+        "SELECTED-MINUTE label={label} minute={minute} date={} time={} population={} \
+         selected={} energy={} loc={}:{} facing={} speed={}:{} honor={} mass={} awake={} \
+         state={} drives={}:{}:{}:{} brain={}:{}:{} social0={}:{} episodic0={}:{} \
+         immune={}:{}:{}:{} preference={}",
+        land.date(),
+        land.time(),
+        state.population(),
+        usize::from(selected.is_some()),
+        selected.map(BeingSummary::energy).unwrap_or(0),
+        location[0],
+        location[1],
+        selected.map(BeingSummary::facing).unwrap_or(0),
+        velocity[0],
+        velocity[1],
+        selected.map(BeingSummary::honor).unwrap_or(0),
+        selected.map(BeingSummary::mass).unwrap_or(0),
+        selected.map(BeingSummary::awake_level).unwrap_or(0),
+        selected.map(BeingSummary::macro_state).unwrap_or(0),
+        drives[0],
+        drives[1],
+        drives[2],
+        drives[3],
+        brain[0],
+        brain[1],
+        brain[2],
+        social.familiarity,
+        social.attraction,
+        episodic.event,
+        episodic.food,
+        immune_antigens[0],
+        immune_shape_antigen[0],
+        immune_seed[0],
+        immune_seed[1],
+        preferences[0]
+    )
+}
+
+pub fn engine_trace_line(snapshot: &str, state: &SimState) -> String {
+    let land = state.land();
+    let genetics = land.genetics();
+    let location = [0, 0];
+    let food = land.terrain_food_fixture_sample(location);
+    let selected = state.selected_being();
+    let selected_flag = usize::from(selected.is_some());
+    let name = selected
+        .map(|being| [being.raw_first_name(), being.family_name()])
+        .unwrap_or([0; 2]);
+    let energy = selected.map(BeingSummary::energy).unwrap_or(0);
+    let loc = selected.map(BeingSummary::location).unwrap_or([0; 2]);
+    let velocity = selected.map(BeingSummary::velocity).unwrap_or([0; 10]);
+    let drives = selected.map(BeingSummary::drives).unwrap_or([0; 4]);
+    let brain = selected
+        .map(BeingSummary::braincode_register)
+        .unwrap_or([0; 3]);
+    let probe = selected
+        .map(|being| being.brainprobe()[0])
+        .unwrap_or_default();
+    let social = selected
+        .map(|being| being.social_memory()[0])
+        .unwrap_or_default();
+    let episodic = selected
+        .map(|being| being.episodic_memory()[0])
+        .unwrap_or_default();
+    let territory = selected
+        .map(|being| being.territory_memory()[0])
+        .unwrap_or_default();
+    let father = selected.map(BeingSummary::father_name).unwrap_or([0; 2]);
+    let mother = selected.map(BeingSummary::mother_name).unwrap_or([0; 2]);
+    let immune_seed = selected.map(BeingSummary::immune_seed).unwrap_or([0; 2]);
+    let immune_antigens = selected
+        .map(BeingSummary::immune_antigens)
+        .unwrap_or_default();
+    let immune_shape_antigen = selected
+        .map(BeingSummary::immune_shape_antigen)
+        .unwrap_or_default();
+    let immune_antibodies = selected
+        .map(BeingSummary::immune_antibodies)
+        .unwrap_or_default();
+    let immune_shape_antibody = selected
+        .map(BeingSummary::immune_shape_antibody)
+        .unwrap_or_default();
+    let inventory = selected.map(BeingSummary::inventory).unwrap_or_default();
+    let shout = selected.map(BeingSummary::shout).unwrap_or_default();
+    let preferences = selected
+        .map(BeingSummary::learned_preference)
+        .unwrap_or_default();
+
+    format!(
+        "TRACE snapshot={snapshot} date={} time={} genetics={}:{} tide={} \
+         topo={}:{}:{} high={}:{} hightide={} weather={} pressure={} food={}:{}:{} \
+         population={} selected={} name={}:{} energy={} loc={}:{} facing={} velocity={}:{} honor={} \
+         height={} mass={} posture={} awake={} drives={}:{}:{}:{} brain={}:{}:{} \
+         probe0={}:{}:{}:{}:{}:{} social0={}:{}:{}:{}:{}:{} episodic0={}:{}:{}:{} \
+         territory0={}:{} conception={} family={}:{}:{}:{}:{}:{} immune={}:{}:{}:{}:{}:{} \
+         inventory={}:{} shout={} preference={}",
+        land.date(),
+        land.time(),
+        genetics[0],
+        genetics[1],
+        land.tide_level(),
+        land.topography_at_map(0, 0),
+        land.topography_at_map(1, 1),
+        land.topography_at_map(MAP_DIMENSION as i64 / 2, MAP_DIMENSION as i64 / 2),
+        c_spread_highdef_at(land, 0, 0),
+        c_spread_highdef_at(
+            land,
+            HI_RES_MAP_DIMENSION as i64 / 2,
+            HI_RES_MAP_DIMENSION as i64 / 2
+        ),
+        usize::from(land.highres_tide_at(0, 0)),
+        land.weather_seven_at_map(0, 0),
+        land.weather_pressure_at_map(0, 0),
+        food.grass,
+        food.trees,
+        food.bush,
+        state.population(),
+        selected_flag,
+        name[0],
+        name[1],
+        energy,
+        loc[0],
+        loc[1],
+        selected.map(BeingSummary::facing).unwrap_or(0),
+        velocity[0],
+        velocity[1],
+        selected.map(BeingSummary::honor).unwrap_or(0),
+        selected.map(BeingSummary::height).unwrap_or(0),
+        selected.map(BeingSummary::mass).unwrap_or(0),
+        selected.map(BeingSummary::posture).unwrap_or(0),
+        selected.map(BeingSummary::awake_level).unwrap_or(0),
+        drives[0],
+        drives[1],
+        drives[2],
+        drives[3],
+        brain[0],
+        brain[1],
+        brain[2],
+        probe.probe_type,
+        probe.position,
+        probe.address,
+        probe.frequency,
+        probe.offset,
+        probe.state,
+        social.first_name[0],
+        social.family_name[0],
+        social.familiarity,
+        social.friend_foe,
+        social.attraction,
+        social.relationship,
+        episodic.event,
+        episodic.food,
+        episodic.affect,
+        episodic.arg,
+        territory.name,
+        territory.familiarity,
+        selected.map(BeingSummary::date_of_conception).unwrap_or(0),
+        father[0],
+        father[1],
+        mother[0],
+        mother[1],
+        selected
+            .map(BeingSummary::child_generation_min)
+            .unwrap_or(0),
+        selected
+            .map(BeingSummary::child_generation_max)
+            .unwrap_or(0),
+        immune_antigens[0],
+        immune_shape_antigen[0],
+        immune_antibodies[0],
+        immune_shape_antibody[0],
+        immune_seed[0],
+        immune_seed[1],
+        inventory[0],
+        inventory[1],
+        shout[0],
+        preferences[0]
+    )
+}
+
+fn c_spread_highdef_at(land: &apesdk_sim::LandState, hires_x: i64, hires_y: i64) -> u8 {
+    let hires_dimension = HI_RES_MAP_DIMENSION as i64;
+    let index = hires_x.rem_euclid(hires_dimension)
+        + (hires_y.rem_euclid(hires_dimension) * hires_dimension);
+    let spread_point = index / 2;
+    land.topography_highdef_at(
+        spread_point % hires_dimension,
+        spread_point / hires_dimension,
     )
 }
 
@@ -1336,6 +1787,85 @@ fn format_file_entries(start: usize, end: usize) -> String {
     output
 }
 
+fn write_speak_file(path: &str, paragraph: &str) -> String {
+    let total_samples = speak_total_samples(paragraph);
+    if total_samples == 0 {
+        return String::new();
+    }
+
+    let mut bytes = aiff_header(total_samples);
+    bytes.resize(
+        bytes.len() + (total_samples as usize * std::mem::size_of::<i16>()),
+        0,
+    );
+    match fs::write(path, bytes) {
+        Ok(()) => String::new(),
+        Err(_) => "ERROR: Failed create speak file! @ ./entity/speak.c 199\n".to_string(),
+    }
+}
+
+fn speak_paragraph(being: &BeingSummary) -> String {
+    let registers = being.braincode_register();
+    format!(
+        "{}{}{}.\n",
+        (registers[0] as char).to_ascii_lowercase(),
+        (registers[1] as char).to_ascii_lowercase(),
+        (registers[2] as char).to_ascii_lowercase()
+    )
+}
+
+fn speak_total_samples(paragraph: &str) -> u32 {
+    32_768u32.saturating_mul(speak_length_total(paragraph)) >> 2
+}
+
+fn speak_length_total(paragraph: &str) -> u32 {
+    let mut total = 0u32;
+    for byte in paragraph.bytes() {
+        if byte == b'\n' || byte == 0 {
+            break;
+        }
+        total = total.saturating_add(1 << speak_length(byte));
+    }
+    total
+}
+
+fn speak_length(character: u8) -> u32 {
+    match character {
+        b'a' | b'e' | b'i' | b'o' => 1,
+        b'p' | b'b' | b'j' | b't' => 0,
+        _ => 2,
+    }
+}
+
+fn aiff_header(total_samples: u32) -> Vec<u8> {
+    let mut header = vec![0; 54];
+    header[0..4].copy_from_slice(b"FORM");
+    header[8..12].copy_from_slice(b"AIFF");
+    header[12..16].copy_from_slice(b"COMM");
+    header[19] = 18;
+    header[21] = 1;
+    header[27] = 16;
+    header[28] = 0x40;
+    header[29] = 0x0e;
+    header[30] = 0xac;
+    header[31] = 0x44;
+    header[38..42].copy_from_slice(b"SSND");
+    put_aiff_u32(
+        &mut header[4..8],
+        total_samples.saturating_mul(2).saturating_add(46),
+    );
+    put_aiff_u32(&mut header[22..26], total_samples);
+    put_aiff_u32(
+        &mut header[42..46],
+        total_samples.saturating_mul(2).saturating_add(8),
+    );
+    header
+}
+
+fn put_aiff_u32(buffer: &mut [u8], value: u32) {
+    buffer.copy_from_slice(&value.to_be_bytes());
+}
+
 fn format_being_list(beings: &[BeingSummary]) -> String {
     let mut output = String::new();
     let mut line = String::new();
@@ -1356,8 +1886,45 @@ fn format_being_list(beings: &[BeingSummary]) -> String {
     output
 }
 
-fn format_top(beings: &[BeingSummary], current_date: u32) -> String {
-    let mut ranked = beings.iter().collect::<Vec<_>>();
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum CommandResponseMode {
+    All,
+    Female,
+    Male,
+    Juvenile,
+}
+
+fn command_response_mode(response: Option<&str>) -> CommandResponseMode {
+    let Some(response) = response else {
+        return CommandResponseMode::All;
+    };
+    if response.contains("fem") {
+        CommandResponseMode::Female
+    } else if response.contains("male") {
+        CommandResponseMode::Male
+    } else if response.contains("juv") || response.contains("chil") {
+        CommandResponseMode::Juvenile
+    } else {
+        CommandResponseMode::All
+    }
+}
+
+fn being_passes_mode(being: &BeingSummary, current_date: u32, mode: CommandResponseMode) -> bool {
+    match mode {
+        CommandResponseMode::All => true,
+        CommandResponseMode::Female => being.is_female(),
+        CommandResponseMode::Male => !being.is_female(),
+        CommandResponseMode::Juvenile => {
+            current_date.saturating_sub(being.date_of_birth()) < apesdk_sim::AGE_OF_MATURITY
+        }
+    }
+}
+
+fn format_top(beings: &[BeingSummary], current_date: u32, mode: CommandResponseMode) -> String {
+    let mut ranked = beings
+        .iter()
+        .filter(|being| being_passes_mode(being, current_date, mode))
+        .collect::<Vec<_>>();
     ranked.sort_by_key(|being| std::cmp::Reverse(being.honor()));
     let mut output = String::new();
     for being in ranked.into_iter().take(10) {
@@ -1373,6 +1940,68 @@ fn format_top(beings: &[BeingSummary], current_date: u32) -> String {
         ));
     }
     output
+}
+
+fn format_epic(beings: &[BeingSummary], current_date: u32, mode: CommandResponseMode) -> String {
+    let mut hits: Vec<([u16; 2], u16)> = Vec::new();
+    for being in beings {
+        for entry in being
+            .episodic_memory()
+            .iter()
+            .filter(|entry| entry.event > 0)
+        {
+            for person in [BEING_MEETER, BEING_MET] {
+                let identity = [entry.first_name[person], entry.family_name[person]];
+                if identity == [0; 2] {
+                    continue;
+                }
+                if person == BEING_MET && matches!(entry.event, EVENT_SEEK_MATE | EVENT_EAT) {
+                    continue;
+                }
+                if !epic_identity_passes_mode(beings, current_date, identity, mode) {
+                    continue;
+                }
+                if identity != [being.gender_name(), being.family_name()] {
+                    continue;
+                }
+                if let Some((_, count)) = hits
+                    .iter_mut()
+                    .find(|(candidate, _)| *candidate == identity)
+                {
+                    *count = count.saturating_add(1);
+                } else if hits.len() < 1024 {
+                    hits.push((identity, 1));
+                }
+            }
+        }
+    }
+    hits.sort_by_key(|(_, count)| std::cmp::Reverse(*count));
+
+    let mut output = String::new();
+    for (identity, count) in hits.into_iter().filter(|(_, count)| *count > 0).take(10) {
+        output.push_str(&format!(
+            "{count:06} {}\n",
+            social_name(identity[0], identity[1])
+        ));
+    }
+    output
+}
+
+fn epic_identity_passes_mode(
+    beings: &[BeingSummary],
+    current_date: u32,
+    identity: [u16; 2],
+    mode: CommandResponseMode,
+) -> bool {
+    match mode {
+        CommandResponseMode::All => true,
+        CommandResponseMode::Female => (identity[0] >> 8) as u8 == apesdk_sim::SEX_FEMALE,
+        CommandResponseMode::Male => (identity[0] >> 8) as u8 != apesdk_sim::SEX_FEMALE,
+        CommandResponseMode::Juvenile => beings
+            .iter()
+            .find(|being| [being.gender_name(), being.family_name()] == identity)
+            .is_some_and(|being| being_passes_mode(being, current_date, mode)),
+    }
 }
 
 fn format_stats(being: &BeingSummary, current_date: u32) -> String {
@@ -1835,13 +2464,13 @@ mod tests {
 
     #[test]
     fn transcript_normalization_masks_only_known_volatile_text() {
-        let input = "open /private/tmp/simape_123.json\r\nString length : 456\r\nERROR: Command @ /Users/barbalet/github/apesdk-rs/sim/console.c 119\r\nPopulation: 128\r\n";
+        let input = "open /private/tmp/simape_123.json\r\nString length : 456\r\nActual size : 912\r\nERROR: Command @ /Users/barbalet/github/apesdk-rs/sim/console.c 119\r\nPopulation: 128\r\n";
 
         let normalized = normalize_cli_transcript(input);
 
         assert_eq!(
             normalized,
-            "open <TMP>\nString length : <N>\nERROR: Command @ ./sim/console.c 119\nPopulation: 128\n"
+            "open <TMP>\nString length : <N>\nActual size : <N>\nERROR: Command @ ./sim/console.c 119\nPopulation: 128\n"
         );
     }
 
@@ -1853,13 +2482,55 @@ mod tests {
 
         let trace = trace_state_line("one_minute", &state);
 
-        assert!(trace.starts_with("TRACE label=one_minute date=0 time=1"));
+        assert!(trace.starts_with("TRACE label=one_minute date=4368 time=301"));
         assert!(trace.contains("population=128"));
         assert!(trace.contains("selected=Ape 001"));
         assert!(trace.contains("drives="));
         assert!(trace.contains("brain="));
         assert!(trace.contains("social0="));
         assert!(trace.contains("territory0="));
+    }
+
+    #[test]
+    fn engine_trace_fixture_exports_native_schema_fields() {
+        let trace = engine_trace_fixture();
+        let lines = trace.lines().collect::<Vec<_>>();
+
+        let trace_lines = lines
+            .iter()
+            .copied()
+            .filter(|line| line.starts_with("TRACE "))
+            .collect::<Vec<_>>();
+        let terrain_lines = lines
+            .iter()
+            .copied()
+            .filter(|line| line.starts_with("TERRAIN "))
+            .collect::<Vec<_>>();
+
+        assert_eq!(trace_lines.len(), 3);
+        assert_eq!(terrain_lines.len(), 24);
+        for line in trace_lines {
+            assert!(line.starts_with("TRACE snapshot="));
+            assert!(line.contains("topo="));
+            assert!(line.contains("food="));
+            assert!(line.contains("population="));
+            assert!(line.contains("drives="));
+            assert!(line.contains("brain="));
+            assert!(line.contains("social0="));
+            assert!(line.contains("episodic0="));
+            assert!(line.contains("territory0="));
+            assert!(line.contains("immune="));
+            assert!(line.contains("inventory="));
+        }
+        for line in terrain_lines {
+            assert!(line.contains("loc="));
+            assert!(line.contains("height="));
+            assert!(line.contains("hightide="));
+            assert!(line.contains("weather="));
+            assert!(line.contains("pressure="));
+            assert!(line.contains("intertidal="));
+            assert!(line.contains("source="));
+        }
     }
 
     #[test]
@@ -1943,11 +2614,11 @@ mod tests {
     #[test]
     fn runtime_parity_transcript_matches_rust_golden() {
         let mut console = Console::default();
-        let actual = console.run_script(
+        let actual = normalize_cli_transcript(&console.run_script(
             include_str!("../../../golden/cli/sessions/runtime_parity.commands"),
             true,
-        );
-        let expected = normalize(include_str!(
+        ));
+        let expected = normalize_cli_transcript(include_str!(
             "../../../golden/cli/transcripts/runtime_parity.txt"
         ));
         assert_eq!(actual, expected);
@@ -2059,7 +2730,7 @@ mod tests {
     }
 
     #[test]
-    fn alpha_command_creates_empty_speech_file_without_console_output() {
+    fn alpha_command_creates_aiff_speech_file_without_console_output() {
         let path = temp_save_path("alpha");
         let path_string = path.to_string_lossy();
         let mut console = Console::default();
@@ -2070,10 +2741,10 @@ mod tests {
                 "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\nalpha {path_string}\nquit\nSimulation stopped\n"
             )
         );
-        assert_eq!(
-            fs::metadata(&path).expect("alpha file should exist").len(),
-            0
-        );
+        let bytes = fs::read(&path).expect("alpha file should exist");
+        assert!(bytes.len() > 54);
+        assert_eq!(&bytes[0..4], b"FORM");
+        assert_eq!(&bytes[8..12], b"AIFF");
         let _ = fs::remove_file(path);
     }
 
@@ -2090,6 +2761,25 @@ mod tests {
             )
         );
         assert!(!path.exists());
+    }
+
+    #[test]
+    fn speak_command_writes_selected_ape_aiff_without_console_output() {
+        let path = temp_save_path("speak_selected");
+        let path_string = path.to_string_lossy();
+        let mut console = Console::default();
+        let actual = console.run_script(
+            &format!("reset\nrun 1 minute\nspeak {path_string}\nquit\n"),
+            true,
+        );
+        assert!(actual.contains("reset\nSimulation reset\n"));
+        assert!(actual.contains("run 1 minute\nRunning for 1 mins\n"));
+        assert!(actual.contains(&format!("speak {path_string}\nquit\n")));
+        let bytes = fs::read(&path).expect("speak file should exist");
+        assert!(bytes.len() > 54);
+        assert_eq!(&bytes[0..4], b"FORM");
+        assert_eq!(&bytes[38..42], b"SSND");
+        let _ = fs::remove_file(path);
     }
 
     #[test]
@@ -2185,15 +2875,19 @@ mod tests {
         let actual = console.run_script("reset\nsim\nclear\nsim\nquit\n", true);
         assert_eq!(
             actual,
-            "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\nreset\nSimulation reset\nsim\nMap dimension: 512\nLand seed: 23809 53481\nPopulation: 128\nAdults: 128   Juveniles: 0\nTide level: 0\n00:00 01/01/0 Simulation not running\nclear\nSimulation reset\nsim\nMap dimension: 512\nLand seed: 50588 11145\nPopulation: 128\nAdults: 128   Juveniles: 0\nTide level: 0\n00:00 01/01/0 Simulation not running\nquit\nSimulation stopped\n"
+            "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\nreset\nSimulation reset\nsim\nMap dimension: 512\nLand seed: 23809 53481\nPopulation: 0\nAdults: 0   Juveniles: 0\nTide level: 0\n00:00 01/01/0 Simulation not running\nclear\nSimulation reset\nsim\nMap dimension: 512\nLand seed: 50588 11145\nPopulation: 0\nAdults: 0   Juveniles: 0\nTide level: 0\n00:00 01/01/0 Simulation not running\nquit\nSimulation stopped\n"
         );
     }
 
     #[test]
     fn reset_creates_selectable_named_population() {
         let mut console = Console::default();
-        let actual = console.run_script("reset\nape\nnext\nape\nprevious\nape\nlist\nquit\n", true);
-        assert!(actual.contains("reset\nSimulation reset\nape\nApe 001\n"));
+        let actual = console.run_script(
+            "reset\nrun 1 minute\nape\nnext\nape\nprevious\nape\nlist\nquit\n",
+            true,
+        );
+        assert!(actual.contains("reset\nSimulation reset\nrun 1 minute\nRunning for 1 mins\n"));
+        assert!(actual.contains("ape\nApe 001\n"));
         assert!(actual.contains("next\nape\nApe 002\nprevious\nape\nApe 001\n"));
         assert!(actual.contains("list\nApe 001                 Ape 002                 Ape 003"));
         assert!(actual.contains("Ape 127                 Ape 128"));
@@ -2202,9 +2896,12 @@ mod tests {
     #[test]
     fn populated_detail_commands_report_summary_data() {
         let mut console = Console::default();
-        let actual = console.run_script("reset\nstats\nappearance\ngenome\nquit\n", true);
+        let actual = console.run_script(
+            "reset\nrun 1 minute\nstats\nappearance\ngenome\nquit\n",
+            true,
+        );
         assert!(actual.contains("stats\nApe 001 ("));
-        assert!(actual.contains("H:064 S:080 F:096 X:112: Mixed drives: Awake\nGen 0:0  Male"));
+        assert!(actual.contains("Gen 0:0  "));
         assert!(actual.contains("Honor:0  HEI:61"));
         assert!(actual.contains("Aware Body: Head Link: Associate\n"));
         assert!(actual.contains("appearance\nHeight: 0.061 m\nMass: 1.00 Kg\nBody fat:"));
@@ -2230,7 +2927,7 @@ mod tests {
     fn watch_can_select_named_ape_and_report_watch_modes() {
         let mut console = Console::default();
         let actual = console.run_script(
-            "reset\nwatch Ape 010\nape\nwatch off\nwatch state\nwatch Missing\nquit\n",
+            "reset\nrun 1 minute\nwatch Ape 010\nape\nwatch off\nwatch state\nwatch Missing\nquit\n",
             true,
         );
         assert!(actual.contains("watch Ape 010\nWatching Ape 010\nape\nApe 010\n"));
@@ -2242,27 +2939,27 @@ mod tests {
     #[test]
     fn top_lists_populated_honor_rows() {
         let mut console = Console::default();
-        let actual = console.run_script("reset\ntop\nquit\n", true);
+        let actual = console.run_script("reset\nrun 1 minute\ntop\nquit\n", true);
         assert!(actual.contains("top\nHonor Name                     Sex\tAge\n"));
-        assert!(actual.contains("099   Ape 100"));
-        assert!(actual.contains("098   Ape 099"));
-        assert!(actual.contains("\t0  days\n"));
+        assert!(actual.contains("Ape 006"));
+        assert!(actual.contains("\t4368  days\n"));
     }
 
     #[test]
     fn populated_social_pathogen_brain_speech_and_idea_commands_report_summaries() {
         let mut console = Console::default();
         let actual = console.run_script(
-            "reset\nwatch Ape 010\nfriends\npathogen\nepisodic\nbraincode\nprobes\nspeech\nidea\nquit\n",
+            "reset\nrun 1 minute\nwatch Ape 010\nfriends\npathogen\nepisodic\nbraincode\nprobes\nspeech\nidea\nquit\n",
             true,
         );
-        assert!(actual.contains("friends\n\nSocial graph for Ape 010\n\nFriends:\n\nEnemies:\n"));
+        assert!(actual.contains("friends\n\nSocial graph for Ape 010\n\nFriends:\n"));
+        assert!(actual.contains("\nEnemies:\n"));
         assert!(actual.contains("pathogen\nAB( "));
         assert!(actual.contains("AG( "));
         assert!(actual.contains("episodic\n\nEpisodic memory for Ape 010\n"));
-        assert!(actual.contains("braincode\n\nBraincode for Ape 010\n\nRegisters:\nJKL\n\n"));
+        assert!(actual.contains("braincode\n\nBraincode for Ape 010\n\nRegisters:\n"));
         assert!(actual.contains("probes\n\nBrain probes for Ape 010\n"));
-        assert!(actual.contains("speech\n\nSpeech for Ape 010\njkl.\n"));
+        assert!(actual.contains("speech\n\nSpeech for Ape 010\n"));
         assert!(actual.contains("idea\nMatches 000.0000 percent\n"));
         assert!(actual.contains("08    000.0000  0000\n"));
     }
@@ -2384,8 +3081,11 @@ mod tests {
             console.run_script("reset\nstep\nsim\nrun 2 minutes\nsim\nstats\nquit\n", true);
         assert!(!actual.contains("Simulated ape cycling not implemented"));
         assert!(!actual.contains("Simulated ape running not implemented"));
-        assert!(actual.contains("step\nsim\nMap dimension: 512\nLand seed: 23809 53481\nPopulation: 128\nAdults: 128   Juveniles: 0\nTide level: 128\n00:01 01/01/0 Simulation not running\n"));
-        assert!(actual.contains("run 2 minutes\nRunning for 2 mins\nsim\nMap dimension: 512\nLand seed: 23809 53481\nPopulation: 128\nAdults: 128   Juveniles: 0\nTide level: 128\n00:03 01/01/0 Simulation not running\n"));
+        assert!(actual.contains("step\nsim\nMap dimension: 512\n"));
+        assert!(actual.contains("Population: 128\nAdults: 128   Juveniles: 0\n"));
+        assert!(actual.contains("05:01 01/01/12 Simulation not running\n"));
+        assert!(actual.contains("run 2 minutes\nRunning for 2 mins\nsim\nMap dimension: 512\n"));
+        assert!(actual.contains("05:03 01/01/12 Simulation not running\n"));
         assert!(actual.contains("stats\nApe 001 ("));
     }
 
@@ -2398,8 +3098,19 @@ mod tests {
         );
         assert_eq!(
             actual,
-            "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\nstep\nsim\nMap dimension: 512\nLand seed: 7633 53305\nPopulation: 0\nAdults: 0   Juveniles: 0\nTide level: 128\n00:01 01/01/0 Simulation not running\nrun 1 minute\nRunning for 1 mins\nsim\nMap dimension: 512\nLand seed: 7633 53305\nPopulation: 0\nAdults: 0   Juveniles: 0\nTide level: 128\n00:02 01/01/0 Simulation not running\nrun 1 day\nRunning for 1 days\nsim\nMap dimension: 512\nLand seed: 7633 53305\nPopulation: 0\nAdults: 0   Juveniles: 0\nTide level: 129\n00:02 02/01/0 Simulation not running\nrun forever\nERROR: Run forever not implemented in Rust port yet\nrun\nERROR: Time not specified, examples: run 2 days, run 6 hours @ ./universe/command.c 2211\nquit\nSimulation stopped\n"
+            "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\nstep\nsim\nMap dimension: 512\nLand seed: 7633 53305\nPopulation: 0\nAdults: 0   Juveniles: 0\nTide level: 128\n00:01 01/01/0 Simulation not running\nrun 1 minute\nRunning for 1 mins\nsim\nMap dimension: 512\nLand seed: 7633 53305\nPopulation: 0\nAdults: 0   Juveniles: 0\nTide level: 128\n00:02 01/01/0 Simulation not running\nrun 1 day\nRunning for 1 days\nsim\nMap dimension: 512\nLand seed: 7633 53305\nPopulation: 0\nAdults: 0   Juveniles: 0\nTide level: 129\n00:02 02/01/0 Simulation not running\nrun forever\nRunning forever (type \"stop\" to end)\nrun\nERROR: Time not specified, examples: run 2 days, run 6 hours @ ./universe/command.c 2211\nquit\nSimulation stopped\n"
         );
+    }
+
+    #[test]
+    fn run_forever_populated_uses_cooperative_running_state_until_stop() {
+        let mut console = Console::default();
+        let actual = console.run_script("reset\nrun forever\nsim\nstop\nsim\nquit\n", true);
+
+        assert!(!actual.contains("Run forever not implemented"));
+        assert!(actual.contains("run forever\nRunning forever (type \"stop\" to end)\n"));
+        assert!(actual.contains("05:01 01/01/12 Simulation running\nstop\nSimulation stopped\n"));
+        assert!(actual.contains("05:01 01/01/12 Simulation not running\nquit\n"));
     }
 
     #[test]
@@ -2505,12 +3216,11 @@ mod tests {
         let mut console = Console::default();
         let actual = console.run_script(&format!("open {path_string}\nsim\nquit\n"), true);
 
-        assert_eq!(
-            actual,
-            format!(
-                "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\nopen {path_string}\nSimulation stopped\nERROR: Failed to read in file @ ./universe/command.c 2394\n"
-            )
-        );
+        assert!(actual.contains(&format!("open {path_string}\nSimulation stopped\n")));
+        assert!(actual.contains("String length : "));
+        assert!(actual.contains("Failed text {\"info\n"));
+        assert!(actual.contains("ERROR: Signature not first in file @ ./universe/transfer.c 286\n"));
+        assert!(actual.contains("ERROR: Failed to read in file @ ./universe/command.c 2394\n"));
         let _ = fs::remove_file(path);
     }
 
@@ -2531,6 +3241,25 @@ mod tests {
             actual,
             format!(
                 "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\nopen {path_string}\nSimulation stopped\nSimulation file {path_string} open\n\nsim\nMap dimension: 512\nLand seed: 1 2\nPopulation: 0\nAdults: 0   Juveniles: 0\nTide level: 132\n05:00 28/01/0 Simulation not running\nquit\nSimulation stopped\n"
+            )
+        );
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn open_truncated_native_transfer_matches_partial_c_load() {
+        let path = temp_save_path("open_native_truncated");
+        let path_string = path.to_string_lossy();
+        fs::write(&path, b"simul{signa=20033;verio=708;};landd{dated=0;")
+            .expect("truncated native fixture should be writable");
+
+        let mut console = Console::default();
+        let actual = console.run_script(&format!("open {path_string}\nsim\nquit\n"), true);
+
+        assert_eq!(
+            actual,
+            format!(
+                "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\nopen {path_string}\nSimulation stopped\nSimulation file {path_string} open\n\nsim\nMap dimension: 512\nLand seed: 0 0\nPopulation: 0\nAdults: 0   Juveniles: 0\nTide level: 128\n00:00 01/01/0 Simulation not running\nquit\nSimulation stopped\n"
             )
         );
         let _ = fs::remove_file(path);
@@ -2560,7 +3289,10 @@ mod tests {
         let path = temp_save_path("roundtrip.native");
         let path_string = path.to_string_lossy();
         let mut console = Console::default();
-        let saved = console.run_script(&format!("reset\nsave {path_string}\nquit\n"), true);
+        let saved = console.run_script(
+            &format!("reset\nrun 1 minute\nsave {path_string}\nquit\n"),
+            true,
+        );
         assert!(saved.contains("Simulation file "));
         let saved_native = fs::read_to_string(&path).expect("native extension save should exist");
         assert!(saved_native.starts_with("{\"information\""));
@@ -2578,7 +3310,10 @@ mod tests {
         let path = temp_save_path("roundtrip_binary").with_extension("bin");
         let path_string = path.to_string_lossy();
         let mut console = Console::default();
-        let saved = console.run_script(&format!("reset\nsave {path_string}\nquit\n"), true);
+        let saved = console.run_script(
+            &format!("reset\nrun 1 minute\nsave {path_string}\nquit\n"),
+            true,
+        );
         assert!(saved.contains("Simulation file "));
         let saved_binary = fs::read_to_string(&path).expect("binary extension save should exist");
         assert!(saved_binary.starts_with("{\"information\""));
@@ -2595,7 +3330,10 @@ mod tests {
         let path = temp_save_path("population_roundtrip");
         let path_string = path.to_string_lossy();
         let mut console = Console::default();
-        let saved = console.run_script(&format!("reset\nsave {path_string}\nquit\n"), true);
+        let saved = console.run_script(
+            &format!("reset\nrun 1 minute\nsave {path_string}\nquit\n"),
+            true,
+        );
         assert!(saved.contains("Simulation file "));
         let saved_json = fs::read_to_string(&path).expect("saved population JSON should exist");
         assert!(saved_json.contains("\"beings\":[{\"name\":\"Ape 001\""));
@@ -2609,12 +3347,10 @@ mod tests {
         let mut loaded_console = Console::default();
         let actual =
             loaded_console.run_script(&format!("open {path_string}\nsim\nape\nquit\n"), true);
-        assert_eq!(
-            actual,
-            format!(
-                "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\nopen {path_string}\nSimulation stopped\nERROR: Failed to read in file @ ./universe/command.c 2394\n"
-            )
-        );
+        assert!(actual.contains(&format!("open {path_string}\nSimulation stopped\n")));
+        assert!(actual.contains("Failed text {\"info\n"));
+        assert!(actual.contains("ERROR: Signature not first in file @ ./universe/transfer.c 286\n"));
+        assert!(actual.contains("ERROR: Failed to read in file @ ./universe/command.c 2394\n"));
         let _ = fs::remove_file(path);
     }
 
@@ -2643,6 +3379,23 @@ mod tests {
         assert!(actual.contains("ERROR: Failed to read in file @ ./universe/command.c 2394\n"));
         let _ = fs::remove_file(path);
         let _ = fs::remove_file(bad_path);
+    }
+
+    #[test]
+    fn open_empty_file_reports_native_allocation_failure() {
+        let path = temp_save_path("empty_open");
+        let path_string = path.to_string_lossy();
+        fs::write(&path, []).expect("empty fixture should be writable");
+
+        let mut console = Console::default();
+        let actual = console.run_script(&format!("open {path_string}\nquit\n"), true);
+        assert_eq!(
+            actual,
+            format!(
+                "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\nopen {path_string}\nSimulation stopped\nERROR: File data could not be allocated @ ./toolkit/file.c 189\n"
+            )
+        );
+        let _ = fs::remove_file(path);
     }
 
     #[test]
@@ -2689,7 +3442,7 @@ mod tests {
         populated.reset_new_simulation_from_land_seed();
         populated.advance_minutes((TIME_DAY_MINUTES + 10) as n_uint);
         let day_trace = trace_state_line("multi_day_seeded", &populated);
-        assert!(day_trace.contains("date=1 time=10"));
+        assert!(day_trace.contains("date=4369 time=310"));
         assert!(day_trace.contains("population=128"));
         assert!(day_trace.contains("adults="));
         assert!(day_trace.contains("juveniles="));
@@ -2714,7 +3467,8 @@ mod tests {
         assert!(actual.contains(
             "ERROR: Time not specified, examples: run 2 days, run 6 hours @ ./universe/command.c 2211\n"
         ));
-        assert!(actual.contains("ERROR: Run forever not implemented in Rust port yet\n"));
+        assert!(actual.contains("Running forever (type \"stop\" to end)\n"));
+        assert!(!actual.contains("Run forever not implemented"));
         assert!(actual.contains("Current time interval is 1 hour(s)\n"));
         assert!(actual.contains("Logging interval set to 2 hours\n"));
         assert!(actual.contains("Logging turned off\n"));

@@ -107,6 +107,8 @@ pub const WEATHER_SEVEN_CLEAR_NIGHT: n_int = 3;
 pub const WEATHER_SEVEN_CLOUDY_NIGHT: n_int = 4;
 pub const WEATHER_SEVEN_RAINY_NIGHT: n_int = 5;
 pub const WEATHER_SEVEN_DAWN_DUSK: n_int = 6;
+const WEATHER_BITS_NEG: n_int = (-131_072 * 254) / 256;
+const WEATHER_BITS_POS: n_int = (131_071 * 254) / 256;
 pub const FOOD_QUANTITY_MAX: n_byte = 255;
 pub const FOOD_REGROWTH_INTERVAL_MINUTES: n_uint = (TIME_DAY_MINUTES / 16) as n_uint;
 
@@ -268,6 +270,10 @@ pub const EVENT_TICKLED_BY: n_byte = 42;
 pub const EVENT_INTENTION: n_byte = 128;
 pub const EPISODIC_AFFECT_ZERO: n_byte2 = 16_384;
 pub const AFFECT_MATE: i32 = 1_000;
+pub const AFFECT_BIRTH: i32 = 850;
+pub const AFFECT_CARRYING: i32 = 600;
+pub const AFFECT_CARRIED: i32 = 600;
+pub const AFFECT_SUCKLING: i32 = 500;
 pub const AFFECT_CHAT: i32 = 100;
 pub const AFFECT_GROOM: i32 = 100;
 pub const AFFECT_SEEK_MATE: i32 = 600;
@@ -301,7 +307,9 @@ pub const MINIMUM_GENETIC_VARIATION: n_int = 32;
 pub const MATING_PROB: n_byte2 = 12;
 pub const IMMUNE_FIT: n_byte = 5;
 pub const MIN_ANTIBODIES: n_byte = 16;
+pub const MIN_ANTIGENS: n_byte = 8;
 pub const PATHOGEN_ENVIRONMENT_PROB: n_byte2 = 100;
+pub const PATHOGEN_TRANSMISSION_PROB: n_byte2 = 1_000;
 pub const PATHOGEN_MUTATION_PROB: n_byte2 = 100;
 pub const ANTIBODY_DEPLETION_PROB: n_byte2 = 100;
 pub const PATHOGEN_TRANSMISSION_AIR: n_byte = 0;
@@ -347,9 +355,13 @@ pub const LARGE_SIM: n_uint = 256;
 pub const INITIAL_POPULATION: usize = (LARGE_SIM as usize) >> 1;
 pub const GESTATION_DAYS: n_byte4 = 1;
 pub const SUCKLING_ENERGY: n_byte2 = 2;
+pub const SUCKLING_MAX_SEPARATION: n_int = 2 * 2 * 80_000;
 pub const WEANING_DAYS: n_byte4 = 14;
 pub const CARRYING_DAYS: n_byte4 = 3;
 pub const CONCEPTION_INHIBITION_DAYS: n_byte4 = 5;
+pub const MUTATION_CROSSOVER_PROB: n_byte2 = 500;
+pub const MUTATION_DELETION_PROB: n_byte2 = 200;
+pub const MUTATION_TRANSPOSE_PROB: n_byte2 = 200;
 pub const RELATIONSHIP_ASSOCIATE: n_byte = 0;
 pub const RELATIONSHIP_MOTHER: n_byte = 2;
 pub const RELATIONSHIP_FATHER: n_byte = 3;
@@ -1236,13 +1248,27 @@ pub struct TerrainFoodFixtureSample {
 pub struct LandTile {
     genetics: [n_byte2; 2],
     topography: Vec<n_byte>,
+    atmosphere: Vec<n_int>,
+    delta_pressure: Vec<n_byte2>,
+    local_delta: n_int,
+    delta_pressure_lowest: n_byte2,
+    delta_pressure_highest: n_byte2,
+    atmosphere_lowest: n_int,
+    atmosphere_highest: n_int,
 }
 
 impl LandTile {
     fn new() -> Self {
         Self {
             genetics: [0; 2],
-            topography: vec![WATER_MAP as n_byte; LAND_TOPOGRAPHY_BUFFERS * MAP_AREA],
+            topography: vec![0; LAND_TOPOGRAPHY_BUFFERS * MAP_AREA],
+            atmosphere: vec![0; LAND_TOPOGRAPHY_BUFFERS * MAP_AREA],
+            delta_pressure: vec![0; MAP_AREA],
+            local_delta: 0,
+            delta_pressure_lowest: n_byte2::MAX,
+            delta_pressure_highest: 1,
+            atmosphere_lowest: WEATHER_BITS_POS,
+            atmosphere_highest: WEATHER_BITS_NEG,
         }
     }
 
@@ -1269,8 +1295,163 @@ impl LandTile {
         self.topography[offset] = value;
     }
 
+    fn atmosphere_offset(buffer: usize, map_x: n_int, map_y: n_int) -> usize {
+        (buffer * MAP_AREA) + map_index(map_x, map_y)
+    }
+
+    fn atmosphere_at(&self, buffer: usize, map_x: n_int, map_y: n_int) -> n_int {
+        self.atmosphere[Self::atmosphere_offset(buffer, map_x, map_y)]
+    }
+
+    fn set_atmosphere(&mut self, buffer: usize, map_x: n_int, map_y: n_int, value: n_int) {
+        let offset = Self::atmosphere_offset(buffer, map_x, map_y);
+        self.atmosphere[offset] = value;
+    }
+
+    fn pressure_at(&self, map_x: n_int, map_y: n_int) -> n_int {
+        n_int::from(self.delta_pressure[map_index(map_x, map_y)])
+    }
+
+    fn set_pressure(&mut self, map_x: n_int, map_y: n_int, value: n_byte2) {
+        let offset = map_index(map_x, map_y);
+        self.delta_pressure[offset] = value;
+        if value > self.delta_pressure_highest {
+            self.delta_pressure_highest = value;
+        }
+        if value < self.delta_pressure_lowest {
+            self.delta_pressure_lowest = value;
+        }
+    }
+
     fn pack_topography(&mut self) {
-        self.topography.fill(WATER_MAP as n_byte);
+        let (primary, working) = self.topography.split_at_mut(MAP_AREA);
+        primary.fill(WATER_MAP as n_byte);
+        working.fill(0);
+    }
+
+    fn copy_primary_to_working(&mut self) {
+        let (primary, working) = self.topography.split_at_mut(MAP_AREA);
+        working[..MAP_AREA].copy_from_slice(primary);
+    }
+
+    fn copy_working_atmosphere_to_primary(&mut self) {
+        let (primary, working) = self.atmosphere.split_at_mut(MAP_AREA);
+        primary.copy_from_slice(&working[..MAP_AREA]);
+    }
+
+    fn native_atmosphere_from_topography(&mut self) {
+        for index in 0..MAP_AREA {
+            self.atmosphere[index] = n_int::from(self.topography[index]) * 4;
+            self.atmosphere[index + MAP_AREA] = 0;
+        }
+    }
+
+    fn reset_native_pressure(&mut self) {
+        self.local_delta = 0;
+        self.delta_pressure_lowest = n_byte2::MAX;
+        self.delta_pressure_highest = 1;
+        self.delta_pressure.fill(0);
+    }
+
+    fn reset_native_atmosphere_range(&mut self) {
+        self.atmosphere_lowest = WEATHER_BITS_POS;
+        self.atmosphere_highest = WEATHER_BITS_NEG;
+    }
+
+    fn update_native_atmosphere_range(&mut self, value: n_int) {
+        if value > self.atmosphere_highest {
+            self.atmosphere_highest = value;
+        }
+        if value < self.atmosphere_lowest {
+            self.atmosphere_lowest = value;
+        }
+    }
+
+    fn wrap_native_atmosphere(&mut self) {
+        for value in &mut self.atmosphere[MAP_AREA..(MAP_AREA * 2)] {
+            *value = (*value * 253) / 256;
+        }
+    }
+
+    fn native_patch_topography(&mut self, refine: n_int) {
+        let local_tiles = 1 << (MAP_BITS - 8);
+        let shift = ((refine & 7) ^ 7) as usize;
+        let span_minor = 64usize >> shift;
+        let span_major = 1usize << shift;
+        if span_minor == 0 {
+            return;
+        }
+
+        for tile_y in 0..local_tiles {
+            for tile_x in 0..local_tiles {
+                for py in 0..span_minor {
+                    for px in 0..span_minor {
+                        let val1 = ((px as n_int) << 2) + ((py as n_int) << 10);
+                        let tseed = math_random(&mut self.genetics);
+                        for ty in 0..4 {
+                            for tx in 0..4 {
+                                let val2 = n_int::from(tseed >> (tx | (ty << 2)));
+                                let val3 = ((((val2 & 1) << 1) - 1) * 20) as n_int;
+                                let val2 = (tx | (ty << 8)) as n_int;
+                                for my in 0..span_major {
+                                    for mx in 0..span_major {
+                                        let point = ((mx as n_int) | ((my as n_int) << 8))
+                                            + ((span_major as n_int) * (val1 + val2));
+                                        let mut point_x = point & 255;
+                                        let mut point_y = point >> 8;
+                                        if refine & 2 != 0 {
+                                            let point_x_tmp = point_x + point_y;
+                                            point_y = point_x - point_y;
+                                            point_x = point_x_tmp;
+                                        }
+                                        point_x += (tile_x as n_int) << 8;
+                                        point_y += (tile_y as n_int) << 8;
+                                        let value = n_int::from(self.topography_at(
+                                            LAND_TOPOGRAPHY_PRIMARY,
+                                            point_x,
+                                            point_y,
+                                        )) + val3;
+                                        self.set_topography(
+                                            LAND_TOPOGRAPHY_PRIMARY,
+                                            point_x,
+                                            point_y,
+                                            value.clamp(0, 255) as n_byte,
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn native_round_topography(&mut self) {
+        for span_minor in 0..6 {
+            let read_buffer = span_minor & 1;
+            let write_buffer = read_buffer ^ 1;
+            for py in 0..MAP_DIMENSION {
+                for px in 0..MAP_DIMENSION {
+                    let mut sum = 0;
+                    for ty in -1..=1 {
+                        for tx in -1..=1 {
+                            sum += n_int::from(self.topography_at(
+                                read_buffer,
+                                px as n_int + tx,
+                                py as n_int + ty,
+                            ));
+                        }
+                    }
+                    self.set_topography(
+                        write_buffer,
+                        px as n_int,
+                        py as n_int,
+                        (sum / 9) as n_byte,
+                    );
+                }
+            }
+        }
     }
 }
 
@@ -1283,6 +1464,12 @@ pub struct LandState {
     tide_level: n_byte,
     food_quantity: Vec<n_byte>,
     food_regrowth_minutes: n_uint,
+    wind_value_x: n_int,
+    wind_value_y: n_int,
+    wind_aim_x: n_int,
+    wind_aim_y: n_int,
+    wind_dissipation: n_int,
+    weather_initialized: bool,
 }
 
 impl LandState {
@@ -1295,6 +1482,12 @@ impl LandState {
             tide_level: 0,
             food_quantity: vec![FOOD_QUANTITY_MAX; MAP_AREA],
             food_regrowth_minutes: 0,
+            wind_value_x: 0,
+            wind_value_y: 0,
+            wind_aim_x: 0,
+            wind_aim_y: 0,
+            wind_dissipation: 0,
+            weather_initialized: false,
         }
     }
 
@@ -1340,12 +1533,10 @@ impl LandState {
             tile.genetics = genetics;
             tile.pack_topography();
         }
-        self.regenerate_tiles();
         self.reset_food_quantities();
         if kind != KIND_OF_USE::KIND_LOAD_FILE {
             self.time = (5 * TIME_HOUR_MINUTES) as n_byte4;
             self.date = start;
-            self.update_tide();
         }
     }
 
@@ -1357,6 +1548,7 @@ impl LandState {
         }
         self.update_tide();
         self.regrow_food_quantities(1);
+        self.cycle_native_weather();
     }
 
     pub fn advance_minutes(&mut self, minutes: n_uint) {
@@ -1380,7 +1572,6 @@ impl LandState {
         }
         self.genetics[0] = random_byte2(random);
         self.genetics[1] = random_byte2(random);
-        self.regenerate_tiles();
         self.reset_food_quantities();
     }
 
@@ -1437,6 +1628,18 @@ impl LandState {
     }
 
     pub fn food_source_at(&self, location: [n_byte2; 2]) -> FoodSample {
+        let classification = self.food_classification_at(location);
+        FoodSample {
+            food_type: classification.food_type,
+            max_energy: scale_food_energy(
+                classification.max_energy,
+                self.food_quantity_at(location),
+            ),
+            energy: 0,
+        }
+    }
+
+    pub fn food_classification_at(&self, location: [n_byte2; 2]) -> FoodSample {
         let height = self.height_at(location);
         let (food_type, max_energy) = if height > TIDE_MAX {
             self.land_food_source(location)
@@ -1445,7 +1648,7 @@ impl LandState {
         };
         FoodSample {
             food_type,
-            max_energy: scale_food_energy(max_energy, self.food_quantity_at(location)),
+            max_energy,
             energy: 0,
         }
     }
@@ -1510,17 +1713,11 @@ impl LandState {
     }
 
     pub fn weather_pressure_at_map(&self, map_x: n_int, map_y: n_int) -> n_int {
-        let center = self.land_location_map(map_x, map_y);
-        let east = self.land_location_map(map_x + 1, map_y);
-        let west = self.land_location_map(map_x - 1, map_y);
-        let north = self.land_location_map(map_x, map_y - 1);
-        let south = self.land_location_map(map_x, map_y + 1);
-        let relief = (east - west).abs() + (south - north).abs() + (center - WATER_MAP).abs();
-        let drift = math_sine(
-            (map_x * 5 + map_y * 3 + n_int::from(self.time >> 4) + n_int::from(self.date)) & 255,
-            512,
-        ) + 512;
-        (relief * 96 + drift).max(0)
+        if self.weather_initialized {
+            self.tiles[0].atmosphere_at(LAND_TOPOGRAPHY_PRIMARY, map_x, map_y)
+        } else {
+            0
+        }
     }
 
     pub fn weather_seven_at(&self, location: [n_byte2; 2]) -> n_int {
@@ -1587,6 +1784,149 @@ impl LandState {
                     tile.set_topography(LAND_TOPOGRAPHY_WORKING, x as n_int, y as n_int, value);
                 }
             }
+        }
+    }
+
+    fn initialize_native_topography(&mut self) {
+        for refine in 0..7 {
+            for tile in &mut self.tiles {
+                tile.native_patch_topography(refine);
+            }
+            for tile in &mut self.tiles {
+                tile.native_round_topography();
+            }
+            for tile in &mut self.tiles {
+                tile.copy_primary_to_working();
+            }
+        }
+    }
+
+    fn initialize_native_weather_random_state(&mut self) {
+        self.wind_value_x = native_tile_wind_aim(&mut self.genetics);
+        self.wind_aim_y = native_tile_wind_aim(&mut self.genetics);
+        math_random3(&mut self.genetics);
+        self.wind_value_y = native_tile_wind_aim(&mut self.genetics);
+        self.wind_aim_x = native_tile_wind_aim(&mut self.genetics);
+        self.wind_dissipation = n_int::from(math_random(&mut self.genetics) & 3);
+        for tile in &mut self.tiles {
+            math_random3(&mut tile.genetics);
+            tile.reset_native_pressure();
+            tile.native_atmosphere_from_topography();
+        }
+        for tile in &mut self.tiles {
+            for map_y in 0..MAP_DIMENSION {
+                for map_x in 0..MAP_DIMENSION {
+                    let value = tile.atmosphere_at(
+                        LAND_TOPOGRAPHY_PRIMARY,
+                        map_x as n_int + 1,
+                        map_y as n_int,
+                    ) - tile.atmosphere_at(
+                        LAND_TOPOGRAPHY_PRIMARY,
+                        map_x as n_int - 1,
+                        map_y as n_int,
+                    ) + tile.atmosphere_at(
+                        LAND_TOPOGRAPHY_PRIMARY,
+                        map_x as n_int,
+                        map_y as n_int + 1,
+                    ) - tile.atmosphere_at(
+                        LAND_TOPOGRAPHY_PRIMARY,
+                        map_x as n_int,
+                        map_y as n_int - 1,
+                    ) + 512;
+                    tile.set_pressure(map_x as n_int, map_y as n_int, value as n_byte2);
+                }
+            }
+        }
+        self.weather_initialized = true;
+    }
+
+    fn cycle_native_weather(&mut self) {
+        if !self.weather_initialized {
+            return;
+        }
+        let dissipation = self.wind_dissipation + 1020;
+        for tile in &mut self.tiles {
+            let mut new_delta = 0;
+            tile.reset_native_atmosphere_range();
+            for map_y in 0..MAP_DIMENSION {
+                for map_x in 0..MAP_DIMENSION {
+                    let map_x = map_x as n_int;
+                    let map_y = map_y as n_int;
+                    let mut value = (dissipation
+                        * tile.atmosphere_at(LAND_TOPOGRAPHY_PRIMARY, map_x, map_y))
+                        >> 10;
+                    let local_atm =
+                        (2 * tile.atmosphere_at(LAND_TOPOGRAPHY_PRIMARY, map_x, map_y - 1))
+                            + (2 * tile.atmosphere_at(LAND_TOPOGRAPHY_PRIMARY, map_x - 1, map_y))
+                            - (2 * tile.atmosphere_at(LAND_TOPOGRAPHY_PRIMARY, map_x + 1, map_y))
+                            - (2 * tile.atmosphere_at(LAND_TOPOGRAPHY_PRIMARY, map_x, map_y + 1));
+                    value += ((local_atm - tile.local_delta) >> MAP_BITS)
+                        + tile.pressure_at(map_x, map_y);
+                    tile.set_atmosphere(LAND_TOPOGRAPHY_WORKING, map_x, map_y, value);
+                    new_delta += value;
+                    tile.update_native_atmosphere_range(value);
+                }
+            }
+            tile.local_delta = new_delta >> MAP_BITS;
+        }
+        for tile in &mut self.tiles {
+            tile.copy_working_atmosphere_to_primary();
+        }
+
+        self.native_wind_calculation();
+        let wind_x = self.wind_value_x;
+        let wind_y = self.wind_value_y;
+        for tile in &mut self.tiles {
+            for map_y in 0..MAP_DIMENSION {
+                for map_x in 0..MAP_DIMENSION {
+                    let map_x = map_x as n_int;
+                    let map_y = map_y as n_int;
+                    let delta_pressure = tile.pressure_at(map_x, map_y);
+                    let tp01 =
+                        (wind_x * delta_pressure) / n_int::from(tile.delta_pressure_highest.max(1));
+                    let tp10 =
+                        (wind_y * delta_pressure) / n_int::from(tile.delta_pressure_highest.max(1));
+                    let tp00 = 256 - tp01.abs() - tp10.abs();
+                    let source_x = if wind_x >= 0 { map_x + 1 } else { map_x - 1 };
+                    let source_y = if wind_y >= 0 { map_y + 1 } else { map_y - 1 };
+                    let local_atm = (tp00
+                        * tile.atmosphere_at(LAND_TOPOGRAPHY_PRIMARY, map_x, map_y))
+                        + (tp10.abs()
+                            * tile.atmosphere_at(LAND_TOPOGRAPHY_PRIMARY, map_x, source_y))
+                        + (tp01.abs()
+                            * tile.atmosphere_at(LAND_TOPOGRAPHY_PRIMARY, source_x, map_y));
+                    tile.set_atmosphere(LAND_TOPOGRAPHY_WORKING, map_x, map_y, local_atm >> 8);
+                }
+            }
+            if tile.atmosphere_lowest < WEATHER_BITS_NEG
+                || tile.atmosphere_highest > WEATHER_BITS_POS
+            {
+                tile.wrap_native_atmosphere();
+            }
+        }
+        for tile in &mut self.tiles {
+            tile.copy_working_atmosphere_to_primary();
+        }
+    }
+
+    fn native_wind_calculation(&mut self) {
+        if math_random(&mut self.genetics) & 31 == 0 {
+            self.wind_aim_x = native_tile_wind_aim(&mut self.genetics);
+            math_random3(&mut self.genetics);
+            self.wind_aim_y = native_tile_wind_aim(&mut self.genetics);
+            self.wind_dissipation = n_int::from(math_random(&mut self.genetics) & 3);
+        }
+        if self.wind_aim_x > self.wind_value_x {
+            self.wind_value_x += 1;
+        }
+        if self.wind_aim_x < self.wind_value_x {
+            self.wind_value_x -= 1;
+        }
+        if self.wind_aim_y > self.wind_value_y {
+            self.wind_value_y += 1;
+        }
+        if self.wind_aim_y < self.wind_value_y {
+            self.wind_value_y -= 1;
         }
     }
 
@@ -1689,7 +2029,11 @@ impl LandState {
                         }
                         continue;
                     }
-                    ((salt * salt) + (dfg * fdg)) >> 4
+                    number_sum += 1;
+                    if operator == b'+' {
+                        total += ((salt * salt) + (dfg * fdg)) >> 4;
+                    }
+                    continue;
                 }
                 _ => continue,
             };
@@ -1791,6 +2135,7 @@ pub struct BeingSummary {
     social_memory: [simulated_isocial; SOCIAL_SIZE],
     episodic_memory: [simulated_iepisodic; EPISODIC_SIZE],
     territory_memory: [simulated_iplace; TERRITORY_AREA],
+    raw_territory_words: Option<[n_byte2; TERRITORY_AREA * 2]>,
     immune_antigens: [n_byte; IMMUNE_ANTIGENS],
     immune_shape_antigen: [n_byte; IMMUNE_ANTIGENS],
     immune_antibodies: [n_byte; IMMUNE_POPULATION],
@@ -1848,6 +2193,7 @@ impl BeingSummary {
             social_memory: [simulated_isocial::default(); SOCIAL_SIZE],
             episodic_memory: [simulated_iepisodic::default(); EPISODIC_SIZE],
             territory_memory: [simulated_iplace::default(); TERRITORY_AREA],
+            raw_territory_words: None,
             immune_antigens: [0; IMMUNE_ANTIGENS],
             immune_shape_antigen: [0; IMMUNE_ANTIGENS],
             immune_antibodies: [0; IMMUNE_POPULATION],
@@ -1875,6 +2221,7 @@ impl BeingSummary {
             0,
             genetics,
         );
+        being.learned_preference = [127; PREFERENCES];
         math_random3(random);
         being.location = [random[0], random[1]];
         being.facing = (math_random(random) & 255) as n_byte;
@@ -1912,6 +2259,133 @@ impl BeingSummary {
         being.immune_seed = [random[0], random[1]];
         being.init_immune();
         being
+    }
+
+    pub fn initial_native(
+        index: usize,
+        random_factor: [n_byte2; 2],
+        land: &LandState,
+        existing: &[BeingSummary],
+    ) -> Self {
+        let mut being = Self::new(format!("Ape {:03}", index + 1), 0, 0, 0, [0; CHROMOSOMES]);
+        being.learned_preference = [127; PREFERENCES];
+        being.drives = [0; DRIVES];
+        being.immune_seed = [0; 2];
+        being.init_immune();
+        being.random_seed = random_factor;
+
+        math_random3(&mut being.random_seed);
+        math_random3(&mut being.random_seed);
+        math_random3(&mut being.random_seed);
+        consume_native_initial_braincode(&mut being.random_seed);
+
+        for register in &mut being.braincode_register {
+            math_random3(&mut being.random_seed);
+            *register = (math_random(&mut being.random_seed) & 255) as n_byte;
+        }
+
+        for probe in &mut being.brainprobe {
+            math_random3(&mut being.random_seed);
+            probe.probe_type = if math_random(&mut being.random_seed) & 1 != 0 {
+                BRAINPROBE_INPUT_SENSOR
+            } else {
+                BRAINPROBE_OUTPUT_ACTUATOR
+            };
+            probe.frequency = 1
+                + (math_random(&mut being.random_seed) % BRAINCODE_MAX_FREQUENCY as n_byte2)
+                    as n_byte;
+            math_random3(&mut being.random_seed);
+            probe.address = (math_random(&mut being.random_seed) & 255) as n_byte;
+            probe.position = (math_random(&mut being.random_seed) & 255) as n_byte;
+            math_random3(&mut being.random_seed);
+            probe.offset = (math_random(&mut being.random_seed) & 255) as n_byte;
+        }
+
+        being.facing = (math_random(&mut being.random_seed) & 255) as n_byte;
+        math_random3(&mut being.random_seed);
+        being.location = native_initial_location(&mut being.random_seed, land);
+
+        let mut gene_random = [0; 2];
+        math_random3(&mut being.random_seed);
+        gene_random[0] = math_random(&mut being.random_seed);
+        math_random3(&mut being.random_seed);
+        math_random3(&mut being.random_seed);
+        gene_random[1] = math_random(&mut being.random_seed);
+        let mother_genetics = random_genetics(&mut gene_random, false);
+
+        math_random3(&mut being.random_seed);
+        gene_random[0] = math_random(&mut being.random_seed);
+        math_random3(&mut being.random_seed);
+        math_random3(&mut being.random_seed);
+        math_random3(&mut being.random_seed);
+        gene_random[1] = math_random(&mut being.random_seed);
+        let father_genetics = random_genetics(&mut gene_random, true);
+
+        math_random3(&mut being.random_seed);
+        being.genetics =
+            native_body_genetics(existing, mother_genetics, father_genetics, &mut gene_random);
+        being.set_native_unique_name(existing);
+
+        let social_x = (math_random(&mut being.random_seed) & 32_767) + 16_384;
+        let social_y = (math_random(&mut being.random_seed) & 32_767) + 16_384;
+        being.social_coord = [social_x, social_y, social_x, social_y];
+        being.energy = BEING_FULL;
+        being.height = BIRTH_HEIGHT;
+        being.mass = BIRTH_MASS;
+        being.crowding = MIN_CROWDING;
+        being.awake = false;
+        being.awake_level = FULLY_ASLEEP;
+        being.brain_state = [86, 501, 73, 171, 0, 146];
+        being
+    }
+
+    fn set_native_unique_name(&mut self, existing: &[BeingSummary]) {
+        math_random3(&mut self.random_seed);
+        math_random3(&mut self.random_seed);
+
+        let mother_family_name =
+            native_family_name(self.random_seed[0] & 255, self.random_seed[1] & 255);
+        math_random3(&mut self.random_seed);
+        let father_family_name =
+            native_family_name(self.random_seed[0] & 255, self.random_seed[1] & 255);
+        let mut possible_family_name = native_family_name(
+            native_family_first_name(mother_family_name),
+            native_family_first_name(father_family_name),
+        );
+
+        for samples in 0..2048 {
+            math_random3(&mut self.random_seed);
+            let possible_first_name =
+                (self.random_seed[0] & 255) | (native_find_sex(self.genetics) << 8);
+
+            if native_family_first_name(mother_family_name)
+                == native_family_second_name(father_family_name)
+            {
+                math_random3(&mut self.random_seed);
+                possible_family_name =
+                    native_family_name(self.random_seed[0] & 255, self.random_seed[1] & 255);
+            }
+            if samples == 1024 {
+                math_random3(&mut self.random_seed);
+                possible_family_name =
+                    native_family_name(self.random_seed[0] & 255, self.random_seed[1] & 255);
+            }
+            if native_family_second_name(mother_family_name)
+                == native_family_first_name(father_family_name)
+            {
+                math_random3(&mut self.random_seed);
+                possible_family_name =
+                    native_family_name(self.random_seed[0] & 255, self.random_seed[1] & 255);
+            }
+
+            self.gender_name = possible_first_name;
+            self.family_name = possible_family_name;
+            if !existing.iter().any(|other| {
+                other.gender_name == self.gender_name && other.family_name == self.family_name
+            }) {
+                return;
+            }
+        }
     }
 
     pub fn from_transfer_object(entries: &[ObjectEntry]) -> Result<Self, &'static str> {
@@ -1978,6 +2452,7 @@ impl BeingSummary {
             social_memory: [simulated_isocial::default(); SOCIAL_SIZE],
             episodic_memory: [simulated_iepisodic::default(); EPISODIC_SIZE],
             territory_memory: [simulated_iplace::default(); TERRITORY_AREA],
+            raw_territory_words: None,
             immune_antigens: [0; IMMUNE_ANTIGENS],
             immune_shape_antigen: [0; IMMUNE_ANTIGENS],
             immune_antibodies: [0; IMMUNE_POPULATION],
@@ -2072,6 +2547,7 @@ impl BeingSummary {
             social_memory: [simulated_isocial::default(); SOCIAL_SIZE],
             episodic_memory: [simulated_iepisodic::default(); EPISODIC_SIZE],
             territory_memory: [simulated_iplace::default(); TERRITORY_AREA],
+            raw_territory_words: None,
             immune_antigens: [0; IMMUNE_ANTIGENS],
             immune_shape_antigen: [0; IMMUNE_ANTIGENS],
             immune_antibodies: [0; IMMUNE_POPULATION],
@@ -2147,6 +2623,7 @@ impl BeingSummary {
             being.init_episodic_memory();
         }
         let _ = being.load_territory_memory(entries)?;
+        being.raw_territory_words = optional_array_byte2_fixed(entries, "raw_territory_words")?;
 
         Ok(being)
     }
@@ -2160,6 +2637,9 @@ impl BeingSummary {
         object_object(&mut object, "changes", self.native_changes_object());
         object_object(&mut object, "braindata", self.native_brain_object());
         object_object(&mut object, "immune_system", self.native_immune_object());
+        if let Some(raw_territory_words) = self.raw_territory_words {
+            object_array_byte2(&mut object, "raw_territory_words", &raw_territory_words);
+        }
         object
     }
 
@@ -2303,6 +2783,25 @@ impl BeingSummary {
         self.territory_memory
             .iter()
             .map(|entry| ObjectValue::Object(territory_entry_to_object(entry)))
+            .collect()
+    }
+
+    fn native_raw_territory_words(&self) -> Vec<n_uint> {
+        if let Some(raw_territory_words) = self.raw_territory_words {
+            return raw_territory_words
+                .iter()
+                .map(|value| n_uint::from(*value))
+                .collect();
+        }
+
+        self.territory_memory
+            .iter()
+            .flat_map(|entry| {
+                [
+                    n_uint::from(n_byte2::from(entry.name)),
+                    n_uint::from(entry.familiarity),
+                ]
+            })
             .collect()
     }
 
@@ -2486,6 +2985,7 @@ impl BeingSummary {
             social_memory: native.events.social,
             episodic_memory: native.events.episodic,
             territory_memory: native.events.territory,
+            raw_territory_words: None,
             immune_antigens: native.immune_system.antigens,
             immune_shape_antigen: native.immune_system.shape_antigen,
             immune_antibodies: native.immune_system.antibodies,
@@ -2500,6 +3000,10 @@ impl BeingSummary {
 
     pub const fn gender_name(&self) -> n_byte2 {
         self.gender_name
+    }
+
+    pub const fn raw_first_name(&self) -> n_byte2 {
+        self.gender_name & 255
     }
 
     pub const fn family_name(&self) -> n_byte2 {
@@ -2666,6 +3170,14 @@ impl BeingSummary {
         self.mother_name
     }
 
+    pub const fn child_generation_min(&self) -> n_byte2 {
+        self.child_generation_min
+    }
+
+    pub const fn child_generation_max(&self) -> n_byte2 {
+        self.child_generation_max
+    }
+
     pub const fn immune_seed(&self) -> [n_byte2; 2] {
         self.immune_seed
     }
@@ -2759,36 +3271,34 @@ impl BeingSummary {
         self.drives[drive] = 0;
     }
 
+    #[allow(dead_code)]
     fn advance_minute(&mut self, land: &mut LandState) {
         let land_date = land.date();
-        let land_time = land.time();
-        self.awake_level = self.awake_level_for_time(land_time);
-        self.awake = self.awake_level != FULLY_ASLEEP;
+        self.update_awake_state(land);
         self.cycle_universal();
-
-        if self.energy == BEING_DEAD || self.awake_level == FULLY_ASLEEP {
-            self.set_speed(0);
-            return;
-        }
-
-        self.cycle_awake(land);
         self.cycle_episodic();
-        self.cycle_drives(land_date);
-        self.cycle_territory(land);
-        self.cycle_internal_braincode(land);
-        self.speed_advance();
-        self.update_brainprobes(land_time);
-
-        if land_time == 0 {
-            self.honor = self.honor.saturating_add(1);
+        if self.awake_level != FULLY_ASLEEP && self.energy != BEING_DEAD {
+            self.cycle_awake(land);
         }
+        self.cycle_drives(land_date, 1);
+        self.tidy_after_minute(land);
+        self.speed_advance();
     }
 
-    fn awake_level_for_time(&self, land_time: n_byte4) -> n_byte {
+    fn update_awake_state(&mut self, land: &LandState) {
+        self.awake_level = self.awake_level_for_time(land);
+        self.awake = self.awake_level != FULLY_ASLEEP;
+    }
+
+    fn awake_level_for_time(&self, land: &LandState) -> n_byte {
         if self.energy_less_than(BEING_DEAD + 1) {
             return FULLY_ASLEEP;
         }
+        let land_time = land.time();
         if !is_night(land_time) {
+            return FULLY_AWAKE;
+        }
+        if land.terrain_sample(self.location).water {
             return FULLY_AWAKE;
         }
         if self.energy_less_than(BEING_HUNGRY + 1) || self.speed() > 0 {
@@ -2822,7 +3332,15 @@ impl BeingSummary {
         if terrain.water {
             state |= BEING_STATE_SWIMMING;
         }
-        if self.energy_less_than(BEING_HUNGRY + 1) {
+        if self.speed() != 0 {
+            state |= BEING_STATE_MOVING;
+        }
+        let hungry_limit = if state == BEING_STATE_AWAKE && self.speed() == 0 {
+            BEING_FULL
+        } else {
+            BEING_HUNGRY
+        };
+        if self.energy_less_than(hungry_limit + 1) {
             state |= BEING_STATE_HUNGRY;
         }
 
@@ -2864,22 +3382,31 @@ impl BeingSummary {
             } else {
                 target_speed = 0;
             }
-        } else if self.speed() == 0 {
-            target_speed = target_speed.max(10);
         }
 
         self.calculate_speed(target_speed, state);
         self.genetic_wandering();
-        self.move_forward();
-        let energy_cost = self.move_energy(land);
-        if energy_cost > 0 {
-            self.energy_delta(-energy_cost);
-        }
-        if self.speed() > 0 {
-            state |= BEING_STATE_MOVING;
-        }
         self.macro_state = state;
+        self.cycle_territory(land);
         self.mass = self.calculated_mass();
+    }
+
+    fn tidy_after_minute(&mut self, land: &LandState) {
+        let mut energy_cost = if self.awake_level != FULLY_ASLEEP {
+            self.move_forward();
+            self.move_energy(land)
+        } else {
+            self.set_speed(0);
+            1
+        };
+
+        if energy_cost > 0 {
+            energy_cost -= (i32::from(gene_hair(self.genetics)) * energy_cost) >> 5;
+            if energy_cost < 1 {
+                energy_cost = 1;
+            }
+        }
+        self.energy_delta(-energy_cost);
     }
 
     fn temporary_speed(&self, land: &LandState) -> (n_int, bool) {
@@ -2900,7 +3427,9 @@ impl BeingSummary {
         if self.awake_level != FULLY_AWAKE
             || ((state & (BEING_STATE_HUNGRY | BEING_STATE_NO_FOOD)) == BEING_STATE_HUNGRY)
         {
-            if state & BEING_STATE_NO_FOOD == 0 {
+            if state & BEING_STATE_SWIMMING != 0 {
+                target_speed = n_int::from(self.energy >> 7);
+            } else if state & BEING_STATE_NO_FOOD == 0 {
                 target_speed = 0;
             }
         }
@@ -3033,7 +3562,7 @@ impl BeingSummary {
         (lean_mass + n_uint::from(self.body_fat())).min(n_uint::from(n_byte2::MAX)) as n_byte2
     }
 
-    fn cycle_drives(&mut self, land_date: n_byte4) {
+    fn cycle_drives(&mut self, land_date: n_byte4, beings_in_vicinity: n_int) {
         if self.energy_less_than(BEING_HUNGRY) {
             self.inc_drive(DRIVE_HUNGER);
             self.dec_drive(DRIVE_SEX);
@@ -3041,12 +3570,17 @@ impl BeingSummary {
             self.dec_drive(DRIVE_HUNGER);
         }
 
-        if self.crowding < MAX_CROWDING {
+        let crowding = n_int::from(self.crowding);
+        if beings_in_vicinity < crowding + n_int::from(SOCIAL_TOLLERANCE) {
             self.inc_drive(DRIVE_SOCIAL);
-            self.crowding = self.crowding.saturating_add(1).min(MAX_CROWDING);
-        } else if self.crowding > MIN_CROWDING {
+        } else {
             self.dec_drive(DRIVE_SOCIAL);
-            self.crowding = self.crowding.saturating_sub(1).max(MIN_CROWDING);
+        }
+        if beings_in_vicinity < crowding && self.crowding > MIN_CROWDING {
+            self.crowding -= 1;
+        }
+        if beings_in_vicinity > crowding && self.crowding < MAX_CROWDING {
+            self.crowding += 1;
         }
 
         if age_days_at(land_date, self.date_of_birth) > AGE_OF_MATURITY {
@@ -3456,12 +3990,14 @@ impl BeingSummary {
         }
     }
 
+    #[allow(dead_code)]
     fn cycle_internal_braincode(&mut self, land: &LandState) {
         let self_view = self.clone();
         let code = self.social_memory[0].braincode;
         self.run_braincode_dialogue(&self_view, 0, code, land, true);
     }
 
+    #[allow(dead_code)]
     fn update_brainprobes(&mut self, land_time: n_byte4) {
         let actor = usize::from(self.attention[ATTENTION_ACTOR]) % SOCIAL_SIZE;
         let code = self.social_memory[actor].braincode;
@@ -3621,10 +4157,30 @@ impl BeingSummary {
         land: &LandState,
         internal: bool,
     ) {
-        let social_index = social_index % SOCIAL_SIZE;
-        let local_code = self.social_memory[social_index].braincode;
+        self.run_braincode_dialogue_with_indices(
+            other,
+            social_index,
+            social_index,
+            remote_code,
+            land,
+            internal,
+        );
+    }
+
+    fn run_braincode_dialogue_with_indices(
+        &mut self,
+        other: &BeingSummary,
+        local_code_index: usize,
+        actor_index: usize,
+        remote_code: [n_byte; BRAINCODE_SIZE],
+        land: &LandState,
+        internal: bool,
+    ) {
+        let local_code_index = local_code_index % SOCIAL_SIZE;
+        let actor_index = actor_index % SOCIAL_SIZE;
+        let local_code = self.social_memory[local_code_index].braincode;
         let mut vm = BraincodeVm::new_pair(local_code, remote_code, self.braincode_register);
-        let mut io = self.braincode_io_with(other, social_index, land, internal);
+        let mut io = self.braincode_io_with(other, actor_index, land, internal);
         let max_iterations = if internal {
             BRAINCODE_MAX_ADDRESS / BRAINCODE_BYTES_PER_INSTRUCTION
         } else {
@@ -3633,9 +4189,42 @@ impl BeingSummary {
         for _ in 0..max_iterations {
             vm.execute_step_with_io(&mut io);
         }
-        self.social_memory[social_index].braincode = *vm.local();
+        self.social_memory[local_code_index].braincode = *vm.local();
         self.braincode_register = vm.registers();
-        self.apply_braincode_io(social_index, io, other, land);
+        self.apply_braincode_io(actor_index, io, other, land);
+    }
+
+    #[allow(dead_code)]
+    fn cycle_native_braincode_dialogue(&mut self, land: &LandState) {
+        let self_view = self.clone();
+        let internal_code_index = usize::from(self.attention[ATTENTION_ACTOR]) % SOCIAL_SIZE;
+        let external_code_index = ATTENTION_EXTERNAL;
+        let external_code = self.social_memory[external_code_index].braincode;
+        let actor_index = usize::from(math_random(&mut self.random_seed)) % SOCIAL_SIZE;
+        self.run_braincode_dialogue_with_indices(
+            &self_view,
+            internal_code_index,
+            actor_index,
+            external_code,
+            land,
+            true,
+        );
+
+        let internal_code = self.social_memory[internal_code_index].braincode;
+        let actor_index = usize::from(math_random(&mut self.random_seed)) % SOCIAL_SIZE;
+        self.run_braincode_dialogue_with_indices(
+            &self_view,
+            external_code_index,
+            actor_index,
+            internal_code,
+            land,
+            true,
+        );
+    }
+
+    fn advance_native_braincode_dialogue_random(&mut self) {
+        let _ = math_random(&mut self.random_seed) % SOCIAL_SIZE as n_byte2;
+        let _ = math_random(&mut self.random_seed) % SOCIAL_SIZE as n_byte2;
     }
 
     fn apply_braincode_io(
@@ -3836,6 +4425,42 @@ impl BeingSummary {
         self.immune_acquire_pathogen(transmission_type);
     }
 
+    fn immune_seed_from_mother(&mut self, mother: &BeingSummary) {
+        self.immune_shape_antibody = mother.immune_shape_antibody;
+        self.immune_antibodies = mother.immune_antibodies;
+    }
+
+    fn immune_transmit_to(&mut self, other: &mut BeingSummary, transmission_type: n_byte) {
+        self.immune_acquire_pathogen(transmission_type);
+
+        math_random3(&mut self.immune_seed);
+        if self.immune_seed[0] >= PATHOGEN_TRANSMISSION_PROB {
+            return;
+        }
+
+        math_random3(&mut self.immune_seed);
+        let index = self.immune_seed[0] as usize % IMMUNE_ANTIGENS;
+        let shape = self.immune_shape_antigen[index];
+        if self.immune_antigens[index] == 0 || pathogen_transmission(shape) != transmission_type {
+            return;
+        }
+
+        if let Some(other_index) = other
+            .immune_shape_antigen
+            .iter()
+            .position(|other_shape| *other_shape == shape)
+        {
+            other.immune_antigens[other_index] =
+                other.immune_antigens[other_index].saturating_add(1);
+            return;
+        }
+
+        let other_index = self.immune_seed[1] as usize % IMMUNE_ANTIGENS;
+        if other.immune_antigens[other_index] <= MIN_ANTIGENS {
+            other.immune_shape_antigen[other_index] = shape;
+        }
+    }
+
     fn immune_acquire_pathogen(&mut self, transmission_type: n_byte) {
         math_random3(&mut self.immune_seed);
         if self.immune_seed[0] >= PATHOGEN_ENVIRONMENT_PROB {
@@ -3872,6 +4497,63 @@ fn random_genetics(random: &mut [n_byte2; 2], male: bool) -> [n_genetics; CHROMO
         SEX_FEMALE as n_genetics
     };
     genetics
+}
+
+fn consume_native_initial_braincode(random: &mut [n_byte2; 2]) {
+    for _ in 0..2 {
+        let mut byte_index = 0;
+        while byte_index < BRAINCODE_SIZE {
+            math_random3(random);
+            let _ = math_random(random) & 255;
+            let _ = math_random(random) & 255;
+            let _ = math_random(random) & 255;
+            byte_index += BRAINCODE_BYTES_PER_INSTRUCTION;
+        }
+    }
+}
+
+fn native_initial_location(random: &mut [n_byte2; 2], land: &LandState) -> [n_byte2; 2] {
+    let mut location = [0; 2];
+    for _ in 0..20 {
+        location = [
+            math_random(random) & APESPACE_BOUNDS,
+            math_random(random) & APESPACE_BOUNDS,
+        ];
+        if !land.terrain_sample(location).water {
+            break;
+        }
+    }
+    location
+}
+
+fn native_body_genetics(
+    existing: &[BeingSummary],
+    mother_genetics: [n_genetics; CHROMOSOMES],
+    father_genetics: [n_genetics; CHROMOSOMES],
+    random: &mut [n_byte2; 2],
+) -> [n_genetics; CHROMOSOMES] {
+    loop {
+        let genetics = child_genetics(mother_genetics, father_genetics, random);
+        if existing.iter().all(|being| being.genetics != genetics) {
+            return genetics;
+        }
+    }
+}
+
+fn native_find_sex(genetics: [n_genetics; CHROMOSOMES]) -> n_byte2 {
+    (genetics[CHROMOSOME_Y] & 3) as n_byte2
+}
+
+fn native_family_name(first: n_byte2, second: n_byte2) -> n_byte2 {
+    (first & 255) | ((second & 255) << 8)
+}
+
+fn native_family_first_name(name: n_byte2) -> n_byte2 {
+    name & 255
+}
+
+fn native_family_second_name(name: n_byte2) -> n_byte2 {
+    (name >> 8) & 255
 }
 
 fn inferred_gender_name(name: &str, genetics: [n_genetics; CHROMOSOMES]) -> n_byte2 {
@@ -4484,6 +5166,10 @@ fn random_pathogen(seed: n_byte2, pathogen_type: n_byte) -> n_byte {
         + n_byte2::from(pathogen_type)) as n_byte
 }
 
+fn pathogen_transmission(pathogen: n_byte) -> n_byte {
+    pathogen & 7
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PopulationState {
     beings: Vec<BeingSummary>,
@@ -4505,6 +5191,28 @@ impl PopulationState {
         let mut beings = Vec::with_capacity(count);
         for index in 0..count {
             beings.push(BeingSummary::initial(index, random));
+        }
+        let selected = (!beings.is_empty()).then_some(0);
+        Self {
+            beings,
+            selected,
+            max,
+        }
+    }
+
+    pub fn initial_native_group(
+        random: &mut [n_byte2; 2],
+        count: usize,
+        max: usize,
+        land: &LandState,
+    ) -> Self {
+        math_random3(random);
+        let count = count.min(max.saturating_sub(1));
+        let mut beings = Vec::with_capacity(count);
+        while beings.len() < count {
+            math_random3(random);
+            let index = beings.len();
+            beings.push(BeingSummary::initial_native(index, *random, land, &beings));
         }
         let selected = (!beings.is_empty()).then_some(0);
         Self {
@@ -4582,11 +5290,37 @@ impl PopulationState {
         let land_date = land.date();
         let land_time = land.time();
         for being in &mut self.beings {
-            being.advance_minute(land);
+            being.update_awake_state(land);
+        }
+        for being in &mut self.beings {
+            being.cycle_universal();
+        }
+        for being in &mut self.beings {
+            being.cycle_episodic();
+        }
+        for being in &mut self.beings {
+            if being.awake_level != FULLY_ASLEEP && being.energy != BEING_DEAD {
+                being.cycle_awake(land);
+            }
+        }
+        let vicinity_counts = native_vicinity_counts(&self.beings);
+        for (being, beings_in_vicinity) in self.beings.iter_mut().zip(vicinity_counts) {
+            being.cycle_drives(land_date, beings_in_vicinity);
+        }
+        if land.time() & 1 == 0 {
+            for being in &mut self.beings {
+                being.advance_native_braincode_dialogue_random();
+            }
+        }
+        for being in &mut self.beings {
+            being.tidy_after_minute(land);
         }
         self.social_initial_loop(land, land_date, land_time);
         self.lifecycle_loop(land_date, land_time);
         self.social_secondary_loop_no_sim();
+        for being in &mut self.beings {
+            being.speed_advance();
+        }
     }
 
     fn social_initial_loop(&mut self, land: &LandState, land_date: n_byte4, land_time: n_byte4) {
@@ -4624,9 +5358,6 @@ impl PopulationState {
     }
 
     fn lifecycle_loop(&mut self, land_date: n_byte4, land_time: n_byte4) {
-        if self.beings.len() >= self.max {
-            return;
-        }
         let base_len = self.beings.len();
         let parent_snapshot = self.beings.clone();
         let mut births = Vec::new();
@@ -4634,7 +5365,7 @@ impl PopulationState {
             if !mother.is_female() || mother.date_of_conception == 0 {
                 continue;
             }
-            if land_date < mother.date_of_conception + GESTATION_DAYS {
+            if land_date <= mother.date_of_conception + GESTATION_DAYS {
                 continue;
             }
             if parent_snapshot.iter().any(|being| {
@@ -4643,29 +5374,170 @@ impl PopulationState {
             }) {
                 continue;
             }
+            if base_len + births.len() >= self.max {
+                break;
+            }
             let child_index = base_len + births.len();
             let child = child_from_mother(mother, child_index, land_date);
             mother.record_episodic_interaction(
                 &child,
                 EVENT_BIRTH,
-                AFFECT_MATE,
+                AFFECT_BIRTH,
                 0,
                 land_date,
                 land_time,
             );
-            if land_date >= mother.date_of_conception + GESTATION_DAYS + CONCEPTION_INHIBITION_DAYS
-            {
+            if land_date > mother.date_of_conception + GESTATION_DAYS + CONCEPTION_INHIBITION_DAYS {
                 mother.date_of_conception = 0;
             }
             births.push((mother_index, child));
-            if base_len + births.len() >= self.max {
-                break;
-            }
         }
 
         for (mother_index, mut child) in births {
             create_family_links(&mut self.beings, mother_index, &mut child);
             self.beings.push(child);
+        }
+
+        self.lifecycle_carry_children(land_date, land_time);
+        self.lifecycle_suckle_children(land_date, land_time);
+        self.lifecycle_clear_finished_carrying(land_date);
+    }
+
+    fn lifecycle_carry_children(&mut self, land_date: n_byte4, land_time: n_byte4) {
+        let mut pairs = Vec::new();
+        for (mother_index, mother) in self.beings.iter().enumerate() {
+            if !mother.is_female() || mother.date_of_conception == 0 {
+                continue;
+            }
+            let carrying_end = mother.date_of_conception + GESTATION_DAYS + CARRYING_DAYS;
+            if land_date >= carrying_end {
+                continue;
+            }
+            let Some(child_index) = self
+                .beings
+                .iter()
+                .enumerate()
+                .filter(|(index, child)| {
+                    *index != mother_index
+                        && child.genetics == mother.fetal_genetics
+                        && land_date.saturating_sub(child.date_of_birth) < CARRYING_DAYS
+                })
+                .max_by_key(|(_, child)| child.date_of_birth)
+                .map(|(index, _)| index)
+            else {
+                continue;
+            };
+            pairs.push((mother_index, child_index));
+        }
+
+        for (mother_index, child_index) in pairs {
+            with_two_beings_mut(
+                &mut self.beings,
+                mother_index,
+                child_index,
+                |mother, child| {
+                    if mother.inventory[usize::from(BODY_FRONT)] & INVENTORY_CHILD == 0
+                        && mother.inventory[usize::from(BODY_BACK)] & INVENTORY_CHILD == 0
+                    {
+                        mother.inventory[usize::from(BODY_BACK)] |= INVENTORY_CHILD;
+                        mother.attention[ATTENTION_BODY] = BODY_BACK;
+                    }
+                    child.location = mother.location;
+                    mother.record_episodic_interaction(
+                        child,
+                        EVENT_CARRIED,
+                        AFFECT_CARRYING,
+                        0,
+                        land_date,
+                        land_time,
+                    );
+                    child.record_episodic_interaction(
+                        mother,
+                        EVENT_CARRIED_BY,
+                        AFFECT_CARRIED,
+                        0,
+                        land_date,
+                        land_time,
+                    );
+                },
+            );
+        }
+    }
+
+    fn lifecycle_suckle_children(&mut self, land_date: n_byte4, land_time: n_byte4) {
+        let mut pairs = Vec::new();
+        for (child_index, child) in self.beings.iter().enumerate() {
+            if land_date.saturating_sub(child.date_of_birth) >= WEANING_DAYS {
+                continue;
+            }
+            if !child.energy_less_than(BEING_HUNGRY + 1) {
+                continue;
+            }
+            let Some(mother_index) = find_being_by_identity(&self.beings, child.mother_name) else {
+                continue;
+            };
+            if mother_index == child_index {
+                continue;
+            }
+            if distance_squared(self.beings[mother_index].location, child.location)
+                < SUCKLING_MAX_SEPARATION
+            {
+                pairs.push((mother_index, child_index));
+            }
+        }
+
+        for (mother_index, child_index) in pairs {
+            with_two_beings_mut(
+                &mut self.beings,
+                mother_index,
+                child_index,
+                |mother, child| {
+                    child.set_facing_towards(n_vect2::new(
+                        n_int::from(mother.location[0]) - n_int::from(child.location[0]),
+                        n_int::from(mother.location[1]) - n_int::from(child.location[1]),
+                    ));
+                    mother.inventory[usize::from(BODY_BACK)] &= !INVENTORY_CHILD;
+                    mother.inventory[usize::from(BODY_FRONT)] |= INVENTORY_CHILD;
+                    mother.inventory[usize::from(BODY_FRONT)] &= !INVENTORY_GROOMED;
+                    mother.attention[ATTENTION_BODY] = BODY_FRONT;
+                    if !mother.energy_less_than(BEING_HUNGRY) {
+                        mother.energy_delta(-i32::from(SUCKLING_ENERGY));
+                        child.energy_delta(i32::from(SUCKLING_ENERGY));
+                        child.macro_state |= BEING_STATE_SUCKLING;
+                        child.immune_seed_from_mother(mother);
+                        mother.record_episodic_interaction(
+                            child,
+                            EVENT_SUCKLED,
+                            AFFECT_SUCKLING,
+                            0,
+                            land_date,
+                            land_time,
+                        );
+                        child.record_episodic_interaction(
+                            mother,
+                            EVENT_SUCKLED_BY,
+                            AFFECT_SUCKLING,
+                            0,
+                            land_date,
+                            land_time,
+                        );
+                    }
+                },
+            );
+        }
+    }
+
+    fn lifecycle_clear_finished_carrying(&mut self, land_date: n_byte4) {
+        for mother in &mut self.beings {
+            if !mother.is_female() {
+                continue;
+            }
+            let carrying = mother.date_of_conception != 0
+                && land_date < mother.date_of_conception + GESTATION_DAYS + CARRYING_DAYS;
+            if !carrying {
+                mother.inventory[usize::from(BODY_FRONT)] &= !INVENTORY_CHILD;
+                mother.inventory[usize::from(BODY_BACK)] &= !INVENTORY_CHILD;
+            }
         }
     }
 }
@@ -4687,76 +5559,125 @@ fn child_from_mother(mother: &BeingSummary, index: usize, land_date: n_byte4) ->
     );
     child.location = mother.location;
     child.facing = mother.facing;
-    child.random_seed = mother.random_seed;
+    let mut random_seed = mother.random_seed;
+    math_random(&mut random_seed);
+    math_random3(&mut random_seed);
+    random_seed[0] = mother.random_seed[0];
+    math_random3(&mut random_seed);
+    random_seed[0] = land_date as n_byte2;
+    math_random3(&mut random_seed);
+    child.random_seed = random_seed;
     child.energy = BEING_FULL;
-    child.height = BIRTH_HEIGHT;
-    child.mass = BIRTH_MASS;
+    child.height = BIRTH_HEIGHT + (child.random_seed[0] % (BEING_MAX_HEIGHT - BIRTH_HEIGHT));
+    child.mass = BIRTH_MASS + (child.random_seed[1] % (BEING_MAX_MASS_G - BIRTH_MASS));
     child.generation_min = mother.child_generation_min + 1;
     child.generation_max = mother.child_generation_max + 1;
     child.mother_name = [mother.gender_name, mother.family_name];
     child.father_name = mother.father_name;
-    child.immune_shape_antibody = mother.immune_shape_antibody;
-    child.immune_antibodies = mother.immune_antibodies;
+    child.honor = mother.honor;
+    child.immune_seed = child.random_seed;
+    child.init_immune();
     child
 }
 
 fn create_family_links(beings: &mut [BeingSummary], mother_index: usize, child: &mut BeingSummary) {
-    let mother_name = [
-        beings[mother_index].gender_name,
-        beings[mother_index].family_name,
-    ];
+    let mother_name = identity_of(&beings[mother_index]);
     let father_name = beings[mother_index].father_name;
-    let child_relation = if child.is_female() {
-        RELATIONSHIP_DAUGHTER
-    } else {
-        RELATIONSHIP_SON
-    };
-    set_relationship_between(
-        &mut beings[mother_index],
-        child,
-        child_relation,
-        RELATIONSHIP_MOTHER,
-    );
-    if let Some(father_index) = beings
-        .iter()
-        .position(|being| [being.gender_name, being.family_name] == father_name)
-    {
-        let (before, after) = beings.split_at_mut(father_index.max(mother_index));
-        if father_index > mother_index {
-            let father = &mut after[0];
-            set_relationship_between(father, child, child_relation, RELATIONSHIP_FATHER);
-        } else if father_index < mother_index {
-            let father = &mut before[father_index];
-            set_relationship_between(father, child, child_relation, RELATIONSHIP_FATHER);
-        }
-    }
+    let father_index = find_being_by_identity(beings, father_name);
     child.mother_name = mother_name;
     child.father_name = father_name;
+
+    let mut parent_indices = [None; 6];
+    parent_indices[0] = Some(mother_index);
+    parent_indices[1] = father_index;
+    for parent_side in 0..2 {
+        let Some(parent_index) = parent_indices[parent_side] else {
+            continue;
+        };
+        for parent_kind in 0..2 {
+            let relationship = RELATIONSHIP_MOTHER + parent_kind as n_byte;
+            let Some(entry_index) = relationship_index_for(&beings[parent_index], relationship)
+            else {
+                continue;
+            };
+            let entry = beings[parent_index].social_memory[entry_index];
+            parent_indices[2 + (parent_side * 2) + parent_kind] = find_being_by_identity(
+                beings,
+                [entry.first_name[BEING_MET], entry.family_name[BEING_MET]],
+            );
+        }
+    }
+
     let sibling_relation = if child.is_female() {
         RELATIONSHIP_SISTER
     } else {
         RELATIONSHIP_BROTHER
     };
-    for sibling in beings.iter_mut() {
-        let sibling_name = [sibling.gender_name, sibling.family_name];
-        if sibling_name == mother_name || sibling_name == father_name {
+    let mut sibling_indices = Vec::new();
+    for parent_index in parent_indices.iter().take(2).flatten().copied() {
+        for entry in beings[parent_index]
+            .social_memory
+            .iter()
+            .take(SOCIAL_SIZE_BEINGS)
+            .skip(1)
+        {
+            if !matches!(entry.relationship, RELATIONSHIP_SON | RELATIONSHIP_DAUGHTER) {
+                continue;
+            }
+            if let Some(sibling_index) = find_being_by_identity(
+                beings,
+                [entry.first_name[BEING_MET], entry.family_name[BEING_MET]],
+            ) {
+                if sibling_index != mother_index && Some(sibling_index) != father_index {
+                    sibling_indices.push(sibling_index);
+                }
+            }
+        }
+    }
+    sibling_indices.sort_unstable();
+    sibling_indices.dedup();
+    for sibling_index in sibling_indices {
+        let child_to_sibling = if beings[sibling_index].is_female() {
+            RELATIONSHIP_SISTER
+        } else {
+            RELATIONSHIP_BROTHER
+        };
+        set_relationship_between(
+            child,
+            &mut beings[sibling_index],
+            child_to_sibling,
+            sibling_relation,
+        );
+    }
+
+    let parent_relation = [
+        RELATIONSHIP_DAUGHTER,
+        RELATIONSHIP_DAUGHTER,
+        RELATIONSHIP_GRANDDAUGHTER,
+        RELATIONSHIP_GRANDDAUGHTER,
+        RELATIONSHIP_GRANDDAUGHTER,
+        RELATIONSHIP_GRANDDAUGHTER,
+    ];
+    let child_relation = [
+        RELATIONSHIP_MOTHER,
+        RELATIONSHIP_MOTHER,
+        RELATIONSHIP_MATERNAL_GRANDMOTHER,
+        RELATIONSHIP_MATERNAL_GRANDMOTHER,
+        RELATIONSHIP_PATERNAL_GRANDMOTHER,
+        RELATIONSHIP_PATERNAL_GRANDMOTHER,
+    ];
+    for (index, parent_index) in parent_indices.iter().copied().enumerate() {
+        let Some(parent_index) = parent_index else {
             continue;
-        }
-        if sibling.date_of_birth == child.date_of_birth {
-            continue;
-        }
-        if sibling.mother_name == mother_name || sibling.father_name == father_name {
-            set_relationship_between(
-                child,
-                sibling,
-                if sibling.is_female() {
-                    RELATIONSHIP_SISTER
-                } else {
-                    RELATIONSHIP_BROTHER
-                },
-                sibling_relation,
-            );
-        }
+        };
+        let parent_to_child = parent_relation[index] + n_byte::from(!child.is_female());
+        let child_to_parent = child_relation[index] + n_byte::from(index % 2 == 1);
+        set_relationship_between(
+            &mut beings[parent_index],
+            child,
+            parent_to_child,
+            child_to_parent,
+        );
     }
 }
 
@@ -4770,6 +5691,61 @@ fn set_relationship_between(
     let met_index = met.meet_being(meeter, 0, 0);
     meeter.social_memory[meeter_index].relationship = meeter_to_met;
     met.social_memory[met_index].relationship = met_to_meeter;
+}
+
+fn identity_of(being: &BeingSummary) -> [n_byte2; 2] {
+    [being.gender_name, being.family_name]
+}
+
+fn find_being_by_identity(beings: &[BeingSummary], identity: [n_byte2; 2]) -> Option<usize> {
+    if identity == [0; 2] {
+        return None;
+    }
+    beings
+        .iter()
+        .position(|being| [being.gender_name, being.family_name] == identity)
+}
+
+fn relationship_index_for(being: &BeingSummary, relationship: n_byte) -> Option<usize> {
+    being
+        .social_memory
+        .iter()
+        .take(SOCIAL_SIZE_BEINGS)
+        .position(|entry| entry.relationship == relationship)
+}
+
+fn with_two_beings_mut<F>(beings: &mut [BeingSummary], first: usize, second: usize, mut f: F)
+where
+    F: FnMut(&mut BeingSummary, &mut BeingSummary),
+{
+    if first == second || first >= beings.len() || second >= beings.len() {
+        return;
+    }
+    if first < second {
+        let (left, right) = beings.split_at_mut(second);
+        f(&mut left[first], &mut right[0]);
+    } else {
+        let (left, right) = beings.split_at_mut(first);
+        f(&mut right[0], &mut left[second]);
+    }
+}
+
+fn distance_squared(first: [n_byte2; 2], second: [n_byte2; 2]) -> n_int {
+    let dx = n_int::from(first[0]) - n_int::from(second[0]);
+    let dy = n_int::from(first[1]) - n_int::from(second[1]);
+    dx * dx + dy * dy
+}
+
+fn native_vicinity_counts(beings: &[BeingSummary]) -> Vec<n_int> {
+    beings
+        .iter()
+        .map(|being| {
+            beings
+                .iter()
+                .filter(|other| distance_squared(being.location, other.location) < 4)
+                .count() as n_int
+        })
+        .collect()
 }
 
 fn social_distance_under(first: &BeingSummary, second: &BeingSummary, distance: n_int) -> bool {
@@ -4788,8 +5764,8 @@ fn social_pair_cycle(
 ) {
     let first_index = first.meet_being(second, land_date, land_time);
     let second_index = second.meet_being(first, land_date, land_time);
-    first.immune_acquire_pathogen(PATHOGEN_TRANSMISSION_AIR);
-    second.immune_acquire_pathogen(PATHOGEN_TRANSMISSION_AIR);
+    first.immune_transmit_to(second, PATHOGEN_TRANSMISSION_AIR);
+    second.immune_transmit_to(first, PATHOGEN_TRANSMISSION_AIR);
     let distance = social_distance(first, second);
 
     let first_familiarity = first.social_memory[first_index].familiarity;
@@ -4878,8 +5854,8 @@ fn social_groom_native(
         return false;
     }
 
-    groomer.immune_acquire_pathogen(PATHOGEN_TRANSMISSION_TOUCH);
-    groomee.immune_acquire_pathogen(PATHOGEN_TRANSMISSION_TOUCH);
+    groomer.immune_transmit_to(groomee, PATHOGEN_TRANSMISSION_TOUCH);
+    groomee.immune_transmit_to(groomer, PATHOGEN_TRANSMISSION_TOUCH);
 
     let mut groomloc = usize::from(groomer.attention[ATTENTION_BODY]) % INVENTORY_SIZE;
     for _ in 0..4 {
@@ -5060,8 +6036,8 @@ fn social_mate_native(
     if meeter.social_memory[being_index].attraction > PAIR_BOND_THRESHOLD {
         attraction += 1;
         if distance < 16 {
-            meeter.immune_acquire_pathogen(PATHOGEN_TRANSMISSION_SEX);
-            met.immune_acquire_pathogen(PATHOGEN_TRANSMISSION_SEX);
+            meeter.immune_transmit_to(met, PATHOGEN_TRANSMISSION_SEX);
+            met.immune_transmit_to(meeter, PATHOGEN_TRANSMISSION_SEX);
         }
     } else {
         attraction -= 1;
@@ -5236,18 +6212,194 @@ fn child_genetics(
     random: &mut [n_byte2; 2],
 ) -> [n_genetics; CHROMOSOMES] {
     let mut child = [0; CHROMOSOMES];
+    let sex = {
+        math_random3(random);
+        SEX_MALE | ((math_random(random) & 1) as n_byte)
+    };
+    math_random3(random);
     for chromosome in 0..CHROMOSOMES {
-        let crossover = n_genetics::from(math_random(random));
-        let mask = crossover | (crossover << 16);
-        child[chromosome] = (mother[chromosome] & mask) | (father[chromosome] & !mask);
+        if chromosome != CHROMOSOME_Y {
+            child[chromosome] = genetics_crossover(mother[chromosome], father[chromosome], random);
+        }
     }
     child[CHROMOSOME_Y] &= !3;
-    child[CHROMOSOME_Y] |= if math_random(random) & 1 == 0 {
-        SEX_FEMALE as n_genetics
+    child[CHROMOSOME_Y] = if sex != SEX_FEMALE {
+        genetics_mutate(father[CHROMOSOME_Y], random)
     } else {
-        SEX_MALE as n_genetics
+        genetics_mutate(mother[CHROMOSOME_Y], random)
     };
+    genetics_transpose(&mut child, random);
+    child[CHROMOSOME_Y] &= !1;
+    child[CHROMOSOME_Y] |= n_genetics::from(sex);
     child
+}
+
+fn genetics_crossover(
+    mother: n_genetics,
+    father: n_genetics,
+    random: &mut [n_byte2; 2],
+) -> n_genetics {
+    let crossover_point = n_int::from(math_random(random) >> 13) << 1;
+    let mut deletion_point = 16;
+    if math_random(random) < MUTATION_DELETION_PROB {
+        deletion_point = n_int::from(math_random(random) >> 13) << 1;
+    }
+
+    let mut result = 0;
+    let mut point = crossover_point - 8;
+    let mut point2 = point;
+    let mut loop_point = 0;
+    while loop_point < 16 {
+        if loop_point == deletion_point {
+            point2 -= 2;
+        }
+        if point2 < 0 {
+            point2 += 16;
+        } else if point2 > 15 {
+            point2 -= 16;
+        }
+
+        let (parent, mutation_prob) = if loop_point < 8 {
+            (father, MUTATION_CROSSOVER_PROB * 50)
+        } else {
+            (mother, MUTATION_CROSSOVER_PROB)
+        };
+        result |= shift_gene(
+            genetics_child_gene(parent, point2, mutation_prob, random),
+            point,
+        );
+        loop_point += 2;
+        point += 2;
+        point2 += 2;
+    }
+    result
+}
+
+fn genetics_mutate(chromosome: n_genetics, random: &mut [n_byte2; 2]) -> n_genetics {
+    let mut result = 0;
+    let mut deletion_point = 16;
+    if math_random(random) < MUTATION_DELETION_PROB {
+        deletion_point = n_int::from(math_random(random) >> 13) << 1;
+    }
+
+    let mut point = 0;
+    let mut loop_point = 0;
+    while loop_point < 16 {
+        if loop_point == deletion_point {
+            point -= 2;
+            if point < 0 {
+                point += 16;
+            }
+        }
+        if point > 15 {
+            point -= 16;
+        }
+        result |= shift_gene(
+            genetics_child_gene(chromosome, point, MUTATION_CROSSOVER_PROB, random),
+            point,
+        );
+        loop_point += 2;
+        point += 2;
+    }
+    result
+}
+
+fn genetics_child_gene(
+    chromosome: n_genetics,
+    point: n_int,
+    mutation_prob: n_byte2,
+    random: &mut [n_byte2; 2],
+) -> n_genetics {
+    math_random3(random);
+    if math_random(random) < mutation_prob {
+        match math_random(random) & 7 {
+            0 => diploid(
+                n_genetics::from(math_random(random) & 3),
+                gene_at(chromosome_from_father(chromosome), point),
+            ),
+            1 => diploid(
+                gene_at(chromosome_from_mother(chromosome), point),
+                n_genetics::from(math_random(random) & 3),
+            ),
+            2 => {
+                let gene = gene_at(chromosome_from_mother(chromosome), point);
+                diploid(gene, gene)
+            }
+            3 => {
+                let gene = gene_at(chromosome_from_father(chromosome), point);
+                diploid(gene, gene)
+            }
+            _ => {
+                math_random3(random);
+                diploid(
+                    n_genetics::from(math_random(random) & 3),
+                    n_genetics::from(math_random(random) & 3),
+                )
+            }
+        }
+    } else if math_random(random) & 1 != 0 {
+        diploid(
+            gene_at(chromosome_from_mother(chromosome), point),
+            gene_at(chromosome_from_father(chromosome), point),
+        )
+    } else {
+        diploid(
+            gene_at(chromosome_from_father(chromosome), point),
+            gene_at(chromosome_from_mother(chromosome), point),
+        )
+    }
+}
+
+fn genetics_transpose(genetics: &mut [n_genetics; CHROMOSOMES], random: &mut [n_byte2; 2]) {
+    math_random3(random);
+    if math_random(random) >= MUTATION_TRANSPOSE_PROB {
+        return;
+    }
+
+    let local_random0 = math_random(random);
+    let local_random1 = math_random(random);
+    let source_offset = n_int::from((local_random0 >> 8) & 31);
+    let dest_offset = n_int::from(local_random1 & 31);
+    let inversion = (local_random0 >> 13) & 1;
+    let source_ch = usize::from((local_random1 >> 5) as n_byte) % CHROMOSOMES;
+    let dest_ch = usize::from((local_random1 >> 7) as n_byte) % CHROMOSOMES;
+    let mut ctr1 = source_offset;
+    math_random3(random);
+    let limit = math_random(random) & 15;
+    for p in 0..limit {
+        ctr1 &= 31;
+        let ctr2 = if inversion == 0 {
+            dest_offset + n_int::from(p)
+        } else {
+            dest_offset - n_int::from(p) + 32
+        } & 31;
+        let dest_mask = 1u32 << (ctr2 as u32);
+        genetics[dest_ch] &= !dest_mask;
+        if genetics[source_ch] & (1u32 << (ctr1 as u32)) != 0 {
+            genetics[dest_ch] |= dest_mask;
+        }
+        ctr1 += 1;
+    }
+}
+
+fn chromosome_from_mother(chromosome: n_genetics) -> n_genetics {
+    (chromosome >> 16) & 65_535
+}
+
+fn chromosome_from_father(chromosome: n_genetics) -> n_genetics {
+    chromosome & 65_535
+}
+
+fn diploid(parent1: n_genetics, parent2: n_genetics) -> n_genetics {
+    parent1 | (parent2 << 16)
+}
+
+fn gene_at(chromosome_half: n_genetics, point: n_int) -> n_genetics {
+    (chromosome_half >> (point.rem_euclid(32) as u32)) & 3
+}
+
+fn shift_gene(gene: n_genetics, point: n_int) -> n_genetics {
+    gene << (point.rem_euclid(32) as u32)
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -5325,7 +6477,6 @@ impl SimState {
         math_random3(&mut seed);
         let randomise = (n_uint::from(seed[0]) << 16) | n_uint::from(seed[1]);
         *self = Self::init(KIND_OF_USE::KIND_NEW_SIMULATION, randomise);
-        self.populate_initial_from_land_seed();
     }
 
     pub fn step_empty(&mut self) {
@@ -5338,6 +6489,13 @@ impl SimState {
     }
 
     pub fn advance_minutes(&mut self, minutes: n_uint) {
+        if self.population() == 0 && self.kind == KIND_OF_USE::KIND_NEW_SIMULATION {
+            for _ in 0..minutes {
+                self.advance_native_engine_cycle();
+            }
+            return;
+        }
+
         if self.population() == 0 {
             self.step_empty_by(minutes);
             return;
@@ -5345,6 +6503,17 @@ impl SimState {
 
         for _ in 0..minutes {
             self.land.advance_minutes(1);
+            self.population.advance_minute(&mut self.land);
+        }
+        self.kind = KIND_OF_USE::KIND_NOTHING_TO_RUN;
+    }
+
+    pub fn advance_native_engine_cycle(&mut self) {
+        if self.kind != KIND_OF_USE::KIND_NOTHING_TO_RUN {
+            self.initialize_pending_native_execution();
+        }
+        self.land.cycle();
+        if self.population() != 0 {
             self.population.advance_minute(&mut self.land);
         }
         self.kind = KIND_OF_USE::KIND_NOTHING_TO_RUN;
@@ -5438,6 +6607,10 @@ impl SimState {
         tranfer_startup_out_native(&self.startup_transfer())
     }
 
+    pub fn tranfer_startup_out_raw_native(&self) -> NFile {
+        tranfer_startup_out_raw_native(&self.startup_transfer())
+    }
+
     pub fn tranfer_startup_out_binary(&self) -> NFile {
         tranfer_startup_out_binary(&self.startup_transfer())
     }
@@ -5446,16 +6619,35 @@ impl SimState {
         self.land.clear(self.kind, AGE_OF_MATURITY);
     }
 
-    fn populate_initial_from_land_seed(&mut self) {
-        let mut local_random = self.land.genetics();
-        math_random3(&mut local_random);
-        self.population =
-            PopulationState::initial(&mut local_random, INITIAL_POPULATION, LARGE_SIM as usize);
+    fn initialize_pending_native_execution(&mut self) {
+        if self.kind == KIND_OF_USE::KIND_MEMORY_SETUP {
+            return;
+        }
+        if self.kind != KIND_OF_USE::KIND_NEW_APES {
+            self.land.clear(self.kind, AGE_OF_MATURITY);
+            self.land.initialize_native_topography();
+            self.land.update_tide();
+        }
+        if self.kind != KIND_OF_USE::KIND_LOAD_FILE {
+            let mut local_random = self.land.genetics();
+            math_random3(&mut local_random);
+            self.land.initialize_native_weather_random_state();
+            self.population = PopulationState::initial_native_group(
+                &mut local_random,
+                INITIAL_POPULATION,
+                LARGE_SIM as usize,
+                &self.land,
+            );
+        }
     }
 }
 
 fn random_byte2(random: &mut [n_byte2; 2]) -> n_byte2 {
     ((math_random(random) & 255) << 8) | (math_random(random) & 255)
+}
+
+fn native_tile_wind_aim(random: &mut [n_byte2; 2]) -> n_int {
+    -96 + n_int::from(math_random(random) % 194)
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -5545,6 +6737,18 @@ pub fn tranfer_startup_out_native(startup: &StartupTransfer) -> NFile {
     let mut file = NFile::new();
     let _ = file.write(output.as_bytes(), 0);
     file
+}
+
+pub fn tranfer_startup_out_raw_native(startup: &StartupTransfer) -> NFile {
+    let mut output = String::new();
+    native_raw_write_header(&mut output);
+    native_raw_write_version(&mut output);
+    for entries in &startup.beings {
+        if let Ok(being) = BeingSummary::from_transfer_object(entries) {
+            native_raw_write_being(&mut output, &being);
+        }
+    }
+    NFile::from_bytes(output.as_bytes())
 }
 
 pub fn tranfer_startup_out_binary(startup: &StartupTransfer) -> NFile {
@@ -5743,6 +6947,105 @@ fn native_write_territory(output: &mut String, index: usize, entry: &simulated_i
     native_write_field(output, "trnam=", &[n_uint::from(entry.name)]);
     native_write_field(output, "trfam=", &[n_uint::from(entry.familiarity)]);
     output.push_str("};\n");
+}
+
+fn native_raw_write_header(output: &mut String) {
+    output.push_str("/*\n\t");
+    output.push_str(SHORT_VERSION_NAME);
+    output.push_str(FULL_DATE);
+    output.push_str("\n\t");
+    output.push_str(COPYRIGHT_DATE);
+    output.push_str("Tom Barbalet. All rights reserved.\n*/\n\n");
+}
+
+fn native_raw_write_version(output: &mut String) {
+    output.push_str("simul{\n");
+    native_raw_write_field(output, "signa=", &[n_uint::from(SIMULATED_APE_SIGNATURE)]);
+    native_raw_write_field(output, "verio=", &[n_uint::from(VERSION_NUMBER)]);
+    output.push_str("};\n\n");
+}
+
+fn native_raw_write_being(output: &mut String, being: &BeingSummary) {
+    let native = being.to_simulated_being();
+    let delta = native.delta;
+    let constant = native.constant;
+    let changes = native.changes;
+    let brain = native.braindata;
+    let immune = native.immune_system;
+
+    output.push_str("being{\n");
+    native_raw_write_field(output, "locat=", &native_uints(&delta.location));
+    native_raw_write_field(output, "facin=", &[n_uint::from(delta.direction_facing)]);
+    native_raw_write_field(output, "speed=", &[n_uint::from(delta.velocity[0])]);
+    native_raw_write_field(output, "energ=", &[n_uint::from(delta.stored_energy)]);
+    native_raw_write_field(output, "datob=", &[n_uint::from(constant.date_of_birth)]);
+    native_raw_write_field(output, "rando=", &native_uints(&delta.random_seed));
+    native_raw_write_field(output, "state=", &[n_uint::from(delta.macro_state)]);
+    native_raw_write_field(output, "brast=", &native_uints(&brain.brain_state));
+    native_raw_write_field(output, "heigt=", &[n_uint::from(delta.height)]);
+    native_raw_write_field(output, "masss=", &[n_uint::from(delta.mass)]);
+    native_raw_write_field(output, "overr=", &[n_uint::from(brain.script_overrides)]);
+    native_raw_write_field(output, "shout=", &native_uints(&changes.shout));
+    native_raw_write_field(output, "crowd=", &[n_uint::from(delta.crowding)]);
+    native_raw_write_field(output, "postu=", &[n_uint::from(delta.posture)]);
+    native_raw_write_field(output, "inven=", &native_uints(&changes.inventory));
+    native_raw_write_field(output, "paras=", &[n_uint::from(delta.parasites)]);
+    native_raw_write_field(output, "honor=", &[n_uint::from(delta.honor)]);
+    native_raw_write_field(
+        output,
+        "conce=",
+        &[n_uint::from(changes.date_of_conception)],
+    );
+    native_raw_write_field(output, "atten=", &native_uints(&brain.attention));
+    native_raw_write_field(output, "genet=", &native_genetics_words(&constant.genetics));
+    native_raw_write_field(
+        output,
+        "fetag=",
+        &native_genetics_words(&changes.fetal_genetics),
+    );
+    native_raw_write_field(
+        output,
+        "fathn=",
+        &[
+            n_uint::from((changes.father_name[0] & 255) as n_byte),
+            n_uint::from((changes.father_name[1] & 255) as n_byte),
+        ],
+    );
+    native_raw_write_field(
+        output,
+        "sosim=",
+        &native_uints(&[
+            delta.social_coord_x,
+            delta.social_coord_y,
+            delta.social_coord_nx,
+            delta.social_coord_ny,
+        ]),
+    );
+    native_raw_write_field(output, "drive=", &native_uints(&changes.drives));
+    native_raw_write_field(output, "goals=", &native_uints(&delta.goal));
+    native_raw_write_field(output, "prefe=", &native_uints(&changes.learned_preference));
+    native_raw_write_field(output, "genex=", &[n_uint::from(constant.generation_max)]);
+    native_raw_write_field(output, "genen=", &[n_uint::from(constant.generation_min)]);
+    native_raw_write_field(
+        output,
+        "chigx=",
+        &[n_uint::from(changes.child_generation_max)],
+    );
+    native_raw_write_field(
+        output,
+        "chign=",
+        &[n_uint::from(changes.child_generation_min)],
+    );
+    let territory = being.native_raw_territory_words();
+    native_raw_write_field(output, "terit=", &territory);
+    native_raw_write_field(output, "immun=", &native_immune_bytes(&immune));
+    native_raw_write_field(output, "brreg=", &native_uints(&brain.braincode_register));
+    native_raw_write_field(
+        output,
+        "brpro=",
+        &native_brainprobe_bytes(&brain.brainprobe),
+    );
+    output.push_str("};\n\n");
 }
 
 fn binary_write_section(output: &mut Vec<u8>, kind: n_byte, payload: &[u8]) {
@@ -5959,6 +7262,12 @@ fn native_write_field(output: &mut String, token: &str, values: &[n_uint]) {
     output.push(';');
 }
 
+fn native_raw_write_field(output: &mut String, token: &str, values: &[n_uint]) {
+    output.push('\t');
+    native_write_field(output, token, values);
+    output.push('\n');
+}
+
 fn native_uints<T>(values: &[T]) -> Vec<n_uint>
 where
     T: Copy,
@@ -6138,9 +7447,7 @@ pub fn startup_transfer_from_native_bytes(input: &[u8]) -> Result<StartupTransfe
         }
     }
 
-    if !land_seen {
-        return Err("native land section missing");
-    }
+    let _ = land_seen;
     Ok(StartupTransfer { land, beings })
 }
 
@@ -6659,6 +7966,9 @@ impl<'a> NativeFileParser<'a> {
             if self.consume_section_end() {
                 break;
             }
+            if self.position >= self.input.len() {
+                break;
+            }
             let field_token = self.read_token()?;
             if field_token[5] != b'=' {
                 return Err("native field assignment expected");
@@ -6794,6 +8104,7 @@ fn native_being_from_section(
     let generation_min = native_first_byte2(section, b"genen=")?.unwrap_or(0);
     let child_generation_max = native_first_byte2(section, b"chigx=")?.unwrap_or(0);
     let child_generation_min = native_first_byte2(section, b"chign=")?.unwrap_or(0);
+    let raw_territory_words = native_byte2_array::<{ TERRITORY_AREA * 2 }>(section, b"terit=")?;
     let braincode_register = native_byte_array::<BRAINCODE_PSPACE_REGISTERS>(section, b"brreg=")?
         .unwrap_or([0; BRAINCODE_PSPACE_REGISTERS]);
     let brainprobe = native_byte_array::<BRAINPROBE_NATIVE_BYTES>(section, b"brpro=")?
@@ -6805,6 +8116,9 @@ fn native_being_from_section(
 
     let mut object = Vec::new();
     object_string(&mut object, "name", &format!("Ape {:03}", index + 1));
+    if let Some(raw_territory_words) = raw_territory_words {
+        object_array_byte2(&mut object, "raw_territory_words", &raw_territory_words);
+    }
 
     let mut delta = Vec::new();
     object_number(&mut delta, "direction_facing", facing.into());
@@ -6886,6 +8200,21 @@ fn native_being_from_section(
     object_object(&mut object, "braindata", brain);
 
     object_object(&mut object, "immune_system", native_immune_object(&immune));
+    let territory_words = raw_territory_words.unwrap_or([0; TERRITORY_AREA * 2]);
+    for territory_index in 0..TERRITORY_AREA {
+        let raw_name = territory_words[territory_index * 2];
+        let familiarity = territory_words[(territory_index * 2) + 1];
+        if raw_name != 0 || familiarity != 0 {
+            native_add_territory_event(
+                &mut object,
+                territory_index,
+                simulated_iplace {
+                    name: (raw_name & 255) as n_byte,
+                    familiarity,
+                },
+            );
+        }
+    }
 
     Ok(object)
 }
@@ -7278,6 +8607,15 @@ fn optional_array_byte2(
         Some(_) => Err("json array expected"),
         None => Ok(None),
     }
+}
+
+fn optional_array_byte2_fixed<const N: usize>(
+    entries: &[ObjectEntry],
+    name: &str,
+) -> Result<Option<[n_byte2; N]>, &'static str> {
+    optional_array_byte2(entries, name, N)?
+        .map(|values| values.try_into().map_err(|_| "array length mismatch"))
+        .transpose()
 }
 
 fn optional_array_byte(
@@ -7900,6 +9238,19 @@ mod tests {
     }
 
     #[test]
+    fn native_engine_startup_cycle_initializes_population_before_minute() {
+        let mut state = SimState::start_up(0x5261_f726);
+        state.advance_native_engine_cycle();
+        assert_eq!(state.kind(), KIND_OF_USE::KIND_NOTHING_TO_RUN);
+        assert_eq!(state.land().date(), AGE_OF_MATURITY);
+        assert_eq!(state.land().time(), (5 * TIME_HOUR_MINUTES + 1) as n_byte4);
+        assert_eq!(state.population(), INITIAL_POPULATION);
+        assert_eq!(state.selected_name(), Some("Ape 001"));
+        assert_eq!(state.adult_count(), INITIAL_POPULATION);
+        assert_eq!(state.juvenile_count(), 0);
+    }
+
+    #[test]
     fn land_cycle_advances_time_and_rolls_day() {
         let mut land = LandState::from_snapshot(LandSnapshot::new(
             10,
@@ -8360,6 +9711,64 @@ mod tests {
         assert_eq!(being.brainprobe()[0].state, 6);
         assert_eq!(being.immune_seed(), [55, 66]);
         assert_eq!(being.episodic_memory()[0].event, EVENT_EAT);
+    }
+
+    #[test]
+    fn native_raw_transfer_accepts_no_land_section() {
+        let native =
+            b"/* native tranfer_out header */\nsimul{\n\tsigna=20033;\n\tverio=708;\n};\n\n";
+        let transfer = startup_transfer_from_native_bytes(native).unwrap();
+        assert_eq!(transfer.land, LandSnapshot::new(0, [0, 0], 0));
+        assert!(transfer.beings.is_empty());
+    }
+
+    #[test]
+    fn native_raw_transfer_reads_inline_territory_words() {
+        let mut territory = vec!["0".to_string(); TERRITORY_AREA * 2];
+        territory[1] = "42".to_string();
+        let native = format!(
+            "simul{{signa=20033;verio=708;}};being{{locat=1,2;facin=3;terit={};}};",
+            territory.join(",")
+        );
+
+        let state = SimState::load_native_transfer_bytes(native.as_bytes()).unwrap();
+        let being = &state.beings()[0];
+        assert_eq!(being.location(), [1, 2]);
+        assert_eq!(being.facing(), 3);
+        assert_eq!(being.territory_memory()[0].familiarity, 42);
+    }
+
+    #[test]
+    fn native_raw_transfer_preserves_full_inline_territory_words() {
+        let mut territory = vec!["0".to_string(); TERRITORY_AREA * 2];
+        territory[0] = "513".to_string();
+        territory[1] = "42".to_string();
+        let native = format!(
+            "simul{{signa=20033;verio=708;}};being{{locat=1,2;facin=3;terit={};}};",
+            territory.join(",")
+        );
+
+        let state = SimState::load_native_transfer_bytes(native.as_bytes()).unwrap();
+        assert_eq!(state.beings()[0].territory_memory()[0].name, 1);
+        assert_eq!(state.beings()[0].territory_memory()[0].familiarity, 42);
+
+        let roundtrip = state.tranfer_startup_out_raw_native();
+        let roundtrip_text = std::str::from_utf8(roundtrip.written_data()).unwrap();
+        assert!(roundtrip_text.contains("\tterit=513,42,"));
+    }
+
+    #[test]
+    fn native_raw_transfer_writer_matches_empty_c_stream_shape() {
+        let startup = StartupTransfer::empty(LandSnapshot::new(7, [11, 12], 13));
+        let raw = tranfer_startup_out_raw_native(&startup);
+        let expected = format!(
+            "/*\n\t{}{FULL_DATE}\n\t{}Tom Barbalet. All rights reserved.\n*/\n\nsimul{{\n\tsigna=20033;\n\tverio=708;\n}};\n\n",
+            SHORT_VERSION_NAME, COPYRIGHT_DATE
+        );
+        assert_eq!(raw.written_data(), expected.as_bytes());
+        assert!(!std::str::from_utf8(raw.written_data())
+            .unwrap()
+            .contains("landd{"));
     }
 
     #[test]
@@ -8914,6 +10323,7 @@ mod tests {
     fn being_summary_projects_to_and_from_native_simulated_being() {
         let mut state = SimState::start_up(0x5261_f726);
         state.reset_new_simulation_from_land_seed();
+        state.advance_native_engine_cycle();
         let first = state.beings()[0].clone();
         let native = first.to_simulated_being();
         assert_eq!(native.constant.date_of_birth, first.date_of_birth());
@@ -8952,6 +10362,7 @@ mod tests {
     fn startup_transfer_roundtrips_extended_being_summary_fields() {
         let mut state = SimState::start_up(0x5261_f726);
         state.reset_new_simulation_from_land_seed();
+        state.advance_native_engine_cycle();
         let first = state.beings()[0].clone();
         let saved = state.tranfer_startup_out_json();
         let saved_json =
@@ -9011,11 +10422,12 @@ mod tests {
         assert_eq!(state.juvenile_count(), 0);
 
         state.reset_new_simulation_from_land_seed();
-        assert_eq!(state.population(), INITIAL_POPULATION);
+        assert_eq!(state.population(), 0);
         assert_eq!(state.adult_count(), 0);
-        assert_eq!(state.juvenile_count(), INITIAL_POPULATION);
+        assert_eq!(state.juvenile_count(), 0);
 
-        state.prepare_land_for_first_cycle();
+        state.advance_native_engine_cycle();
+        assert_eq!(state.population(), INITIAL_POPULATION);
         assert_eq!(state.adult_count(), INITIAL_POPULATION);
         assert_eq!(state.juvenile_count(), 0);
     }
@@ -9024,12 +10436,16 @@ mod tests {
     fn advance_minutes_cycles_populated_beings_and_land_time() {
         let mut state = SimState::start_up(0x5261_f726);
         state.reset_new_simulation_from_land_seed();
+        state.advance_native_engine_cycle();
         let before = state.beings()[0].clone();
         state.advance_minutes(400);
         let after = &state.beings()[0];
 
-        assert_eq!(state.land().time(), 400);
-        assert_eq!(state.land().date(), 0);
+        assert_eq!(
+            state.land().time(),
+            (5 * TIME_HOUR_MINUTES + 401) as n_byte4
+        );
+        assert_eq!(state.land().date(), AGE_OF_MATURITY);
         assert_eq!(state.kind(), KIND_OF_USE::KIND_NOTHING_TO_RUN);
         assert_ne!(after.location(), before.location());
         assert_ne!(after.facing(), before.facing());
@@ -9040,16 +10456,22 @@ mod tests {
     #[test]
     fn awake_level_follows_energy_time_and_speed_like_c() {
         let mut being = BeingSummary::new("Sleeper".to_string(), 512, 258, 0, [2, 3, 4, 5]);
+        let night_land = LandState::new();
+        let mut day_land = LandState::new();
+        day_land.time = 400;
+        let mut water_night_land = LandState::new();
+        water_night_land.tide_level = 1;
         being.energy_delta(i32::from(BEING_FULL));
-        assert_eq!(being.awake_level_for_time(0), FULLY_ASLEEP);
-        assert_eq!(being.awake_level_for_time(400), FULLY_AWAKE);
+        assert_eq!(being.awake_level_for_time(&night_land), FULLY_ASLEEP);
+        assert_eq!(being.awake_level_for_time(&day_land), FULLY_AWAKE);
+        assert_eq!(being.awake_level_for_time(&water_night_land), FULLY_AWAKE);
         being.set_speed(1);
-        assert_eq!(being.awake_level_for_time(0), SLIGHTLY_AWAKE);
+        assert_eq!(being.awake_level_for_time(&night_land), SLIGHTLY_AWAKE);
         being.set_speed(0);
         being.energy = BEING_HUNGRY;
-        assert_eq!(being.awake_level_for_time(0), SLIGHTLY_AWAKE);
+        assert_eq!(being.awake_level_for_time(&night_land), SLIGHTLY_AWAKE);
         being.energy = BEING_DEAD;
-        assert_eq!(being.awake_level_for_time(400), FULLY_ASLEEP);
+        assert_eq!(being.awake_level_for_time(&day_land), FULLY_ASLEEP);
     }
 
     #[test]
@@ -9071,13 +10493,39 @@ mod tests {
     }
 
     #[test]
+    fn immune_transmission_spreads_matching_pathogen_shapes() {
+        let mut carrier = BeingSummary::new("Carrier".to_string(), 512, 258, 0, [2, 3, 4, 5]);
+        let mut exposed = BeingSummary::new("Exposed".to_string(), 768, 300, 0, [3, 4, 5, 6]);
+        carrier.immune_antigens[0] = 10;
+        carrier.immune_shape_antigen[0] = random_pathogen(9, PATHOGEN_TRANSMISSION_AIR);
+
+        for seed in 0..20_000 {
+            let mut candidate_carrier = carrier.clone();
+            let mut candidate_exposed = exposed.clone();
+            candidate_carrier.immune_seed = [seed, seed ^ 0x3333];
+            candidate_carrier.immune_transmit_to(&mut candidate_exposed, PATHOGEN_TRANSMISSION_AIR);
+            if candidate_exposed
+                .immune_shape_antigen()
+                .contains(&carrier.immune_shape_antigen[0])
+            {
+                exposed = candidate_exposed;
+                break;
+            }
+        }
+
+        assert!(exposed
+            .immune_shape_antigen()
+            .contains(&carrier.immune_shape_antigen[0]));
+    }
+
+    #[test]
     fn drive_cycle_updates_hunger_fatigue_social_and_maturity() {
         let mut being = BeingSummary::new("Driven".to_string(), 512, 258, 0, [2, 3, 4, 5]);
         being.energy = BEING_HUNGRY - 1;
         being.set_speed(FATIGUE_SPEED_THRESHOLD + 1);
         being.awake_level = FULLY_AWAKE;
         being.drives = [0; DRIVES];
-        being.cycle_drives(AGE_OF_MATURITY + 1);
+        being.cycle_drives(AGE_OF_MATURITY + 1, 1);
         assert_eq!(being.drive(DRIVE_HUNGER), 1);
         assert_eq!(being.drive(DRIVE_SOCIAL), 1);
         assert_eq!(being.drive(DRIVE_FATIGUE), 1);
@@ -9193,6 +10641,7 @@ mod tests {
     fn body_and_social_native_state_initializes_and_roundtrips() {
         let mut state = SimState::start_up(0x5261_f726);
         state.reset_new_simulation_from_land_seed();
+        state.advance_native_engine_cycle();
         let first = &state.beings()[0];
         assert_eq!(body_inventory_description(BODY_HEAD), "Head");
         assert_eq!(first.body_attention_description(), "Head");
@@ -9516,7 +10965,7 @@ mod tests {
         assert_ne!(mother.fetal_genetics(), [0; CHROMOSOMES]);
 
         let mut population = PopulationState::from_beings(vec![mother, father], 4);
-        population.lifecycle_loop(1 + GESTATION_DAYS, 20);
+        population.lifecycle_loop(1 + GESTATION_DAYS + 1, 20);
 
         assert_eq!(population.len(), 3);
         let child = &population.beings()[2];
@@ -9537,6 +10986,50 @@ mod tests {
             .social_memory()
             .iter()
             .any(|entry| matches!(entry.relationship, RELATIONSHIP_DAUGHTER | RELATIONSHIP_SON)));
+    }
+
+    #[test]
+    fn lifecycle_carrying_and_suckling_follow_native_state_shape() {
+        let mut mother = BeingSummary::new(
+            "Mother".to_string(),
+            n_byte2::from(SEX_FEMALE) << 8,
+            100,
+            0,
+            [3, 4, 5, 6],
+        );
+        let mut father = BeingSummary::new(
+            "Father".to_string(),
+            n_byte2::from(SEX_MALE) << 8,
+            200,
+            0,
+            [2, 7, 8, 9],
+        );
+        mother.energy = BEING_FULL;
+        father.energy = BEING_FULL;
+        mother.immune_antibodies[0] = 20;
+        mother.immune_shape_antibody[0] = 99;
+        social_conception_native(&mut mother, &mut father, 1, 10);
+
+        let mut population = PopulationState::from_beings(vec![mother, father], 4);
+        population.lifecycle_loop(1 + GESTATION_DAYS + 1, 20);
+        assert_eq!(population.len(), 3);
+        assert!(population.beings()[0].inventory()[usize::from(BODY_BACK)] & INVENTORY_CHILD != 0);
+
+        population.beings[2].energy = BEING_HUNGRY - 1;
+        let mother_energy = population.beings()[0].energy();
+        population.lifecycle_loop(1 + GESTATION_DAYS + 1, 21);
+        assert!(population.beings()[0].energy() < mother_energy);
+        assert!(population.beings()[2].energy() >= BEING_HUNGRY);
+        assert!(population.beings()[2].macro_state() & BEING_STATE_SUCKLING != 0);
+        assert_eq!(population.beings()[2].immune_antibodies()[0], 20);
+        assert_eq!(population.beings()[2].immune_shape_antibody()[0], 99);
+        assert!(population.beings()[0].inventory()[usize::from(BODY_FRONT)] & INVENTORY_CHILD != 0);
+
+        population.lifecycle_loop(1 + GESTATION_DAYS + CARRYING_DAYS, 22);
+        assert_eq!(
+            population.beings()[0].inventory()[usize::from(BODY_BACK)] & INVENTORY_CHILD,
+            0
+        );
     }
 
     #[test]
@@ -9605,17 +11098,31 @@ mod tests {
         assert_eq!(state.land().genetics(), [23809, 53481]);
         assert_eq!(state.land().planet_genetics(), [46774, 42340]);
         assert_eq!(state.random_seed(), [27236, 50571]);
-        assert_eq!(state.population(), INITIAL_POPULATION);
+        assert_eq!(state.population(), 0);
         assert_eq!(state.max_population(), LARGE_SIM as usize);
+        assert_eq!(state.selected_name(), None);
+
+        state.advance_native_engine_cycle();
+        assert_eq!(state.kind(), KIND_OF_USE::KIND_NOTHING_TO_RUN);
+        assert_eq!(state.land().date(), AGE_OF_MATURITY);
+        assert_eq!(state.land().time(), (5 * TIME_HOUR_MINUTES + 1) as n_byte4);
+        assert_eq!(state.population(), INITIAL_POPULATION);
         assert_eq!(state.selected_name(), Some("Ape 001"));
-        assert_eq!(state.beings()[0].gender_name() >> 8, SEX_MALE as n_byte2);
-        assert_eq!(state.beings()[1].gender_name() >> 8, SEX_FEMALE as n_byte2);
+        assert!(matches!(
+            state.beings()[0].gender_name() >> 8,
+            value if value == SEX_MALE as n_byte2 || value == SEX_FEMALE as n_byte2
+        ));
+        assert!(matches!(
+            state.beings()[1].gender_name() >> 8,
+            value if value == SEX_MALE as n_byte2 || value == SEX_FEMALE as n_byte2
+        ));
     }
 
     #[test]
     fn population_selection_moves_and_finds_names() {
         let mut state = SimState::start_up(0x5261_f726);
         state.reset_new_simulation_from_land_seed();
+        state.advance_native_engine_cycle();
         assert_eq!(state.selected_name(), Some("Ape 001"));
         state.select_next();
         assert_eq!(state.selected_name(), Some("Ape 002"));
@@ -9708,6 +11215,7 @@ mod tests {
     fn sim_state_transfer_round_trips_initial_being_summaries() {
         let mut state = SimState::start_up(0x5261_f726);
         state.reset_new_simulation_from_land_seed();
+        state.advance_native_engine_cycle();
         let json = state.tranfer_startup_out_json();
         let loaded = SimState::load_startup_json(json.written_data()).unwrap();
         assert_eq!(loaded.population(), INITIAL_POPULATION);

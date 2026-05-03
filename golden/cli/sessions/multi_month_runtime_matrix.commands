@@ -1,0 +1,9 @@
+reset
+run 1 month
+sim
+run 2 months
+sim
+top female
+top male
+epic male
+quit

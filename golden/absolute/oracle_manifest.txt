@@ -2,5 +2,33 @@
 transcript | help | golden/cli/sessions/help.commands | raw-transcript-diff | exact C/Rust transport-normalized diff
 transcript | help_errors | golden/cli/sessions/help_errors.commands | raw-transcript-diff | exact C/Rust transport-normalized diff
 transcript | command_edges | golden/cli/sessions/command_edges.commands | raw-transcript-diff | exact C/Rust transport-normalized diff
+transcript | run_forever_empty | golden/cli/sessions/run_forever_empty.commands | raw-transcript-diff | safe run forever command-text and quit path
+transcript | runtime_edges_empty | golden/cli/sessions/runtime_edges_empty.commands | raw-transcript-diff | empty-population runtime/detail edges
+transcript | timing_stop_forever | golden/cli/sessions/timing_stop_forever.commands | interactive-timing | PTY stop after safe run forever
+timing | closed-stdin | scripts/run_closed_stdin_oracle.sh | interactive-timing | native output-class oracle canonicalized to exact diff
+timing | eof-verbose-command | scripts/canonicalize_eof_verbose_command_transcript.sh | interactive-timing | help-run output with native optional EOF console failures canonicalized
+timing | eof-bounded-run | scripts/canonicalize_eof_bounded_run_transcript.sh | interactive-timing | native output-order oracle canonicalized to exact diff
+timing | regression-lock | scripts/run_timing_regression_lock.sh | timing-regression | negative checks for banner/failure/stop ordering drift
+trace | trace_land_startup | golden/cli/sessions/trace_land_startup.commands | native-trace-oracle | command-visible land/time/tide trace extraction
+trace | c-engine-trace-probe | scripts/generate_c_engine_trace_probe.sh | native-engine-trace | direct C engine field trace for schema/value closure
+trace | engine-trace-schema | scripts/run_engine_trace_schema_gate.sh | engine-trace-schema | C/Rust trace field order gate before value closure
+trace | engine-trace-value | scripts/run_engine_trace_value_gate.sh | engine-trace-value | promoted startup, first-cycle, invariant, and runtime-core value subset with negative mutation check
+trace | terrain-food-first-cycle | scripts/run_terrain_food_first_cycle_gate.sh | engine-trace-value | exact startup and first-cycle multi-location terrain/weather/food gate
+trace | terrain-food-value-inventory | scripts/run_terrain_food_value_inventory.sh | engine-trace-value-inventory | multi-location terrain, highdef, tide, weather, food operator, and food classification inventory
+trace | selected-being-value-inventory | scripts/run_selected_being_value_inventory.sh | engine-trace-value-inventory | exact selected-being first-cycle native init and after-day runtime inventory
+platform | local-platform | scripts/run_platform_absolute_parity_gate.sh | platform | host manifest and optional absolute rerun
+profile | compiler-matrix | scripts/run_profile_compiler_matrix_gate.sh | profile-compiler | native/Rust debug/release transcript matrix
+ci | required-pipeline | scripts/run_required_absolute_parity_pipeline.sh | required | platform, absolute, profile/compiler, and failure-smoke gates
+ci | failure-smoke | scripts/run_absolute_parity_failure_smoke.sh | negative-gate | deliberate trace/transcript/save mutations fail
+fuzz | command-grammar | scripts/run_command_fuzz_gate.sh | raw-transcript-diff | deterministic C/Rust command grammar corpus
+fuzz | malformed-save | scripts/run_malformed_save_fuzz.sh | malformed-save | exact missing/empty/bad-json/truncated-native/random-text with unpromoted inventory captures
+fuzz | raw-binary-mutation | scripts/run_raw_binary_mutation_fuzz.sh | raw-binary | Rust rejection corpus until native byte oracle is promoted
+fuzz | seed-population | scripts/run_seed_population_fuzz.sh | seed-population | Rust deterministic repeatability until C value drift closes
+corpus | pending-corpus-inventory | scripts/run_pending_corpus_inventory.sh | corpus-inventory | blocker inventory for long/runtime/save-open/exhaustive promotion corpus
 save-open | cli-json | golden/cli/sessions/runtime_parity.commands | native-c-oracle | default C and Rust command paths reject JSON reopen
+save-open | native-save-artifacts | scripts/generate_native_save_artifacts.sh | native-save-artifacts | captures command-line save bytes and hashes
+layout | c-layout-probe | scripts/generate_c_layout_probe.sh | native-c-layout | optional AUDIT_FILE native layout report
 binary | raw-native | rust_port/raw_c_binary_oracle.md | native-c-oracle | no default CLI framed-binary substitute
+binary | native-raw-byte-oracle | scripts/generate_native_raw_binary_oracle.sh | native-raw-byte-oracle | direct C tranfer_out artifacts and token byte map
+binary | native-raw-byte-oracle-gate | scripts/run_native_raw_binary_oracle_gate.sh | native-raw-byte-oracle | reproducible hashes and byte map
+binary | native-raw-value-gate | scripts/run_native_raw_binary_value_gate.sh | native-raw-value | C/Rust value summaries and empty/reset byte roundtrip

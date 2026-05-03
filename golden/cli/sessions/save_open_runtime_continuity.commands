@@ -1,0 +1,8 @@
+reset
+run 1 day
+save /private/tmp/simape_runtime_continuity.json
+open /private/tmp/simape_runtime_continuity.json
+sim
+run 1 day
+sim
+quit

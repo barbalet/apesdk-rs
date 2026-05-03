@@ -1,0 +1,38 @@
+help
+reset
+clear
+sim
+memory
+list
+ape
+top
+top female
+top male
+top juvenile
+epic
+epic female
+watch
+monitor state
+stats
+appearance
+genome
+friends
+pathogen
+graph
+braincode
+speech
+episodic
+probes
+speak /private/tmp/simape_speak_surface.aiff
+alpha /private/tmp/simape_alpha_surface.aiff
+interval
+interval 1 minute
+logging
+event
+file simul
+file being
+next
+previous
+debug
+stop
+quit

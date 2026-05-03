@@ -9,10 +9,10 @@ Event output for social turned on
 run 5 minutes
 Running for 5 mins
 stats
-Ape 001 (1313 22) SW 
-H:064 S:080 F:000 X:112: Mixed drives: Sleeping
-Gen 0:0  Male    ERG:3840 SPD:0
-Honor:0  HEI:61  Old(Years:0  Days:0)
+Ape 001 (1227 777) ENE
+H:000 S:005 F:000 X:000: Find friends: Sleeping
+Gen 0:0  Female  ERG:3835 SPD:0
+Honor:0  HEI:61  Old(Years:12  Days:0)
 Aware Body: Head Link: Associate
 Friend
 Enemy
@@ -33,4 +33,17 @@ Simulation file /private/tmp/simape_runtime_parity.json saved
 
 open /private/tmp/simape_runtime_parity.json
 Simulation stopped
+String length : <N>
+Actual size : <N>
+String location : 6
+Failed text {"info
+Failed text 123
+Failed text 34
+Failed text 105
+Failed text 110
+Failed text 102
+Failed text 111
+ERROR: {"info @ ./toolkit/file.c 833
+ERROR: Unknown command @ ./toolkit/file.c 1011
+ERROR: Signature not first in file @ ./universe/transfer.c 286
 ERROR: Failed to read in file @ ./universe/command.c 2394
