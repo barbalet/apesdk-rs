@@ -38,7 +38,8 @@
 #define USE_FIL_SOE
 #define USE_FIL_EPI
 #define USE_FIL_TER
-#undef USE_FIL_WEA
+#define USE_FIL_TOP
+#define USE_FIL_WEA
 #undef USE_FIL_BRA
 
 /*	Land - References */
@@ -72,6 +73,11 @@
 #else
 #define TERRITORY_BYTES        0
 #endif
+
+#define TOPOGRAPHY_BYTES       (MAP_AREA * 2)
+#define WEATHER_ATMOSPHERE_BYTES (sizeof(n_c_int) * MAP_AREA * 2)
+#define WEATHER_LIGHTNING_OFFSET (WEATHER_ATMOSPHERE_BYTES)
+#define WEATHER_BYTES          (WEATHER_ATMOSPHERE_BYTES + MAP_AREA)
 
 #define PARA_BYTES      2
 #define PARA_ENTRIES    2
@@ -116,7 +122,8 @@ enum file_section_type
     FIL_WEA = ( 0x60 ),
     FIL_BRA = ( 0x70 ),
     FIL_TER = ( 0x80 ),
-    FIL_END = ( 0x90 )
+    FIL_TOP = ( 0x90 ),
+    FIL_END = ( 0xA0 )
 };
 
 static const simulated_file_entry simulated_file_format[] =
@@ -133,12 +140,17 @@ static const simulated_file_entry simulated_file_format[] =
     {"landg=", FIL_LAN | FILE_TYPE_BYTE2, 2, 6,  "Seed that created the land"},
 
 #endif
+#ifdef USE_FIL_TOP
+    {"topog{", FIL_TOP,  0, 0, "topography definition"},
+    {"topby=", FIL_TOP | FILE_TYPE_BYTE, TOPOGRAPHY_BYTES, 0, "Topography byte buffers"},
+#endif
     /* the line above is a substantial limit to the simulation space. The weather will limit the map area to;
      ((sizeof(n_int)/2) * (MAP_AREA)/(256*256)) <= 255
      */
 #ifdef USE_FIL_WEA
-    {"weath{", FIL_WEA,  0, 0},
-    {"press=", FIL_WEA | FILE_TYPE_BYTE,    sizeof( n_c_int ),    0},
+    {"weath{", FIL_WEA,  0, 0, "weather definition"},
+    {"atmby=", FIL_WEA | FILE_TYPE_BYTE, WEATHER_ATMOSPHERE_BYTES, 0, "Atmosphere byte buffers"},
+    {"litby=", FIL_WEA | FILE_TYPE_BYTE, MAP_AREA, WEATHER_LIGHTNING_OFFSET, "Lightning byte buffer"},
 #endif
 
 #ifndef REDUCE_FILE /* FILE_TYPE_PACKED has a different form - no offset and the number is the size of the PACKED_DATA_BLOCK units */

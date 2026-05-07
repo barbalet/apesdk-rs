@@ -314,6 +314,6 @@ folders.
 - The banner contains `__DATE__`, which changes when C is rebuilt.
 - Error text includes C source paths and line numbers.
 - POSIX console behavior is threaded.
-- Save via `tranfer_out_json` currently creates JSON that `command_open` fails
-  to read as a native transfer file in the captured startup smoke transcript.
+- Default command-line `save` now uses native transfer text; JSON transfer
+  remains a library compatibility path rather than the CLI parity target.
 - `APESCRIPT_INCLUDED` is undefined, even though `script/*.c` is compiled.

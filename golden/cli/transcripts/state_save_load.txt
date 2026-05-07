@@ -4,7 +4,7 @@
 
 sim
 Map dimension: 512
-Land seed: 6443 36036
+Land seed: 39986 1328
 Population: 0
 Adults: 0   Juveniles: 0
 Tide level: 0
@@ -21,17 +21,7 @@ Simulation file /private/tmp/simape_cycle02_save.txt saved
 
 open /private/tmp/simape_cycle02_save.txt
 Simulation stopped
-String length : 170
-Actual size : 347
-String location : 6
-Failed text {"info
-Failed text 123
-Failed text 34
-Failed text 105
-Failed text 110
-Failed text 102
-Failed text 111
-ERROR: {"info @ ./toolkit/file.c 833
-ERROR: Unknown command @ ./toolkit/file.c 1011
-ERROR: Signature not first in file @ ./universe/transfer.c 677
-ERROR: Failed to read in file @ ./universe/command.c 2394
+Simulation file /private/tmp/simape_cycle02_save.txt open
+
+quit
+Simulation stopped

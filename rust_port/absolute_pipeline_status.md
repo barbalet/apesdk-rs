@@ -76,9 +76,10 @@ Cycle 511-540 update: the absolute pipeline now runs a selected minute-60 value
 gate, save/open continuity inventory, and populated raw fixture inventory. The
 minute-60 selected core is exact for movement/body/energy/honor/drive samples,
 while minute-60 brain/social and later selected-minute rows remain inventory.
-Save/open continuity is present but raw-diff blocked, and the broader populated
-raw fixture set is explicitly tracked as social-heavy, immune-heavy,
-terrain-heavy, and save/open-derived artifacts.
+Save/open continuity is present on the default native transfer path; remaining
+promotion work is value-level populated runtime drift and the broader populated
+raw fixture set tracked as social-heavy, immune-heavy, terrain-heavy, and
+save/open-derived artifacts.
 
 Cycle 541-550 update: exact corpus promotion and final signoff now have strict
 readiness commands. `scripts/run_exact_corpus_promotion_gate.sh` fails while any

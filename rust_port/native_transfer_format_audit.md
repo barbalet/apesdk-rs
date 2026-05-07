@@ -15,13 +15,17 @@ being{locat=...,...;facin=...;...;};
 ```
 
 `tranfer_in` strips comments and whitespace with `io_whitespace`, requires
-`FIL_VER` first, then accepts `FIL_LAN`, `FIL_BEI`, social, episodic, and
-territory sections. In this checkout `USE_FIL_VER`, `USE_FIL_LAN`,
-`USE_FIL_BEI`, `USE_FIL_SOE`, `USE_FIL_EPI`, and `USE_FIL_TER` are enabled.
+`FIL_VER` first, then accepts `FIL_LAN`, topography, weather, `FIL_BEI`,
+social, episodic, and territory sections. In this checkout `USE_FIL_VER`,
+`USE_FIL_LAN`, `USE_FIL_TOP`, `USE_FIL_WEA`, `USE_FIL_BEI`, `USE_FIL_SOE`,
+`USE_FIL_EPI`, and `USE_FIL_TER` are enabled.
 
 The C CLI `save` path now uses `tranfer_out()` instead of the JSON-only writer,
 so native command-line save/open has a real round trip for startup and populated
-sessions.
+sessions. The topography section writes both `MAP_AREA` byte buffers, and the
+weather section writes both raw atmosphere buffers plus the lightning byte map.
+The high-definition topography/tide buffers remain generated from the loaded
+map and time.
 
 ## Rust Coverage Added In Cycles 121-125
 
@@ -43,9 +47,7 @@ format, so existing JSON behavior remains unchanged.
 
 Rust now also loads `sgcia` social sections, `episo` episodic sections,
 braincode registers/probes, and immune bytes from native `being` sections.
-It can write native transfer text through `tranfer_startup_out_native`, and
-the CLI writes native transfer files when saving to filenames containing
-`.native` or ending in `.ape`.
+It can write native transfer text through `tranfer_startup_out_native`.
 
 ## Cycle 145-160 Update
 
@@ -54,10 +56,18 @@ non-empty territory entries through native transfer text as `terri` sections.
 JSON transfer also includes the complete territory array under
 `events.territory`, preserving the existing structured transfer path.
 
+## Current Update
+
+Rust CLI `save` now uses `tranfer_startup_out_native()` for every filename, so
+the default command-line path no longer writes the older JSON transfer. Rust
+`open` accepts C `topog{}` and `weath{}` sections so C command-line saves with
+terrain/weather bytes remain readable during the next land-state porting pass.
+
 ## Remaining Work
 
-Next binary/native cycles should port weather sections, older version migration
-behavior, raw byte-structured compatibility if required by external save
-corpora, and deeper C-vs-Rust fixture generation. Raw byte-structured
-compatibility remains unsupported because the C command-line writer currently
-emits the native text format, not a raw `NA` byte stream.
+Next binary/native cycles should port the Rust-side semantic storage for those
+topography/weather bytes, older version migration behavior, raw byte-structured
+compatibility if required by external save corpora, and deeper C-vs-Rust
+fixture generation. Raw byte-structured compatibility remains unsupported
+because the C command-line writer currently emits the native text format, not a
+raw `NA` byte stream.

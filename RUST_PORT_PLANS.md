@@ -2,7 +2,7 @@
 
 Consolidated numbered Rust port plans. Each section begins with the original numbered filename so plan ranges remain visible without keeping one file per range.
 
-Included files: 6.
+Included files: 7.
 
 ## Index
 
@@ -12,6 +12,7 @@ Included files: 6.
 - [RUST_PORT_CYCLE_301_400_PLAN.md](#rust-port-cycle-301-400-planmd)
 - [RUST_PORT_CYCLE_366_400_PLAN.md](#rust-port-cycle-366-400-planmd)
 - [RUST_PORT_CYCLE_411_500_PLAN.md](#rust-port-cycle-411-500-planmd)
+- [RUST_PORT_CYCLE_551_620_PLAN.md](#rust-port-cycle-551-620-planmd)
 
 ---
 
@@ -3759,3 +3760,193 @@ promotion inventory. It reports `status=blocked` by default and exits non-zero
 in strict mode through `APESDK_REQUIRE_ABSOLUTE_SIGNOFF=1` until no blocker
 categories remain.
 
+---
+
+<a id="rust-port-cycle-551-620-planmd"></a>
+
+## RUST_PORT_CYCLE_551_620_PLAN.md
+
+Original file: `RUST_PORT_CYCLE_551_620_PLAN.md`
+
+# Rust Port Cycle 551-620 Completion Plan
+
+## Scope
+
+This 70-cycle plan starts after the completed cycle 550 readiness inventory and
+targets transcript-level native C parity for the command-line `simape`. The
+focus is to remove the remaining readiness blockers rather than add more
+inventory-only gates.
+
+The planned cycle budget is:
+
+- 12 cycles: Rust semantic terrain/weather/topography load/store parity for the
+  new C transfer sections.
+- 15 cycles: braincode execution, probe updates, social hooks, and
+  selected-being minute/runtime drift.
+- 12 cycles: after-day movement/body/energy/honor/social/episodic/immune value
+  closure.
+- 10 cycles: populated save/open continuity and post-load advancement parity.
+- 8 cycles: broader populated raw fixtures: social-heavy, immune-heavy,
+  terrain-heavy, and save/open-derived.
+- 8 cycles: promote long seeded, multi-day/month, save/open, and exhaustive
+  corpora into exact gates.
+- 5 cycles: nondeterminism, profile/platform checks, cleanup, and strict
+  signoff.
+
+## Rust Land Transfer Semantics: Cycles 551-562
+
+- Cycle 551: Extend Rust startup/native transfer state to carry optional raw
+  topography and weather payloads from C `topog{}` and `weath{}` sections.
+- Cycle 552: Parse and validate `topby=` byte counts against both native
+  topography buffers without rejecting older native files that omit the section.
+- Cycle 553: Parse and validate `atmby=` and `litby=` byte counts for both raw
+  atmosphere buffers and the lightning map.
+- Cycle 554: Add Rust `LandState` storage or snapshot hooks for loaded
+  topography buffers without perturbing generated startup terrain behavior.
+- Cycle 555: Add Rust `LandState` storage or snapshot hooks for loaded
+  atmosphere and lightning bytes without perturbing generated startup weather.
+- Cycle 556: Rebuild high-definition topography and tide maps from loaded
+  topography/time in the same order as C load.
+- Cycle 557: Preserve loaded topography/weather bytes across default Rust
+  save-open-save loops.
+- Cycle 558: Add C fixture checks proving Rust can read C saves containing
+  `topog{}` and `weath{}` and retain command-visible land values.
+- Cycle 559: Add Rust writer support for terrain/weather native sections when
+  loaded byte payloads are available.
+- Cycle 560: Compare C/Rust post-load terrain/weather trace rows for startup,
+  after one minute, and after one day.
+- Cycle 561: Promote terrain/weather transfer preservation into the save/open
+  continuity inventory with mutation checks.
+- Cycle 562: Remove land transfer byte-preservation blockers from the drift
+  register when exact gates pass.
+
+## Brain, Probe, Social Runtime: Cycles 563-577
+
+- Cycle 563: Capture native internal/external braincode initialization bytes for
+  selected and neighboring beings.
+- Cycle 564: Initialize Rust internal braincode bytes to match native reset and
+  first-cycle values.
+- Cycle 565: Initialize Rust external/social braincode bytes to match native
+  self and first social-memory slots.
+- Cycle 566: Enable native-equivalent internal braincode execution at the exact
+  minute-cycle point without disturbing first-cycle promoted baselines.
+- Cycle 567: Enable native-equivalent external/social braincode execution at
+  the C social hook point.
+- Cycle 568: Match brain register mutation, brain state updates, and random
+  consumption through minute 60.
+- Cycle 569: Match probe type, address, frequency, offset, position, and state
+  updates through selected-minute traces.
+- Cycle 570: Match shout, speech, listen, and attention side effects connected
+  to braincode runtime.
+- Cycle 571: Match social target selection and vicinity ordering after
+  braincode execution is active.
+- Cycle 572: Match social graph updates for attraction, belief, friend/foe,
+  familiarity, relationship, and entity type.
+- Cycle 573: Match chat, grooming, squabble, mate, and anecdote insertion side
+  effects in social-heavy traces.
+- Cycle 574: Close selected minute-60 brain/social trace mismatches and promote
+  those rows from inventory.
+- Cycle 575: Extend exact selected-minute gates beyond minute 60 to the first
+  day boundary for brain/social fields.
+- Cycle 576: Add mutation checks for brain register, probe, and social-memory
+  promoted fields.
+- Cycle 577: Remove brain/probe/social runtime blockers from corpus and final
+  readiness inventories.
+
+## After-Day Runtime Value Closure: Cycles 578-589
+
+- Cycle 578: Re-run selected-minute and selected-being inventories after
+  brain/social closure and identify remaining first-day divergence.
+- Cycle 579: Close awake-state transitions that still differ after day/night,
+  water, hunger, and prior-speed cases.
+- Cycle 580: Close selected-being movement vector, facing, speed history, and
+  wander ordering through after-day traces.
+- Cycle 581: Close movement/resting/eating energy costs at the selected being's
+  exact native locations.
+- Cycle 582: Close body mass, body fat, height/growth, posture, wound,
+  parasite, grooming, and inventory side effects after one day.
+- Cycle 583: Close honor recalibration and social honor side effects exposed by
+  the after-day selected row.
+- Cycle 584: Close drive reset/order drift for hunger, fatigue, sex, and social
+  values beyond minute 60.
+- Cycle 585: Close episodic replacement, fade, event, affect, food, argument,
+  and location drift over first-day traces.
+- Cycle 586: Close immune runtime mutation, antigen/antibody shape, random
+  seed, infection response, and energy-use drift.
+- Cycle 587: Promote after-day selected-being movement/body/energy/honor,
+  episodic, immune, and preference fields into exact value gates.
+- Cycle 588: Add mutation checks for every newly promoted after-day runtime
+  field group.
+- Cycle 589: Remove selected-runtime blockers from final signoff readiness.
+
+## Populated Save/Open Continuity: Cycles 590-599
+
+- Cycle 590: Capture C/Rust populated save/open state summaries immediately
+  before save, immediately after open, and after one post-open minute.
+- Cycle 591: Preserve selected-being identity, random state, and selection
+  across populated Rust save/open.
+- Cycle 592: Preserve social, episodic, immune, brain/probe, territory, and
+  preference state across populated Rust save/open.
+- Cycle 593: Preserve loaded land topography/weather/tide/food state across
+  populated save/open.
+- Cycle 594: Match post-open one-minute advancement for movement/body/brain/
+  social/immune/terrain fields.
+- Cycle 595: Match post-open one-day and multi-day advancement against native
+  state traces.
+- Cycle 596: Match malformed populated-open failure/recovery behavior without
+  changing exact malformed-loader diagnostics.
+- Cycle 597: Promote `save_open_runtime_continuity` state traces into exact
+  save/open gates.
+- Cycle 598: Add save/open mutation checks for selected, land, population, and
+  artifact bytes.
+- Cycle 599: Remove save/open continuity blockers from pending corpus and final
+  readiness inventories.
+
+## Broader Populated Raw Fixtures: Cycles 600-607
+
+- Cycle 600: Generate native social-heavy populated raw fixture artifacts from
+  direct `tranfer_out()` or an equivalent command-reachable C oracle.
+- Cycle 601: Generate native immune-heavy populated raw fixture artifacts.
+- Cycle 602: Generate native terrain/weather-heavy populated raw fixture
+  artifacts using the byte-complete C land transfer layer.
+- Cycle 603: Generate save/open-derived populated raw fixture artifacts.
+- Cycle 604: Add Rust reader value summaries for every new populated raw
+  fixture.
+- Cycle 605: Add Rust writer byte-roundtrip checks for every new populated raw
+  fixture.
+- Cycle 606: Promote broader populated raw fixtures into native raw value/byte
+  gates with mutation checks.
+- Cycle 607: Remove populated raw fixture blockers from corpus and final
+  readiness inventories.
+
+## Exact Corpus Promotion: Cycles 608-615
+
+- Cycle 608: Promote `long_seeded_command_corpus` into exact raw transcript,
+  state trace, and artifact gates.
+- Cycle 609: Promote `multi_day_runtime_matrix` into exact transcript and state
+  trace gates.
+- Cycle 610: Promote `multi_month_runtime_matrix` into exact transcript and
+  state trace gates.
+- Cycle 611: Promote `save_open_runtime_continuity` into exact transcript,
+  state trace, and byte artifact gates.
+- Cycle 612: Promote `exhaustive_command_surface` into exact raw transcript
+  gates, including file-producing commands.
+- Cycle 613: Merge redundant corpus coverage and delete obsolete pending-only
+  fixtures after exact replacements exist.
+- Cycle 614: Make corpus promotion fail on any regression to blocked, triage,
+  inventory, or pending status.
+- Cycle 615: Wire all promoted corpora into the required absolute parity
+  pipeline and profile/platform gates.
+
+## Final Strict Signoff: Cycles 616-620
+
+- Cycle 616: Run repeated clean-checkout absolute parity to catch
+  nondeterminism across generated artifacts and long corpora.
+- Cycle 617: Run debug/release/profile/compiler matrix checks and close any
+  profile-specific drift.
+- Cycle 618: Run platform checks or record constrained host-oracle behavior
+  where a second native platform is unavailable.
+- Cycle 619: Remove or reclassify all remaining accepted-difference,
+  documented-difference, pending, inventory-only, and triage-only markers.
+- Cycle 620: Final absolute native C parity signoff with strict readiness mode
+  passing and no accepted/documented differences left.

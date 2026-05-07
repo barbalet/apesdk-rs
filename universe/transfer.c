@@ -186,6 +186,32 @@ static void transfer_unpack_land( n_byte *data )
                      genetics );
 }
 
+static void transfer_pack_topography( n_byte *data, n_uint size )
+{
+    memory_erase( data, size );
+    memory_copy( land_topography(), data, TOPOGRAPHY_BYTES );
+}
+
+static void transfer_unpack_topography( n_byte *data )
+{
+    memory_copy( data, land_topography(), TOPOGRAPHY_BYTES );
+    land_init_high_def( 1 );
+    land_tide();
+}
+
+static void transfer_pack_weather( n_byte *data, n_uint size )
+{
+    memory_erase( data, size );
+    memory_copy( ( n_byte * )land_weather( 0 ), data, WEATHER_ATMOSPHERE_BYTES );
+    memory_copy( land_weather_lightning( 0 ), &data[WEATHER_LIGHTNING_OFFSET], MAP_AREA );
+}
+
+static void transfer_unpack_weather( n_byte *data )
+{
+    memory_copy( data, ( n_byte * )land_weather( 0 ), WEATHER_ATMOSPHERE_BYTES );
+    memory_copy( &data[WEATHER_LIGHTNING_OFFSET], land_weather_lightning( 0 ), MAP_AREA );
+}
+
 #ifdef TERRITORY_ON
 static void transfer_pack_inline_territory( n_byte *data, simulated_iplace *territory )
 {
@@ -401,6 +427,7 @@ static void transfer_unpack_episodic( n_byte *data, simulated_iepisodic *episodi
 static void transfer_land( n_file *tranfer_out, simulated_group *group, simulated_file_entry *format, n_byte *store, n_uint store_size )
 {
     n_byte2    loc_signature[2] = {( n_byte2 )SIMULATED_APE_SIGNATURE, ( n_byte2 )VERSION_NUMBER};
+    ( void )group;
 
 #ifdef USE_FIL_VER
     io_write_buff( tranfer_out, loc_signature, format, FIL_VER, 0L );
@@ -409,8 +436,13 @@ static void transfer_land( n_file *tranfer_out, simulated_group *group, simulate
     transfer_pack_land( store, store_size );
     io_write_buff( tranfer_out, store, format, FIL_LAN, 0L );
 #endif
+#ifdef USE_FIL_TOP
+    transfer_pack_topography( store, store_size );
+    io_write_buff( tranfer_out, store, format, FIL_TOP, 0L );
+#endif
 #ifdef USE_FIL_WEA
-    io_write_buff( tranfer_out, value->weather, format, FIL_WEA, 0L );
+    transfer_pack_weather( store, store_size );
+    io_write_buff( tranfer_out, store, format, FIL_WEA, 0L );
 #endif
 }
 
@@ -707,6 +739,12 @@ n_int    tranfer_in( n_file *input_file )
             {
             case FIL_LAN:
                 transfer_unpack_land( temp_store );
+                break;
+            case FIL_TOP:
+                transfer_unpack_topography( temp_store );
+                break;
+            case FIL_WEA:
+                transfer_unpack_weather( temp_store );
                 break;
             case FIL_BEI:
                 if ( ape_count >= group->max )

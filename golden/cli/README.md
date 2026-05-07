@@ -60,11 +60,11 @@ separate console reads.
 That file is intentionally not part of the repository because it contains
 randomly seeded simulation state.
 
-Current C behavior: command-line `save` writes native transfer text and
-command-line `open` reopens that format. Older JSON-reopen transcript fixtures
-are historical until the Rust default `save` path is retargeted to the completed
-C transfer behavior; alternate JSON/framed-binary compatibility loaders remain
-outside the native command-line parity gate.
+Current C and Rust command-line behavior: `save` writes native transfer text and
+`open` reopens that format. The C transfer now includes command-line land
+topography/weather byte sections (`topog{}` and `weath{}`), while Rust accepts
+those sections on read and keeps JSON/framed-binary support outside the native
+command-line parity gate.
 
 ## Harness
 

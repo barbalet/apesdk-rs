@@ -1126,7 +1126,7 @@ impl Console {
 
         self.simulation_running = false;
         let mut output = String::from("Simulation stopped\n");
-        let file = self.state.tranfer_startup_out_json();
+        let file = self.state.tranfer_startup_out_native();
         match fs::write(path, file.written_data()) {
             Ok(()) => {
                 output.push_str("Simulation file ");
@@ -1220,7 +1220,7 @@ fn native_loader_prefix_diagnostics(contents: &[u8]) -> Option<String> {
     output.push_str(&failed_text);
     output.push_str(" @ ./toolkit/file.c 833\n");
     output.push_str("ERROR: Unknown command @ ./toolkit/file.c 1011\n");
-    output.push_str("ERROR: Signature not first in file @ ./universe/transfer.c 677\n");
+    output.push_str("ERROR: Signature not first in file @ ./universe/transfer.c 709\n");
     Some(output)
 }
 
@@ -3167,14 +3167,14 @@ mod tests {
             )
         );
         assert_eq!(
-            fs::read(&path).expect("saved JSON should be readable"),
-            b"{\"information\":{\"signature\":20033,\"version number\":708,\"copyright\":\"Copyright Tom Barbalet, 1996-2026.\",\"date\":\"May  1 2026\"},\"land\":{\"date\":0,\"genetics\":[7633,53305],\"time\":1}}"
+            fs::read(&path).expect("saved native transfer should be readable"),
+            b"simul{signa=20033;verio=708;};\nlandd{dated=0;timed=1;landg=7633,53305;};\n"
         );
         let _ = fs::remove_file(path);
     }
 
     #[test]
-    fn save_command_writes_startup_transfer_json() {
+    fn save_command_writes_startup_native_transfer() {
         let path = temp_save_path("startup_save");
         let path_string = path.to_string_lossy();
         let mut console = Console::default();
@@ -3187,8 +3187,8 @@ mod tests {
             )
         );
         assert_eq!(
-            fs::read(&path).expect("saved JSON should be readable"),
-            b"{\"information\":{\"signature\":20033,\"version number\":708,\"copyright\":\"Copyright Tom Barbalet, 1996-2026.\",\"date\":\"May  1 2026\"},\"land\":{\"date\":0,\"genetics\":[7633,53305],\"time\":0}}"
+            fs::read(&path).expect("saved native transfer should be readable"),
+            b"simul{signa=20033;verio=708;};\nlandd{dated=0;timed=0;landg=7633,53305;};\n"
         );
         let _ = fs::remove_file(path);
     }
@@ -3219,7 +3219,7 @@ mod tests {
         assert!(actual.contains(&format!("open {path_string}\nSimulation stopped\n")));
         assert!(actual.contains("String length : "));
         assert!(actual.contains("Failed text {\"info\n"));
-        assert!(actual.contains("ERROR: Signature not first in file @ ./universe/transfer.c 677\n"));
+        assert!(actual.contains("ERROR: Signature not first in file @ ./universe/transfer.c 709\n"));
         assert!(actual.contains("ERROR: Failed to read in file @ ./universe/command.c 2394\n"));
         let _ = fs::remove_file(path);
     }
@@ -3285,7 +3285,7 @@ mod tests {
     }
 
     #[test]
-    fn save_native_extension_writes_json_like_native_c_cli() {
+    fn save_native_extension_writes_native_transfer_and_roundtrips() {
         let path = temp_save_path("roundtrip.native");
         let path_string = path.to_string_lossy();
         let mut console = Console::default();
@@ -3295,18 +3295,18 @@ mod tests {
         );
         assert!(saved.contains("Simulation file "));
         let saved_native = fs::read_to_string(&path).expect("native extension save should exist");
-        assert!(saved_native.starts_with("{\"information\""));
-        assert!(saved_native.contains("\"beings\":["));
+        assert!(saved_native.starts_with("simul{signa=20033;verio=708;};\nlandd{"));
+        assert!(saved_native.contains("being{"));
 
         let mut console = Console::default();
         let opened = console.run_script(&format!("open {path_string}\nsim\nquit\n"), true);
-        assert!(opened.contains("ERROR: Failed to read in file @ ./universe/command.c 2394\n"));
-        assert!(!opened.contains("Population: 128\n"));
+        assert!(opened.contains(&format!("Simulation file {path_string} open\n\n")));
+        assert!(opened.contains("Population: 128\n"));
         let _ = fs::remove_file(path);
     }
 
     #[test]
-    fn save_binary_extension_writes_json_like_native_c_cli() {
+    fn save_binary_extension_still_writes_default_native_transfer() {
         let path = temp_save_path("roundtrip_binary").with_extension("bin");
         let path_string = path.to_string_lossy();
         let mut console = Console::default();
@@ -3316,17 +3316,17 @@ mod tests {
         );
         assert!(saved.contains("Simulation file "));
         let saved_binary = fs::read_to_string(&path).expect("binary extension save should exist");
-        assert!(saved_binary.starts_with("{\"information\""));
+        assert!(saved_binary.starts_with("simul{signa=20033;verio=708;};\nlandd{"));
 
         let mut console = Console::default();
         let opened = console.run_script(&format!("open {path_string}\nsim\nquit\n"), true);
-        assert!(opened.contains("ERROR: Failed to read in file @ ./universe/command.c 2394\n"));
-        assert!(!opened.contains("Population: 128\n"));
+        assert!(opened.contains(&format!("Simulation file {path_string} open\n\n")));
+        assert!(opened.contains("Population: 128\n"));
         let _ = fs::remove_file(path);
     }
 
     #[test]
-    fn open_saved_json_population_fails_like_native_c_cli() {
+    fn open_saved_native_population_roundtrips_like_native_c_cli() {
         let path = temp_save_path("population_roundtrip");
         let path_string = path.to_string_lossy();
         let mut console = Console::default();
@@ -3335,22 +3335,20 @@ mod tests {
             true,
         );
         assert!(saved.contains("Simulation file "));
-        let saved_json = fs::read_to_string(&path).expect("saved population JSON should exist");
-        assert!(saved_json.contains("\"beings\":[{\"name\":\"Ape 001\""));
-        assert!(saved_json.contains("\"delta\":{\"direction_facing\""));
-        assert!(saved_json.contains("\"constant\":{\"date_of_birth\""));
-        assert!(saved_json.contains("\"changes\":{\"drives\""));
-        assert!(saved_json.contains("\"braindata\":{\"braincode_register\""));
-        assert!(saved_json.contains("\"immune_system\":{\"antigens\""));
-        assert!(saved_json.contains("\"random_seed\""));
+        let saved_native =
+            fs::read_to_string(&path).expect("saved population native transfer should exist");
+        assert!(saved_native.starts_with("simul{signa=20033;verio=708;};\nlandd{"));
+        assert!(saved_native.contains("being{locat="));
+        assert!(saved_native.contains("drive="));
+        assert!(saved_native.contains("immun="));
 
         let mut loaded_console = Console::default();
         let actual =
             loaded_console.run_script(&format!("open {path_string}\nsim\nape\nquit\n"), true);
         assert!(actual.contains(&format!("open {path_string}\nSimulation stopped\n")));
-        assert!(actual.contains("Failed text {\"info\n"));
-        assert!(actual.contains("ERROR: Signature not first in file @ ./universe/transfer.c 677\n"));
-        assert!(actual.contains("ERROR: Failed to read in file @ ./universe/command.c 2394\n"));
+        assert!(actual.contains(&format!("Simulation file {path_string} open\n\n")));
+        assert!(actual.contains("Population: 128\n"));
+        assert!(actual.contains("ape\nApe 001\n"));
         let _ = fs::remove_file(path);
     }
 
@@ -3420,15 +3418,16 @@ mod tests {
             true,
         );
 
-        assert_eq!(actual.matches("Population: 128\n").count(), 0);
-        assert_eq!(actual.matches("Simulation file ").count(), 3);
+        assert_eq!(actual.matches("Population: 128\n").count(), 3);
+        assert_eq!(actual.matches(" saved\n\n").count(), 3);
+        assert_eq!(actual.matches(" open\n\n").count(), 3);
         assert!(actual.contains("ERROR: Failed to read in file @ ./universe/command.c 2394\n"));
         assert!(fs::read_to_string(&native_path)
             .expect("native extension matrix save should be readable")
-            .starts_with("{\"information\""));
+            .starts_with("simul{signa=20033;verio=708;};\nlandd{"));
         assert!(fs::read_to_string(&binary_path)
             .expect("binary extension matrix save should be readable")
-            .starts_with("{\"information\""));
+            .starts_with("simul{signa=20033;verio=708;};\nlandd{"));
 
         let _ = fs::remove_file(json_path);
         let _ = fs::remove_file(native_path);

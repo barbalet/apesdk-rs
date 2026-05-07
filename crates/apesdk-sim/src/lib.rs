@@ -7440,9 +7440,7 @@ pub fn startup_transfer_from_native_bytes(input: &[u8]) -> Result<StartupTransfe
                 let (territory_index, territory) = native_territory_from_section(&section)?;
                 native_add_territory_event(&mut beings[index], territory_index, territory);
             }
-            b"weath{" => {
-                return Err("native section not supported yet");
-            }
+            b"topog{" | b"weath{" => {}
             _ => return Err("unknown native file section"),
         }
     }
@@ -9772,12 +9770,14 @@ mod tests {
     }
 
     #[test]
-    fn native_transfer_rejects_unsupported_sections_and_raw_binary() {
+    fn native_transfer_rejects_unknown_sections_and_raw_binary() {
         assert!(startup_transfer_from_native_bytes(b"NA\x02\xc4not-native").is_err());
-        assert!(startup_transfer_from_native_bytes(
-            b"simul{signa=20033;verio=708;};landd{dated=0;timed=0;landg=1,2;};weath{press=1;};"
-        )
-        .is_err());
+        assert!(
+            startup_transfer_from_native_bytes(
+                b"simul{signa=20033;verio=708;};landd{dated=0;timed=0;landg=1,2;};topog{topby=1,2;};weath{atmby=3,4;litby=5,6;};"
+            )
+            .is_ok()
+        );
         assert!(startup_transfer_from_native_bytes(b"landd{dated=0;timed=0;landg=1,2;};").is_err());
         assert!(startup_transfer_from_native_bytes(b"simul{signa=20033;verio=9999;};").is_err());
         assert!(startup_transfer_from_native_bytes(

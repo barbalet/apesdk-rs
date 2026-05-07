@@ -2,7 +2,9 @@
 
 ## Decision
 
-The Rust CLI remains JSON-only for save/load through cycle 85.
+Historical note: the Rust CLI remained JSON-only for save/load through cycle
+85. The active command-line target is now native transfer text for both C and
+Rust.
 
 The C runtime has two transfer paths:
 
@@ -12,9 +14,9 @@ tranfer_out
 tranfer_in
 ```
 
-`tranfer_out_json` is the shape the Rust CLI currently writes and reads. The C
-binary path uses the file-format table, section identifiers, and raw native
-structure blocks for land, beings, social memory, and episodic memory.
+`tranfer_out_json` remains a compatibility path. The C native transfer path uses
+the file-format table and section identifiers for land, topography/weather,
+beings, social memory, episodic memory, and territory memory.
 
 ## Rationale
 
@@ -25,9 +27,9 @@ fields are still reduced.
 
 ## Current Behavior
 
-Rust `save` writes C-shaped JSON. Rust `open` accepts JSON whose signature is
-`SIMULATED_APE_SIGNATURE` and rejects non-JSON/binary data through the existing
-read failure path.
+Rust `save` writes native transfer text on the default command-line path. Rust
+`open` reads native transfer text and accepts the C topography/weather sections;
+JSON remains available for library regression fixtures, not CLI parity.
 
 ## Later Work
 
@@ -42,4 +44,3 @@ FIL_SOE
 FIL_EPI
 FILE_EOF
 ```
-

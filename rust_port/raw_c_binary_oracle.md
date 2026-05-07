@@ -3,12 +3,9 @@
 Native command-line `command_save` now writes the native transfer text produced
 by `tranfer_out()` regardless of filename extension. The C command-line
 `open` path reads that same transfer text through `tranfer_in()`, so startup and
-populated command-line saves are intended to reopen on the C side.
-
-The Rust command-line save path still needs to be retargeted from the earlier
-JSON-compatible behavior to this completed C transfer target. Until that
-follow-up lands, save/open transcript parity should treat C transfer completion
-as the oracle update rather than as Rust drift closure.
+populated command-line saves reopen on the C side. Rust command-line `save` is
+retargeted to the same native text format, and Rust `open` accepts the C land
+topography/weather byte sections.
 
 The older Rust `NAB1` framed transfer reader/writer remains as library-level
 compatibility machinery for regression fixtures. It is not the default native C

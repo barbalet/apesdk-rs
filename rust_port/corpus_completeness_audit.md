@@ -17,7 +17,8 @@ Absolute parity coverage map:
   commands, file-format lookup, logging, event toggles, watch, interval, exact
   EOF-after-command timing, native-backed closed-stdin output-class timing, and
   PTY stop-after-forever timing.
-- Save/open: default JSON save and native-text open behavior now follows C.
+- Save/open: default native-text save/open behavior now follows C, including
+  C-side topography/weather transfer sections on the command-line file path.
 - Binary: default CLI no longer uses the Rust framed-binary substitute.
 - Binary artifacts: `golden/absolute/binary_scenarios.txt` inventories the
   reachable command-line save bytes and the raw binary scenarios that still need

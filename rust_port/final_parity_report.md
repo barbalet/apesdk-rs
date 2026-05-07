@@ -7,9 +7,9 @@ native command-line parity path.
 
 - Native C `save` now writes native transfer text through `tranfer_out()`, and
   native C `open` reads it back through `tranfer_in()`.
-- Rust `open` already reads native transfer text on the default command-line
-  path, but Rust `save` still needs to move from the older JSON-compatible
-  behavior to the completed C transfer target.
+- Rust `save` and `open` now use native transfer text on the default
+  command-line path. The Rust reader accepts the C topography/weather sections
+  that are now written by `tranfer_out()`.
 - JSON and framed-binary compatibility remain library-level regression support,
   not default CLI behavior.
 
