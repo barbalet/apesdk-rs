@@ -5,8 +5,9 @@ command-line gates.
 
 ## Completed Changes
 
-- Default Rust `save` now mirrors native C by writing JSON for every filename
-  extension.
+- Native C `save` now writes native transfer text for every filename extension;
+  Rust `save` still needs to be retargeted from the older JSON-compatible
+  behavior to mirror this completed C path.
 - Default Rust `open` now mirrors native C by reading native transfer text on
   the command-line path and rejecting JSON/framed binary input.
 - Native C harness builds can pin `FULL_DATE` and `FIXED_RANDOM_SIM` so exact

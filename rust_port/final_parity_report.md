@@ -5,10 +5,11 @@ native command-line parity path.
 
 ## Default CLI Parity
 
-- `save` writes JSON for every filename extension, matching native C
-  `command_save`.
-- `open` reads native transfer text on the default command-line path, matching
-  native C `tranfer_in`.
+- Native C `save` now writes native transfer text through `tranfer_out()`, and
+  native C `open` reads it back through `tranfer_in()`.
+- Rust `open` already reads native transfer text on the default command-line
+  path, but Rust `save` still needs to move from the older JSON-compatible
+  behavior to the completed C transfer target.
 - JSON and framed-binary compatibility remain library-level regression support,
   not default CLI behavior.
 

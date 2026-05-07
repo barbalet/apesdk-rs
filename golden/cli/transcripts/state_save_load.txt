@@ -33,5 +33,5 @@ Failed text 102
 Failed text 111
 ERROR: {"info @ ./toolkit/file.c 833
 ERROR: Unknown command @ ./toolkit/file.c 1011
-ERROR: Signature not first in file @ ./universe/transfer.c 286
+ERROR: Signature not first in file @ ./universe/transfer.c 677
 ERROR: Failed to read in file @ ./universe/command.c 2394

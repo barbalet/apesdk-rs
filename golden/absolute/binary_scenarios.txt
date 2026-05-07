@@ -1,9 +1,9 @@
 # scenario | command_path | expected_artifact | status | note
-empty_startup | golden/cli/sessions/state_save_load.commands | simape_cycle02_save.txt | cli-json-bytes | default native command_save writes JSON bytes
-populated_short | golden/cli/sessions/runtime_parity.commands | simape_runtime_parity.json | cli-json-bytes | populated short-run save through default CLI
-matrix_json | golden/cli/sessions/save_open_matrix.commands | simape_matrix.json | cli-json-bytes | extension does not change native command_save output
-matrix_native | golden/cli/sessions/save_open_matrix.commands | simape_matrix.native | cli-json-bytes | extension does not change native command_save output
-matrix_bin | golden/cli/sessions/save_open_matrix.commands | simape_matrix.bin | cli-json-bytes | extension does not expose raw native binary on default CLI
+empty_startup | golden/cli/sessions/state_save_load.commands | simape_cycle02_save.txt | cli-native-transfer-text | default native command_save writes tranfer_out text
+populated_short | golden/cli/sessions/runtime_parity.commands | simape_runtime_parity.json | cli-native-transfer-text | populated short-run save through default CLI
+matrix_json | golden/cli/sessions/save_open_matrix.commands | simape_matrix.json | cli-native-transfer-text | extension does not change native command_save output
+matrix_native | golden/cli/sessions/save_open_matrix.commands | simape_matrix.native | cli-native-transfer-text | extension does not change native command_save output
+matrix_bin | golden/cli/sessions/save_open_matrix.commands | simape_matrix.bin | cli-native-transfer-text | extension does not expose raw native binary on default CLI
 raw_empty_startup | scripts/generate_native_raw_binary_oracle.sh | raw_empty_startup.native | native-raw-value | direct tranfer_out byte stream, Rust value load and byte roundtrip exact
 raw_reset_startup | scripts/generate_native_raw_binary_oracle.sh | raw_reset_startup.native | native-raw-value | direct tranfer_out byte stream, Rust value load and byte roundtrip exact
 raw_after_one_cycle | scripts/generate_native_raw_binary_oracle.sh | raw_after_one_cycle.native | native-raw-value | direct tranfer_out byte stream, Rust value load exact, raw territory byte preservation pending

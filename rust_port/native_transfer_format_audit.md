@@ -15,9 +15,13 @@ being{locat=...,...;facin=...;...;};
 ```
 
 `tranfer_in` strips comments and whitespace with `io_whitespace`, requires
-`FIL_VER` first, then accepts `FIL_LAN`, `FIL_BEI`, and compiled-in optional
-sections. In this checkout `USE_FIL_VER`, `USE_FIL_LAN`, and `USE_FIL_BEI` are
-enabled, while `USE_FIL_SOE` and `USE_FIL_EPI` are disabled.
+`FIL_VER` first, then accepts `FIL_LAN`, `FIL_BEI`, social, episodic, and
+territory sections. In this checkout `USE_FIL_VER`, `USE_FIL_LAN`,
+`USE_FIL_BEI`, `USE_FIL_SOE`, `USE_FIL_EPI`, and `USE_FIL_TER` are enabled.
+
+The C CLI `save` path now uses `tranfer_out()` instead of the JSON-only writer,
+so native command-line save/open has a real round trip for startup and populated
+sessions.
 
 ## Rust Coverage Added In Cycles 121-125
 

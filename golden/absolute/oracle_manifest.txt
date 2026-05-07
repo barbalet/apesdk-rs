@@ -25,7 +25,7 @@ fuzz | malformed-save | scripts/run_malformed_save_fuzz.sh | malformed-save | ex
 fuzz | raw-binary-mutation | scripts/run_raw_binary_mutation_fuzz.sh | raw-binary | Rust rejection corpus until native byte oracle is promoted
 fuzz | seed-population | scripts/run_seed_population_fuzz.sh | seed-population | Rust deterministic repeatability until C value drift closes
 corpus | pending-corpus-inventory | scripts/run_pending_corpus_inventory.sh | corpus-inventory | blocker inventory for long/runtime/save-open/exhaustive promotion corpus
-save-open | cli-json | golden/cli/sessions/runtime_parity.commands | native-c-oracle | default C and Rust command paths reject JSON reopen
+save-open | cli-native-transfer-text | golden/cli/sessions/runtime_parity.commands | native-c-oracle | default C command path writes and reopens native transfer text; Rust save retarget pending
 save-open | native-save-artifacts | scripts/generate_native_save_artifacts.sh | native-save-artifacts | captures command-line save bytes and hashes
 layout | c-layout-probe | scripts/generate_c_layout_probe.sh | native-c-layout | optional AUDIT_FILE native layout report
 binary | raw-native | rust_port/raw_c_binary_oracle.md | native-c-oracle | no default CLI framed-binary substitute

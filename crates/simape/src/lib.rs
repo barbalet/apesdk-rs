@@ -1220,7 +1220,7 @@ fn native_loader_prefix_diagnostics(contents: &[u8]) -> Option<String> {
     output.push_str(&failed_text);
     output.push_str(" @ ./toolkit/file.c 833\n");
     output.push_str("ERROR: Unknown command @ ./toolkit/file.c 1011\n");
-    output.push_str("ERROR: Signature not first in file @ ./universe/transfer.c 286\n");
+    output.push_str("ERROR: Signature not first in file @ ./universe/transfer.c 677\n");
     Some(output)
 }
 
@@ -3219,7 +3219,7 @@ mod tests {
         assert!(actual.contains(&format!("open {path_string}\nSimulation stopped\n")));
         assert!(actual.contains("String length : "));
         assert!(actual.contains("Failed text {\"info\n"));
-        assert!(actual.contains("ERROR: Signature not first in file @ ./universe/transfer.c 286\n"));
+        assert!(actual.contains("ERROR: Signature not first in file @ ./universe/transfer.c 677\n"));
         assert!(actual.contains("ERROR: Failed to read in file @ ./universe/command.c 2394\n"));
         let _ = fs::remove_file(path);
     }
@@ -3349,7 +3349,7 @@ mod tests {
             loaded_console.run_script(&format!("open {path_string}\nsim\nape\nquit\n"), true);
         assert!(actual.contains(&format!("open {path_string}\nSimulation stopped\n")));
         assert!(actual.contains("Failed text {\"info\n"));
-        assert!(actual.contains("ERROR: Signature not first in file @ ./universe/transfer.c 286\n"));
+        assert!(actual.contains("ERROR: Signature not first in file @ ./universe/transfer.c 677\n"));
         assert!(actual.contains("ERROR: Failed to read in file @ ./universe/command.c 2394\n"));
         let _ = fs::remove_file(path);
     }

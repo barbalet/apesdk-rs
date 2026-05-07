@@ -35,8 +35,9 @@
 #define USE_FIL_VER
 #define USE_FIL_LAN
 #define USE_FIL_BEI
-#undef USE_FIL_SOE
-#undef USE_FIL_EPI
+#define USE_FIL_SOE
+#define USE_FIL_EPI
+#define USE_FIL_TER
 #undef USE_FIL_WEA
 #undef USE_FIL_BRA
 
@@ -114,7 +115,8 @@ enum file_section_type
     FIL_EPI = ( 0x50 ),
     FIL_WEA = ( 0x60 ),
     FIL_BRA = ( 0x70 ),
-    FIL_END = ( 0x80 )
+    FIL_TER = ( 0x80 ),
+    FIL_END = ( 0x90 )
 };
 
 static const simulated_file_entry simulated_file_format[] =
@@ -235,6 +237,13 @@ static const simulated_file_entry simulated_file_format[] =
     {"epfoo=", FIL_EPI | FILE_TYPE_BYTE,  1, 19, "Food"},/* n_byte   food;*/
     {"epafe=", FIL_EPI | FILE_TYPE_BYTE2, 1, 20, "Affect"},/* n_byte2  affect;*/
     {"eparg=", FIL_EPI | FILE_TYPE_BYTE2, 1, 22, "Arg"},/* n_byte2  arg;*/
+#endif
+
+#ifdef USE_FIL_TER
+    {"terri{", FIL_TER,  0, 0, "Territory memory definition"},
+    {"tridx=", FIL_TER | FILE_TYPE_BYTE2, 1, 0, "Territory index"},
+    {"trnam=", FIL_TER | FILE_TYPE_BYTE,  1, 2, "Territory name"},
+    {"trfam=", FIL_TER | FILE_TYPE_BYTE2, 1, 4, "Territory familiarity"},
 #endif
 
 #ifndef REDUCE_FILE  /* FILE_TYPE_PACKED has a different form - no offset and the number is the size of the PACKED_DATA_BLOCK units */

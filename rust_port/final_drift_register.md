@@ -13,9 +13,6 @@ category is now one of:
 
 ## Closed Items
 
-- Default command-line save/open drift: Rust `save` now writes JSON for every
-  extension like native C, and Rust `open` now accepts native transfer text
-  while rejecting JSON/framed binary input on the default CLI path.
 - Build metadata drift: native C and Rust harness builds share the
   `APESDK_FULL_DATE` value.
 - Source-path drift: the native harness compiles C sources with `./folder/file.c`
@@ -53,6 +50,11 @@ category is now one of:
   runtime rows remain open.
 
 ## Open Fixture Tasks
+
+- Retarget Rust default command-line `save` to the completed native C transfer
+  path. Native C now writes native transfer text through `tranfer_out()` and
+  reopens it through `tranfer_in()`; Rust `open` reads that format, but Rust
+  `save` still reflects the older JSON-compatible target.
 
 - Promote direct C state trace emitters for deeper terrain, braincode, social,
   lifecycle, immune, movement, and save/load categories. The startup,

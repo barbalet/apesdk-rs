@@ -430,6 +430,7 @@ void land_color_time_8bit( n_byte *color_fit, n_int toggle_tidedaylight );
 n_byte4 land_date( void );
 n_byte4 land_time( void );
 n_byte2 *land_genetics( void );
+void land_load_state( n_byte4 date, n_byte2 time, n_byte2 *genetics );
 n_byte land_tide_level( void );
 n_byte *land_topography( void );
 n_byte *land_topography_highdef( void );

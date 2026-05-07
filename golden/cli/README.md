@@ -60,10 +60,11 @@ separate console reads.
 That file is intentionally not part of the repository because it contains
 randomly seeded simulation state.
 
-Current C behavior: opening the JSON file saved from the startup simulation
-fails in the loader with `Signature not first in file`. The Rust default CLI now
-preserves that behavior; alternate library compatibility loaders are kept out of
-the native command-line parity gate.
+Current C behavior: command-line `save` writes native transfer text and
+command-line `open` reopens that format. Older JSON-reopen transcript fixtures
+are historical until the Rust default `save` path is retargeted to the completed
+C transfer behavior; alternate JSON/framed-binary compatibility loaders remain
+outside the native command-line parity gate.
 
 ## Harness
 
