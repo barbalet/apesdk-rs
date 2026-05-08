@@ -60,14 +60,23 @@ JSON transfer also includes the complete territory array under
 
 Rust CLI `save` now uses `tranfer_startup_out_native()` for every filename, so
 the default command-line path no longer writes the older JSON transfer. Rust
-`open` accepts C `topog{}` and `weath{}` sections so C command-line saves with
-terrain/weather bytes remain readable during the next land-state porting pass.
+`open` now accepts, validates, applies, and re-emits C `topog{}` and `weath{}`
+sections, so command-line saves preserve loaded terrain/weather bytes across
+Rust save-open-save loops.
+
+Cycles 581-600 extend the populated transfer layer. C and Rust native transfer
+now preserve selected being name and awake state with `bname=` and `awako=`,
+Rust writes every social and episodic slot to keep C slot ordering stable, and
+the raw native Rust writer emits `landd`, `topog`, and `weath` sections. The
+Rust `--save-open-trace` fixture proves populated Rust native save/open state
+continuity is exact for the selected snapshot before save and immediately after
+open.
 
 ## Remaining Work
 
-Next binary/native cycles should port the Rust-side semantic storage for those
-topography/weather bytes, older version migration behavior, raw byte-structured
-compatibility if required by external save corpora, and deeper C-vs-Rust
-fixture generation. Raw byte-structured compatibility remains unsupported
-because the C command-line writer currently emits the native text format, not a
-raw `NA` byte stream.
+Next binary/native cycles should close generated-value parity for
+high-definition topography/tide behavior, older version migration behavior, raw
+byte-structured compatibility if required by external save corpora, C/Rust
+post-open advancement parity, and deeper C-vs-Rust fixture generation. Raw
+byte-structured compatibility remains unsupported because the C command-line
+writer currently emits the native text format, not a raw `NA` byte stream.

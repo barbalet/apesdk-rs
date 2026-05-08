@@ -9,6 +9,12 @@ fn main() -> io::Result<()> {
         print!("{}", simape::engine_trace_fixture());
         return Ok(());
     }
+    if args.get(1).map(String::as_str) == Some("--save-open-trace") {
+        let trace = simape::save_open_continuity_fixture()
+            .map_err(|message| io::Error::new(io::ErrorKind::InvalidData, message))?;
+        print!("{trace}");
+        return Ok(());
+    }
     if args.get(1).map(String::as_str) == Some("--native-raw-summary") {
         let scenario = args.get(2).ok_or_else(|| {
             io::Error::new(io::ErrorKind::InvalidInput, "missing native raw scenario")

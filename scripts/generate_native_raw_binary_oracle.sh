@@ -24,6 +24,7 @@ cat > "$HARNESS" <<'C'
 #include <stdlib.h>
 
 #include "toolkit/toolkit.h"
+#include "entity/entity.h"
 #include "sim/sim.h"
 #include "universe/universe.h"
 
@@ -65,27 +66,26 @@ static void write_summary( FILE *summary, const char *scenario )
 
     if ( being != 0L )
     {
-        n_byte *raw = ( n_byte * )being;
-        loc0 = ( unsigned )( raw[0] | ( raw[1] << 8 ) );
-        loc1 = ( unsigned )( raw[2] | ( raw[3] << 8 ) );
-        facing = raw[4];
-        speed = raw[5];
-        energy = ( unsigned )( raw[6] | ( raw[7] << 8 ) );
-        state = ( unsigned )( raw[16] | ( raw[17] << 8 ) );
-        brain0 = ( unsigned )( raw[18] | ( raw[19] << 8 ) );
-        brain1 = ( unsigned )( raw[20] | ( raw[21] << 8 ) );
-        brain2 = ( unsigned )( raw[22] | ( raw[23] << 8 ) );
-        brain3 = ( unsigned )( raw[24] | ( raw[25] << 8 ) );
-        brain4 = ( unsigned )( raw[26] | ( raw[27] << 8 ) );
-        brain5 = ( unsigned )( raw[28] | ( raw[29] << 8 ) );
-        territory0 = ( unsigned )( raw[150] | ( raw[151] << 8 ) );
-        antigen0 = raw[406];
-        shape_antigen0 = raw[414];
-        antibody0 = raw[422];
-        shape_antibody0 = raw[438];
-        inventory0 = ( unsigned )( raw[44] | ( raw[45] << 8 ) );
-        inventory1 = ( unsigned )( raw[46] | ( raw[47] << 8 ) );
-        shout0 = raw[36];
+        loc0 = ( unsigned )being->delta.location[0];
+        loc1 = ( unsigned )being->delta.location[1];
+        facing = ( unsigned )being->delta.direction_facing;
+        speed = ( unsigned )being->delta.velocity[0];
+        energy = ( unsigned )being->delta.stored_energy;
+        state = ( unsigned )being->delta.macro_state;
+        brain0 = ( unsigned )being->braindata.brain_state[0];
+        brain1 = ( unsigned )being->braindata.brain_state[1];
+        brain2 = ( unsigned )being->braindata.brain_state[2];
+        brain3 = ( unsigned )being->braindata.brain_state[3];
+        brain4 = ( unsigned )being->braindata.brain_state[4];
+        brain5 = ( unsigned )being->braindata.brain_state[5];
+        territory0 = ( unsigned )being->events.territory[0].familiarity;
+        antigen0 = ( unsigned )being->immune_system.antigens[0];
+        shape_antigen0 = ( unsigned )being->immune_system.shape_antigen[0];
+        antibody0 = ( unsigned )being->immune_system.antibodies[0];
+        shape_antibody0 = ( unsigned )being->immune_system.shape_antibody[0];
+        inventory0 = ( unsigned )being->changes.inventory[0];
+        inventory1 = ( unsigned )being->changes.inventory[1];
+        shout0 = ( unsigned )being->changes.shout[0];
     }
 
     fprintf( summary,
@@ -120,6 +120,7 @@ int main( int argc, char **argv )
     char summary_path[4096];
     const char *out_dir = argc > 1 ? argv[1] : ".";
     n_uint seed = 0x5261f726;
+    n_int cycle = 0;
     FILE *summary;
 
     snprintf( summary_path, sizeof( summary_path ), "%s/native_raw_binary_values.trace", out_dir );
@@ -143,6 +144,64 @@ int main( int argc, char **argv )
     snprintf( path, sizeof( path ), "%s/raw_after_one_cycle.native", out_dir );
     sim_cycle();
     write_summary( summary, "raw_after_one_cycle" );
+    write_n_file( path, tranfer_out() );
+
+    snprintf( path, sizeof( path ), "%s/raw_social_heavy.native", out_dir );
+    for ( cycle = 0; cycle < 120; cycle++ )
+    {
+        sim_cycle();
+    }
+    write_summary( summary, "raw_social_heavy" );
+    write_n_file( path, tranfer_out() );
+
+    snprintf( path, sizeof( path ), "%s/raw_immune_heavy.native", out_dir );
+    if ( sim_group()->num > 1 )
+    {
+        simulated_group *group = sim_group();
+        n_int transmission = 0;
+        for ( cycle = 0; cycle < 96; cycle++ )
+        {
+            transmission = cycle % PATHOGEN_TRANSMISSION_TOTAL;
+            immune_ingest_pathogen( &( group->beings[0].immune_system ), transmission % 4 );
+            immune_transmit( &( group->beings[0].immune_system ),
+                             &( group->beings[1].immune_system ),
+                             ( n_byte )transmission );
+            ( void )immune_response( &( group->beings[0].immune_system ),
+                                     being_honor_immune( &( group->beings[0] ) ),
+                                     being_energy( &( group->beings[0] ) ) );
+            sim_cycle();
+        }
+    }
+    write_summary( summary, "raw_immune_heavy" );
+    write_n_file( path, tranfer_out() );
+
+    snprintf( path, sizeof( path ), "%s/raw_terrain_heavy.native", out_dir );
+    for ( cycle = 0; cycle < 1440; cycle++ )
+    {
+        sim_cycle();
+    }
+    write_summary( summary, "raw_terrain_heavy" );
+    write_n_file( path, tranfer_out() );
+
+    snprintf( path, sizeof( path ), "%s/raw_save_open_derived.native", out_dir );
+    {
+        n_file *saved = tranfer_out();
+        n_file *load_copy = io_file_duplicate( saved );
+        if ( ( load_copy == 0L ) || ( tranfer_in( load_copy ) != 0 ) )
+        {
+            fprintf( stderr, "failed to reload save/open-derived raw fixture\n" );
+            exit( 5 );
+        }
+        if ( sim_init( KIND_LOAD_FILE, 0, MAP_AREA, 0 ) == 0L )
+        {
+            fprintf( stderr, "failed to initialize save/open-derived fixture\n" );
+            exit( 6 );
+        }
+        io_file_free( &load_copy );
+        io_file_free( &saved );
+    }
+    sim_cycle();
+    write_summary( summary, "raw_save_open_derived" );
     write_n_file( path, tranfer_out() );
 
     fclose( summary );
@@ -201,7 +260,7 @@ rm -f "$HASH_FILE" "$MAP_FILE"
         printf '%s | 0 | %s | native-transfer-text | io_write_buff byte stream generated by tranfer_out()\n' "$name" "$size"
         while IFS=: read -r offset token; do
             printf '%s | %s | 6 | token:%s | native simulated_file_format section/field marker\n' "$name" "$offset" "$token"
-        done < <(LC_ALL=C grep -aboE 'simul\{|signa=|verio=|being\{|locat=|facin=|speed=|energ=|datob=|rando=|state=|brast=|heigt=|masss=|overr=|shout=|crowd=|postu=|inven=|paras=|honor=|conce=|atten=|genet=|fetag=|fathn=|sosim=|drive=|goals=|prefe=|genex=|genen=|chigx=|chign=|terit=|immun=|brreg=|brpro=' "$artifact" || true)
+        done < <(LC_ALL=C grep -aboE 'simul\{|signa=|verio=|landd\{|dated=|timed=|landg=|topog\{|topby=|weath\{|atmby=|litby=|being\{|locat=|facin=|speed=|energ=|datob=|rando=|state=|brast=|heigt=|masss=|overr=|shout=|crowd=|postu=|inven=|paras=|honor=|conce=|atten=|genet=|fetag=|fathn=|sosim=|drive=|goals=|prefe=|genex=|genen=|chigx=|chign=|awako=|bname=|terit=|immun=|brreg=|brpro=' "$artifact" || true)
     done
 } > "$MAP_FILE"
 

@@ -4,7 +4,7 @@
 
 use apesdk_toolkit::{
     array_add, array_number, array_object, math_random, math_random3, math_sine, math_tan, n_byte,
-    n_byte2, n_byte4, n_int, n_spacetime, n_uint, n_vect2, object_array, object_number,
+    n_byte2, n_byte4, n_c_int, n_int, n_spacetime, n_uint, n_vect2, object_array, object_number,
     object_object, object_parse_json, object_string, object_top_object, vect2_direction, vect2_dot,
     NFile, ObjectEntry, ObjectValue,
 };
@@ -81,6 +81,10 @@ pub const MAP_AREA: usize = 1 << (2 * MAP_BITS);
 pub const LAND_TOPOGRAPHY_BUFFERS: usize = 2;
 pub const LAND_TOPOGRAPHY_PRIMARY: usize = 0;
 pub const LAND_TOPOGRAPHY_WORKING: usize = 1;
+pub const NATIVE_TOPOGRAPHY_BYTES: usize = LAND_TOPOGRAPHY_BUFFERS * MAP_AREA;
+pub const NATIVE_WEATHER_ATMOSPHERE_BYTES: usize =
+    LAND_TOPOGRAPHY_BUFFERS * MAP_AREA * std::mem::size_of::<n_c_int>();
+pub const NATIVE_WEATHER_LIGHTNING_BYTES: usize = MAP_AREA;
 pub const HI_RES_MAP_BITS: usize = MAP_BITS + 3;
 pub const HI_RES_MAP_DIMENSION: usize = 1 << HI_RES_MAP_BITS;
 pub const HI_RES_MAP_AREA: usize = 1 << (2 * HI_RES_MAP_BITS);
@@ -736,6 +740,14 @@ pub struct BraincodeVm {
     pc: usize,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct NativeInitialBraincode {
+    pub internal: [n_byte; BRAINCODE_SIZE],
+    pub external: [n_byte; BRAINCODE_SIZE],
+    pub internal_overflow: n_byte,
+    pub external_overflow: n_byte,
+}
+
 impl BraincodeVm {
     pub const fn new(local: [n_byte; BRAINCODE_SIZE]) -> Self {
         Self {
@@ -1250,6 +1262,7 @@ pub struct LandTile {
     topography: Vec<n_byte>,
     atmosphere: Vec<n_int>,
     delta_pressure: Vec<n_byte2>,
+    lightning: Vec<n_byte>,
     local_delta: n_int,
     delta_pressure_lowest: n_byte2,
     delta_pressure_highest: n_byte2,
@@ -1264,6 +1277,7 @@ impl LandTile {
             topography: vec![0; LAND_TOPOGRAPHY_BUFFERS * MAP_AREA],
             atmosphere: vec![0; LAND_TOPOGRAPHY_BUFFERS * MAP_AREA],
             delta_pressure: vec![0; MAP_AREA],
+            lightning: vec![0; MAP_AREA],
             local_delta: 0,
             delta_pressure_lowest: n_byte2::MAX,
             delta_pressure_highest: 1,
@@ -1308,6 +1322,10 @@ impl LandTile {
         self.atmosphere[offset] = value;
     }
 
+    pub fn lightning_buffer(&self) -> &[n_byte] {
+        &self.lightning
+    }
+
     fn pressure_at(&self, map_x: n_int, map_y: n_int) -> n_int {
         n_int::from(self.delta_pressure[map_index(map_x, map_y)])
     }
@@ -1344,6 +1362,7 @@ impl LandTile {
             self.atmosphere[index] = n_int::from(self.topography[index]) * 4;
             self.atmosphere[index + MAP_AREA] = 0;
         }
+        self.lightning.fill(0);
     }
 
     fn reset_native_pressure(&mut self) {
@@ -1682,6 +1701,42 @@ impl LandState {
         self.tiles
             .get(tile)
             .and_then(|tile| tile.topography_buffer(buffer))
+    }
+
+    pub fn lightning_buffer(&self, tile: usize) -> Option<&[n_byte]> {
+        self.tiles.get(tile).map(LandTile::lightning_buffer)
+    }
+
+    pub fn native_land_payload(&self) -> NativeLandPayload {
+        let tile = &self.tiles[0];
+        NativeLandPayload {
+            topography: Some(tile.topography.clone()),
+            atmosphere: Some(native_atmosphere_bytes(&tile.atmosphere)),
+            lightning: Some(tile.lightning.clone()),
+        }
+    }
+
+    pub fn apply_native_land_payload(&mut self, payload: &NativeLandPayload) {
+        let tile = &mut self.tiles[0];
+        if let Some(topography) = payload.topography_bytes() {
+            tile.topography.copy_from_slice(topography);
+        }
+        if let Some(atmosphere) = payload.atmosphere_bytes() {
+            for (slot, chunk) in tile
+                .atmosphere
+                .iter_mut()
+                .zip(atmosphere.chunks_exact(std::mem::size_of::<n_c_int>()))
+            {
+                let bytes: [u8; std::mem::size_of::<n_c_int>()] =
+                    chunk.try_into().expect("validated native atmosphere bytes");
+                *slot = n_int::from(n_c_int::from_le_bytes(bytes));
+            }
+            self.weather_initialized = true;
+        }
+        if let Some(lightning) = payload.lightning_bytes() {
+            tile.lightning.copy_from_slice(lightning);
+        }
+        self.update_tide();
     }
 
     pub fn topography_at_map(&self, map_x: n_int, map_y: n_int) -> n_byte {
@@ -2277,7 +2332,8 @@ impl BeingSummary {
         math_random3(&mut being.random_seed);
         math_random3(&mut being.random_seed);
         math_random3(&mut being.random_seed);
-        consume_native_initial_braincode(&mut being.random_seed);
+        let initial_braincode = native_initial_braincode(&mut being.random_seed);
+        being.social_memory[ATTENTION_EXTERNAL].braincode = initial_braincode.external;
 
         for register in &mut being.braincode_register {
             math_random3(&mut being.random_seed);
@@ -4499,17 +4555,38 @@ fn random_genetics(random: &mut [n_byte2; 2], male: bool) -> [n_genetics; CHROMO
     genetics
 }
 
-fn consume_native_initial_braincode(random: &mut [n_byte2; 2]) {
-    for _ in 0..2 {
-        let mut byte_index = 0;
-        while byte_index < BRAINCODE_SIZE {
-            math_random3(random);
-            let _ = math_random(random) & 255;
-            let _ = math_random(random) & 255;
-            let _ = math_random(random) & 255;
-            byte_index += BRAINCODE_BYTES_PER_INSTRUCTION;
-        }
+pub fn native_initial_braincode(random: &mut [n_byte2; 2]) -> NativeInitialBraincode {
+    let (internal, internal_overflow) = native_initial_braincode_block(random);
+    let (external, external_overflow) = native_initial_braincode_block(random);
+    NativeInitialBraincode {
+        internal,
+        external,
+        internal_overflow,
+        external_overflow,
     }
+}
+
+fn native_initial_braincode_block(random: &mut [n_byte2; 2]) -> ([n_byte; BRAINCODE_SIZE], n_byte) {
+    let mut braincode = [0; BRAINCODE_SIZE];
+    let mut overflow = 0;
+    let mut byte_index = 0;
+    while byte_index < BRAINCODE_SIZE {
+        math_random3(random);
+        let bytes = [
+            (math_random(random) & 255) as n_byte,
+            (math_random(random) & 255) as n_byte,
+            (math_random(random) & 255) as n_byte,
+        ];
+        for (offset, byte) in bytes.into_iter().enumerate() {
+            if let Some(slot) = braincode.get_mut(byte_index + offset) {
+                *slot = byte;
+            } else {
+                overflow = byte;
+            }
+        }
+        byte_index += BRAINCODE_BYTES_PER_INSTRUCTION;
+    }
+    (braincode, overflow)
 }
 
 fn native_initial_location(random: &mut [n_byte2; 2], land: &LandState) -> [n_byte2; 2] {
@@ -6444,9 +6521,11 @@ impl SimState {
             .iter()
             .filter_map(|entries| BeingSummary::from_transfer_object(entries).ok())
             .collect();
+        let mut land = LandState::from_snapshot(startup.land);
+        land.apply_native_land_payload(&startup.land_payload);
         Self {
             kind: KIND_OF_USE::KIND_LOAD_FILE,
-            land: LandState::from_snapshot(startup.land),
+            land,
             random_seed: [0; 2],
             population: PopulationState::from_beings(beings, LARGE_SIM as usize),
         }
@@ -6590,6 +6669,7 @@ impl SimState {
     pub fn startup_transfer(&self) -> StartupTransfer {
         StartupTransfer {
             land: self.land_snapshot(),
+            land_payload: self.land.native_land_payload(),
             beings: self
                 .population
                 .beings()
@@ -6650,9 +6730,76 @@ fn native_tile_wind_aim(random: &mut [n_byte2; 2]) -> n_int {
     -96 + n_int::from(math_random(random) % 194)
 }
 
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct NativeLandPayload {
+    topography: Option<Vec<n_byte>>,
+    atmosphere: Option<Vec<n_byte>>,
+    lightning: Option<Vec<n_byte>>,
+}
+
+impl NativeLandPayload {
+    pub fn new(
+        topography: Option<Vec<n_byte>>,
+        atmosphere: Option<Vec<n_byte>>,
+        lightning: Option<Vec<n_byte>>,
+    ) -> Result<Self, &'static str> {
+        if topography
+            .as_ref()
+            .is_some_and(|values| values.len() != NATIVE_TOPOGRAPHY_BYTES)
+        {
+            return Err("native topography byte length mismatch");
+        }
+        if atmosphere
+            .as_ref()
+            .is_some_and(|values| values.len() != NATIVE_WEATHER_ATMOSPHERE_BYTES)
+        {
+            return Err("native atmosphere byte length mismatch");
+        }
+        if lightning
+            .as_ref()
+            .is_some_and(|values| values.len() != NATIVE_WEATHER_LIGHTNING_BYTES)
+        {
+            return Err("native lightning byte length mismatch");
+        }
+        Ok(Self {
+            topography,
+            atmosphere,
+            lightning,
+        })
+    }
+
+    pub fn topography_bytes(&self) -> Option<&[n_byte]> {
+        self.topography.as_deref()
+    }
+
+    pub fn atmosphere_bytes(&self) -> Option<&[n_byte]> {
+        self.atmosphere.as_deref()
+    }
+
+    pub fn lightning_bytes(&self) -> Option<&[n_byte]> {
+        self.lightning.as_deref()
+    }
+}
+
+fn native_atmosphere_bytes(values: &[n_int]) -> Vec<n_byte> {
+    let mut output = Vec::with_capacity(values.len() * std::mem::size_of::<n_c_int>());
+    for value in values {
+        let native = n_c_int::try_from(*value).unwrap_or_else(|_| {
+            if *value < 0 {
+                n_c_int::MIN
+            } else {
+                n_c_int::MAX
+            }
+        });
+        output.extend_from_slice(&native.to_le_bytes());
+    }
+    output
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct StartupTransfer {
     pub land: LandSnapshot,
+    pub land_payload: NativeLandPayload,
     pub beings: Vec<Vec<ObjectEntry>>,
 }
 
@@ -6660,6 +6807,7 @@ impl StartupTransfer {
     pub fn empty(land: LandSnapshot) -> Self {
         Self {
             land,
+            land_payload: NativeLandPayload::default(),
             beings: Vec::new(),
         }
     }
@@ -6729,6 +6877,7 @@ pub fn tranfer_startup_out_native(startup: &StartupTransfer) -> NFile {
     let mut output = String::new();
     native_write_version(&mut output);
     native_write_land(&mut output, startup.land);
+    native_write_land_payload(&mut output, &startup.land_payload);
     for entries in &startup.beings {
         if let Ok(being) = BeingSummary::from_transfer_object(entries) {
             native_write_being(&mut output, &being);
@@ -6743,6 +6892,8 @@ pub fn tranfer_startup_out_raw_native(startup: &StartupTransfer) -> NFile {
     let mut output = String::new();
     native_raw_write_header(&mut output);
     native_raw_write_version(&mut output);
+    native_raw_write_land(&mut output, startup.land);
+    native_raw_write_land_payload(&mut output, &startup.land_payload);
     for entries in &startup.beings {
         if let Ok(being) = BeingSummary::from_transfer_object(entries) {
             native_raw_write_being(&mut output, &being);
@@ -6791,6 +6942,24 @@ fn native_write_land(output: &mut String, land: LandSnapshot) {
         ],
     );
     output.push_str("};\n");
+}
+
+fn native_write_land_payload(output: &mut String, payload: &NativeLandPayload) {
+    if let Some(topography) = payload.topography_bytes() {
+        output.push_str("topog{");
+        native_write_field(output, "topby=", &native_uints(topography));
+        output.push_str("};\n");
+    }
+    if payload.atmosphere_bytes().is_some() || payload.lightning_bytes().is_some() {
+        output.push_str("weath{");
+        if let Some(atmosphere) = payload.atmosphere_bytes() {
+            native_write_field(output, "atmby=", &native_uints(atmosphere));
+        }
+        if let Some(lightning) = payload.lightning_bytes() {
+            native_write_field(output, "litby=", &native_uints(lightning));
+        }
+        output.push_str("};\n");
+    }
 }
 
 fn native_write_being(output: &mut String, being: &BeingSummary) {
@@ -6864,6 +7033,8 @@ fn native_write_being(output: &mut String, being: &BeingSummary) {
         "chign=",
         &[n_uint::from(changes.child_generation_min)],
     );
+    native_write_field(output, "awako=", &[n_uint::from(delta.awake) + 1]);
+    native_write_field(output, "bname=", &native_uints(&constant.name));
     native_write_field(output, "immun=", &native_immune_bytes(&immune));
     native_write_field(output, "brreg=", &native_uints(&brain.braincode_register));
     native_write_field(
@@ -6873,20 +7044,10 @@ fn native_write_being(output: &mut String, being: &BeingSummary) {
     );
     output.push_str("};\n");
 
-    for social in native
-        .events
-        .social
-        .iter()
-        .filter(|entry| !social_entry_empty(entry))
-    {
+    for social in native.events.social.iter() {
         native_write_social(output, social);
     }
-    for episodic in native
-        .events
-        .episodic
-        .iter()
-        .filter(|entry| entry.event != 0)
-    {
+    for episodic in native.events.episodic.iter() {
         native_write_episodic(output, episodic);
     }
     for (index, territory) in native
@@ -6965,6 +7126,39 @@ fn native_raw_write_version(output: &mut String) {
     output.push_str("};\n\n");
 }
 
+fn native_raw_write_land(output: &mut String, land: LandSnapshot) {
+    output.push_str("landd{\n");
+    native_raw_write_field(output, "dated=", &[n_uint::from(land.date)]);
+    native_raw_write_field(output, "timed=", &[n_uint::from(land.time)]);
+    native_raw_write_field(
+        output,
+        "landg=",
+        &[
+            n_uint::from(land.genetics[0]),
+            n_uint::from(land.genetics[1]),
+        ],
+    );
+    output.push_str("};\n\n");
+}
+
+fn native_raw_write_land_payload(output: &mut String, payload: &NativeLandPayload) {
+    if let Some(topography) = payload.topography_bytes() {
+        output.push_str("topog{\n");
+        native_raw_write_field(output, "topby=", &native_uints(topography));
+        output.push_str("};\n\n");
+    }
+    if payload.atmosphere_bytes().is_some() || payload.lightning_bytes().is_some() {
+        output.push_str("weath{\n");
+        if let Some(atmosphere) = payload.atmosphere_bytes() {
+            native_raw_write_field(output, "atmby=", &native_uints(atmosphere));
+        }
+        if let Some(lightning) = payload.lightning_bytes() {
+            native_raw_write_field(output, "litby=", &native_uints(lightning));
+        }
+        output.push_str("};\n\n");
+    }
+}
+
 fn native_raw_write_being(output: &mut String, being: &BeingSummary) {
     let native = being.to_simulated_being();
     let delta = native.delta;
@@ -7036,6 +7230,8 @@ fn native_raw_write_being(output: &mut String, being: &BeingSummary) {
         "chign=",
         &[n_uint::from(changes.child_generation_min)],
     );
+    native_raw_write_field(output, "awako=", &[n_uint::from(delta.awake) + 1]);
+    native_raw_write_field(output, "bname=", &native_uints(&constant.name));
     let territory = being.native_raw_territory_words();
     native_raw_write_field(output, "terit=", &territory);
     native_raw_write_field(output, "immun=", &native_immune_bytes(&immune));
@@ -7370,6 +7566,7 @@ pub fn startup_transfer_from_json_bytes(input: &[u8]) -> Result<StartupTransfer,
 
     Ok(StartupTransfer {
         land: LandSnapshot::new(date, genetics, time),
+        land_payload: NativeLandPayload::default(),
         beings,
     })
 }
@@ -7405,6 +7602,7 @@ pub fn startup_transfer_from_native_bytes(input: &[u8]) -> Result<StartupTransfe
     }
 
     let mut land = LandSnapshot::new(0, [0; 2], 0);
+    let mut land_payload = NativeLandPayload::default();
     let mut land_seen = false;
     let mut beings = Vec::new();
     let mut current_being = None;
@@ -7440,13 +7638,26 @@ pub fn startup_transfer_from_native_bytes(input: &[u8]) -> Result<StartupTransfe
                 let (territory_index, territory) = native_territory_from_section(&section)?;
                 native_add_territory_event(&mut beings[index], territory_index, territory);
             }
-            b"topog{" | b"weath{" => {}
+            b"topog{" => {
+                land_payload.topography =
+                    native_byte_vec_exact(&section, b"topby=", NATIVE_TOPOGRAPHY_BYTES)?;
+            }
+            b"weath{" => {
+                land_payload.atmosphere =
+                    native_byte_vec_exact(&section, b"atmby=", NATIVE_WEATHER_ATMOSPHERE_BYTES)?;
+                land_payload.lightning =
+                    native_byte_vec_exact(&section, b"litby=", NATIVE_WEATHER_LIGHTNING_BYTES)?;
+            }
             _ => return Err("unknown native file section"),
         }
     }
 
     let _ = land_seen;
-    Ok(StartupTransfer { land, beings })
+    Ok(StartupTransfer {
+        land,
+        land_payload,
+        beings,
+    })
 }
 
 pub fn startup_transfer_from_binary_bytes(input: &[u8]) -> Result<StartupTransfer, &'static str> {
@@ -7507,7 +7718,11 @@ pub fn startup_transfer_from_binary_bytes(input: &[u8]) -> Result<StartupTransfe
     if !land_seen {
         return Err("binary land section missing");
     }
-    Ok(StartupTransfer { land, beings })
+    Ok(StartupTransfer {
+        land,
+        land_payload: NativeLandPayload::default(),
+        beings,
+    })
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -8102,6 +8317,14 @@ fn native_being_from_section(
     let generation_min = native_first_byte2(section, b"genen=")?.unwrap_or(0);
     let child_generation_max = native_first_byte2(section, b"chigx=")?.unwrap_or(0);
     let child_generation_min = native_first_byte2(section, b"chign=")?.unwrap_or(0);
+    let awake_level = native_first_byte(section, b"awako=")?
+        .map(|value| value.saturating_sub(1))
+        .unwrap_or(if energy > BEING_DEAD {
+            FULLY_AWAKE
+        } else {
+            FULLY_ASLEEP
+        });
+    let being_name = native_byte2_array::<2>(section, b"bname=")?.unwrap_or([0; 2]);
     let raw_territory_words = native_byte2_array::<{ TERRITORY_AREA * 2 }>(section, b"terit=")?;
     let braincode_register = native_byte_array::<BRAINCODE_PSPACE_REGISTERS>(section, b"brreg=")?
         .unwrap_or([0; BRAINCODE_PSPACE_REGISTERS]);
@@ -8133,7 +8356,7 @@ fn native_being_from_section(
     object_number(&mut delta, "posture", posture.into());
     object_array_byte2(&mut delta, "goal", &goal);
     object_array_byte2(&mut delta, "social_coord", &social_coord);
-    object_number(&mut delta, "awake", FULLY_AWAKE.into());
+    object_number(&mut delta, "awake", awake_level.into());
     object_object(&mut object, "delta", delta);
 
     let mut constant = Vec::new();
@@ -8148,7 +8371,7 @@ fn native_being_from_section(
         "generation_range",
         &[generation_min, generation_max],
     );
-    object_array_byte2(&mut constant, "name", &[0, 0]);
+    object_array_byte2(&mut constant, "name", &being_name);
     object_object(&mut object, "constant", constant);
 
     let mut changes = Vec::new();
@@ -8446,6 +8669,25 @@ fn native_byte_array<const N: usize>(
         *slot = n_byte::try_from(value).map_err(|_| "native byte value too large")?;
     }
     Ok(Some(output))
+}
+
+fn native_byte_vec_exact(
+    section: &NativeFileSection,
+    token: &[u8; 6],
+    expected: usize,
+) -> Result<Option<Vec<n_byte>>, &'static str> {
+    let Some(values) = section.field_values(token) else {
+        return Ok(None);
+    };
+    if values.len() != expected {
+        return Err("native byte array length mismatch");
+    }
+    values
+        .iter()
+        .copied()
+        .map(|value| n_byte::try_from(value).map_err(|_| "native byte value too large"))
+        .collect::<Result<Vec<_>, _>>()
+        .map(Some)
 }
 
 fn native_byte2_array<const N: usize>(
@@ -9760,13 +10002,16 @@ mod tests {
         let startup = StartupTransfer::empty(LandSnapshot::new(7, [11, 12], 13));
         let raw = tranfer_startup_out_raw_native(&startup);
         let expected = format!(
-            "/*\n\t{}{FULL_DATE}\n\t{}Tom Barbalet. All rights reserved.\n*/\n\nsimul{{\n\tsigna=20033;\n\tverio=708;\n}};\n\n",
+            "/*\n\t{}{FULL_DATE}\n\t{}Tom Barbalet. All rights reserved.\n*/\n\nsimul{{\n\tsigna=20033;\n\tverio=708;\n}};\n\nlandd{{\n\tdated=7;\n\ttimed=13;\n\tlandg=11,12;\n}};\n\n",
             SHORT_VERSION_NAME, COPYRIGHT_DATE
         );
         assert_eq!(raw.written_data(), expected.as_bytes());
-        assert!(!std::str::from_utf8(raw.written_data())
+        assert!(std::str::from_utf8(raw.written_data())
             .unwrap()
             .contains("landd{"));
+        assert!(!std::str::from_utf8(raw.written_data())
+            .unwrap()
+            .contains("topog{"));
     }
 
     #[test]
@@ -9776,7 +10021,7 @@ mod tests {
             startup_transfer_from_native_bytes(
                 b"simul{signa=20033;verio=708;};landd{dated=0;timed=0;landg=1,2;};topog{topby=1,2;};weath{atmby=3,4;litby=5,6;};"
             )
-            .is_ok()
+            .is_err()
         );
         assert!(startup_transfer_from_native_bytes(b"landd{dated=0;timed=0;landg=1,2;};").is_err());
         assert!(startup_transfer_from_native_bytes(b"simul{signa=20033;verio=9999;};").is_err());
@@ -9784,6 +10029,64 @@ mod tests {
             b"simul{signa=20033;verio=708;};sgcia{sgfin=1;};"
         )
         .is_err());
+    }
+
+    #[test]
+    fn native_transfer_loads_reemits_and_applies_land_payload_bytes() {
+        fn csv_bytes(values: &[n_byte]) -> String {
+            values
+                .iter()
+                .map(|value| value.to_string())
+                .collect::<Vec<_>>()
+                .join(",")
+        }
+
+        let mut topography = vec![0; NATIVE_TOPOGRAPHY_BYTES];
+        topography[0] = 201;
+        topography[MAP_AREA] = 202;
+
+        let mut atmosphere = vec![0; NATIVE_WEATHER_ATMOSPHERE_BYTES];
+        atmosphere[0..4].copy_from_slice(&(12_345 as n_c_int).to_le_bytes());
+        let working_offset = MAP_AREA * std::mem::size_of::<n_c_int>();
+        atmosphere[working_offset..working_offset + 4]
+            .copy_from_slice(&(-2_345 as n_c_int).to_le_bytes());
+
+        let mut lightning = vec![0; NATIVE_WEATHER_LIGHTNING_BYTES];
+        lightning[2] = 77;
+
+        let native = format!(
+            "simul{{signa=20033;verio=708;}};\
+             landd{{dated=4;timed=5;landg=6,7;}};\
+             topog{{topby={};}};\
+             weath{{atmby={};litby={};}};",
+            csv_bytes(&topography),
+            csv_bytes(&atmosphere),
+            csv_bytes(&lightning)
+        );
+
+        let state = SimState::load_startup_bytes(native.as_bytes()).unwrap();
+        assert_eq!(state.land_snapshot(), LandSnapshot::new(4, [6, 7], 5));
+        assert_eq!(state.land().topography_at_map(0, 0), 201);
+        assert_eq!(
+            state
+                .land()
+                .topography_buffer(0, LAND_TOPOGRAPHY_WORKING)
+                .unwrap()[0],
+            202
+        );
+        assert_eq!(state.land().weather_pressure_at_map(0, 0), 12_345);
+        assert_eq!(state.land().lightning_buffer(0).unwrap()[2], 77);
+
+        let roundtrip = state.tranfer_startup_out_native();
+        let roundtrip_text = std::str::from_utf8(roundtrip.written_data()).unwrap();
+        assert!(roundtrip_text.contains("topog{topby=201,"));
+        assert!(roundtrip_text.contains("weath{atmby=57,48,0,0,"));
+        assert!(roundtrip_text.contains("litby=0,0,77,"));
+
+        let reloaded = SimState::load_startup_bytes(roundtrip.written_data()).unwrap();
+        assert_eq!(reloaded.land().topography_at_map(0, 0), 201);
+        assert_eq!(reloaded.land().weather_pressure_at_map(0, 0), 12_345);
+        assert_eq!(reloaded.land().lightning_buffer(0).unwrap()[2], 77);
     }
 
     fn binary_section(kind: n_byte, payload: Vec<u8>) -> Vec<u8> {
@@ -10166,6 +10469,7 @@ mod tests {
 
         let startup = StartupTransfer {
             land: LandSnapshot::new(9, [11, 12], 13),
+            land_payload: NativeLandPayload::default(),
             beings: vec![being.transfer_object()],
         };
         let file = tranfer_startup_out_binary(&startup);
@@ -10204,6 +10508,7 @@ mod tests {
         let being = BeingSummary::new("Binary Ape".to_string(), 512, 258, 0, [2, 3, 4, 5]);
         let single = tranfer_startup_out_binary(&StartupTransfer {
             land,
+            land_payload: NativeLandPayload::default(),
             beings: vec![being.transfer_object()],
         });
         assert_eq!(
@@ -10215,6 +10520,7 @@ mod tests {
 
         let max = tranfer_startup_out_binary(&StartupTransfer {
             land,
+            land_payload: NativeLandPayload::default(),
             beings: vec![being.transfer_object(); LARGE_SIM as usize],
         });
         assert_eq!(
@@ -10878,6 +11184,28 @@ mod tests {
     }
 
     #[test]
+    fn native_initial_being_keeps_c_shaped_external_braincode_bytes() {
+        let random_factor = [0x1234, 0xabcd];
+        let mut expected_random = random_factor;
+        math_random3(&mut expected_random);
+        math_random3(&mut expected_random);
+        math_random3(&mut expected_random);
+        let expected_braincode = native_initial_braincode(&mut expected_random);
+
+        let land = LandState::from_snapshot(LandSnapshot::new(0, [1, 2], 0));
+        let being = BeingSummary::initial_native(0, random_factor, &land, &[]);
+        let social = being.social_memory();
+
+        assert_ne!(expected_braincode.internal, expected_braincode.external);
+        assert!(expected_braincode.external.iter().any(|byte| *byte != 0));
+        assert_eq!(
+            social[ATTENTION_EXTERNAL].braincode,
+            expected_braincode.external
+        );
+        assert_ne!(expected_braincode.external_overflow, 0);
+    }
+
+    #[test]
     fn braincode_sensors_actuators_and_probes_run_against_being_state() {
         let mut first = BeingSummary::new("Thinker".to_string(), 512, 100, 0, [2, 3, 4, 5]);
         let second = BeingSummary::new("Other".to_string(), 768, 200, 0, [3, 4, 5, 6]);
@@ -11202,6 +11530,7 @@ mod tests {
 
         let startup = StartupTransfer {
             land: LandSnapshot::new(0, [1, 2], 3),
+            land_payload: NativeLandPayload::default(),
             beings: vec![being],
         };
         let file = tranfer_startup_out_json(&startup);

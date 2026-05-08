@@ -201,6 +201,8 @@ static const simulated_file_entry simulated_file_format[] =
     {"genen=", FIL_BEI | FILE_TYPE_BYTE2, 1, 144, "Generation Min"},
     {"chigx=", FIL_BEI | FILE_TYPE_BYTE2, 1, 146, "Child Generation Max"},
     {"chign=", FIL_BEI | FILE_TYPE_BYTE2, 1, 148, "Child Generation Min"},
+    {"awako=", FIL_BEI | FILE_TYPE_BYTE, 1, 550, "Awake level plus one"},
+    {"bname=", FIL_BEI | FILE_TYPE_BYTE2, 2, 552, "Being name"},
 #ifdef TERRITORY_ON
     {"terit=", FIL_BEI | FILE_TYPE_BYTE2, TERRITORY_BYTES / 2, 150, "Territory information"},
 #endif

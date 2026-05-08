@@ -87,3 +87,17 @@ promoted corpus remains blocked. `scripts/run_final_signoff_readiness.sh`
 reports the combined selected-runtime, save/open, populated-raw-fixture, and
 corpus status, and exits non-zero in strict mode with
 `APESDK_REQUIRE_ABSOLUTE_SIGNOFF=1`.
+
+Cycle 601-630 update: the absolute pipeline now has an after-day drift
+inventory gate. That gate buckets selected-being day-one drift and reports
+selection/body exact with movement, energy, honor/drives, brain/probe, social,
+episodic, and immune still inventory-only. The direct raw oracle now generates
+all broader populated fixture families; the raw value gate covers all seven
+artifacts and final readiness separately blocks on the five populated
+byte-pending scenarios.
+
+Cycle 631-660 update: the absolute pipeline now also runs day-one slice and
+brain/social runtime inventories. Final readiness records first-mismatch bucket
+counts for movement/energy/body/honor and brain/social/episodic/immune runtime
+fields, plus save/open post-load minute/day continuity. Save/open is exact
+through one post-load minute and inventory-only by one post-load day.

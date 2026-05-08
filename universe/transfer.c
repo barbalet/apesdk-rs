@@ -85,7 +85,9 @@ enum transfer_being_offset
     TRANSFER_BEING_TERRITORY = 150,
     TRANSFER_BEING_IMMUNE = 406,
     TRANSFER_BEING_BRAINCODE_REGISTER = 451,
-    TRANSFER_BEING_BRAINPROBE = 454
+    TRANSFER_BEING_BRAINPROBE = 454,
+    TRANSFER_BEING_AWAKE_PLUS_ONE = 550,
+    TRANSFER_BEING_NAME = 552
 };
 
 enum transfer_social_offset
@@ -295,6 +297,8 @@ static void transfer_pack_being( n_byte *data, n_uint size, simulated_being *bei
     transfer_store_byte2( data, TRANSFER_BEING_GENERATION_MIN, being->constant.generation_min );
     transfer_store_byte2( data, TRANSFER_BEING_CHILD_GENERATION_MAX, being->changes.child_generation_max );
     transfer_store_byte2( data, TRANSFER_BEING_CHILD_GENERATION_MIN, being->changes.child_generation_min );
+    data[TRANSFER_BEING_AWAKE_PLUS_ONE] = being->delta.awake + 1;
+    transfer_store_byte2_array( data, TRANSFER_BEING_NAME, being->constant.name, 2 );
 #ifdef TERRITORY_ON
     transfer_pack_inline_territory( data, being->events.territory );
 #endif
@@ -344,6 +348,15 @@ static void transfer_unpack_being( n_byte *data, simulated_being *being )
     being->constant.generation_min = transfer_read_byte2( data, TRANSFER_BEING_GENERATION_MIN );
     being->changes.child_generation_max = transfer_read_byte2( data, TRANSFER_BEING_CHILD_GENERATION_MAX );
     being->changes.child_generation_min = transfer_read_byte2( data, TRANSFER_BEING_CHILD_GENERATION_MIN );
+    if ( data[TRANSFER_BEING_AWAKE_PLUS_ONE] != 0 )
+    {
+        being->delta.awake = data[TRANSFER_BEING_AWAKE_PLUS_ONE] - 1;
+    }
+    else
+    {
+        being->delta.awake = ( being->delta.stored_energy > BEING_DEAD ) ? FULLY_AWAKE : FULLY_ASLEEP;
+    }
+    transfer_read_byte2_array( data, TRANSFER_BEING_NAME, being->constant.name, 2 );
 #ifdef TERRITORY_ON
     transfer_unpack_inline_territory( data, being->events.territory );
 #endif
@@ -354,7 +367,6 @@ static void transfer_unpack_being( n_byte *data, simulated_being *being )
     memory_copy( &data[TRANSFER_BEING_BRAINCODE_REGISTER], being->braindata.braincode_register, BRAINCODE_PSPACE_REGISTERS );
     memory_copy( &data[TRANSFER_BEING_BRAINPROBE], ( n_byte * )being->braindata.brainprobe, sizeof( simulated_ibrain_probe ) * BRAINCODE_PROBES );
 #endif
-    being->delta.awake = ( being->delta.stored_energy > BEING_DEAD ) ? FULLY_AWAKE : FULLY_ASLEEP;
 }
 
 static void transfer_pack_social( n_byte *data, n_uint size, simulated_isocial *social )

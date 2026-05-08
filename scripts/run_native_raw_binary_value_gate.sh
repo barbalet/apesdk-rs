@@ -23,6 +23,10 @@ SCENARIOS=(
     raw_empty_startup
     raw_reset_startup
     raw_after_one_cycle
+    raw_social_heavy
+    raw_immune_heavy
+    raw_terrain_heavy
+    raw_save_open_derived
 )
 
 for scenario in "${SCENARIOS[@]}"; do
@@ -46,17 +50,27 @@ for scenario in "${EXACT_BYTE_SCENARIOS[@]}"; do
     diff -u "$artifact" "$roundtrip"
 done
 
-POPULATED_ARTIFACT="$ORACLE_DIR/artifacts/raw_after_one_cycle.native"
-POPULATED_ROUNDTRIP="$ROUNDTRIP_DIR/raw_after_one_cycle.native"
-"$ROOT/target/debug/simape" --native-raw-roundtrip "$POPULATED_ARTIFACT" "$POPULATED_ROUNDTRIP"
-"$ROOT/target/debug/simape" --native-raw-summary raw_after_one_cycle "$POPULATED_ROUNDTRIP" > "$RUST_DIR/raw_after_one_cycle.roundtrip.trace"
-diff -u "$RUST_DIR/raw_after_one_cycle.native.trace" "$RUST_DIR/raw_after_one_cycle.roundtrip.trace"
+POPULATED_SCENARIOS=(
+    raw_after_one_cycle
+    raw_social_heavy
+    raw_immune_heavy
+    raw_terrain_heavy
+    raw_save_open_derived
+)
 
-if cmp -s "$POPULATED_ARTIFACT" "$POPULATED_ROUNDTRIP"; then
-    populated_byte_mode="exact"
-else
-    populated_byte_mode="value-exact-territory-raw-bytes-pending"
-fi
+populated_byte_modes=()
+for scenario in "${POPULATED_SCENARIOS[@]}"; do
+    artifact="$ORACLE_DIR/artifacts/$scenario.native"
+    roundtrip="$ROUNDTRIP_DIR/$scenario.native"
+    "$ROOT/target/debug/simape" --native-raw-roundtrip "$artifact" "$roundtrip"
+    "$ROOT/target/debug/simape" --native-raw-summary "$scenario" "$roundtrip" > "$RUST_DIR/$scenario.roundtrip.trace"
+    diff -u "$RUST_DIR/$scenario.native.trace" "$RUST_DIR/$scenario.roundtrip.trace"
+    if cmp -s "$artifact" "$roundtrip"; then
+        populated_byte_modes+=("$scenario:exact")
+    else
+        populated_byte_modes+=("$scenario:value-exact-byte-pending")
+    fi
+done
 
 {
     printf 'full_date=%s\n' "$FULL_DATE"
@@ -65,7 +79,8 @@ fi
     printf 'roundtrip=%s\n' "$ROUNDTRIP_DIR"
     printf 'value_scenarios=%s\n' "${SCENARIOS[*]}"
     printf 'exact_byte_scenarios=%s\n' "${EXACT_BYTE_SCENARIOS[*]}"
-    printf 'populated_byte_mode=%s\n' "$populated_byte_mode"
+    printf 'populated_scenarios=%s\n' "${POPULATED_SCENARIOS[*]}"
+    printf 'populated_byte_modes=%s\n' "${populated_byte_modes[*]}"
 } > "$OUT_DIR/native_raw_binary_value_gate_manifest.txt"
 
-echo "native-raw-binary-value-gate=pass out=$OUT_DIR full_date=$FULL_DATE exact_bytes=${EXACT_BYTE_SCENARIOS[*]} populated=$populated_byte_mode"
+echo "native-raw-binary-value-gate=pass out=$OUT_DIR full_date=$FULL_DATE exact_bytes=${EXACT_BYTE_SCENARIOS[*]} populated=${populated_byte_modes[*]}"

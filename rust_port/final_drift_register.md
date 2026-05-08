@@ -38,11 +38,16 @@ category is now one of:
   text native parser diagnostics, and truncated native text recovery are exact
   under `scripts/run_malformed_save_fuzz.sh`. Remaining malformed fixtures are
   split into stdout/stderr/combined inventory artifacts before promotion.
-- Direct raw populated territory drift: Rust now preserves the full native
-  `terit=` word stream when loading direct `tranfer_out()` artifacts and emits
-  those words unchanged from the raw writer. The direct raw value gate now
-  reports empty startup, reset startup, and populated after-one-cycle artifacts
-  byte-exact for the current oracle set.
+- Direct raw startup/reset drift: Rust now emits the C-shaped raw native land
+  sections (`landd`, `topog`, `weath`) from the raw writer. The direct raw
+  value gate reports empty startup and reset startup byte-exact, and populated
+  values exact across after-one-cycle, social-heavy, immune-heavy,
+  terrain-heavy, and save/open-derived direct raw fixtures. Broader populated
+  artifact byte exactness remains open for those populated artifacts.
+- Populated Rust internal save/open state drift: Rust native transfer now
+  preserves being name, awake state, social/episodic slot order, land payload,
+  immune, brain/probe, random state, and selected identity across a populated
+  Rust save/open trace.
 - Selected minute-60 runtime core drift: Rust now matches C for the promoted
   selected-being minute-60 energy, location, facing, speed, honor, mass,
   awake/state, drives, episodic sample, immune sample, and preference values.
@@ -53,33 +58,45 @@ category is now one of:
 
 - Promote the native command-line save/open roundtrip into the broader strict
   corpus now that Rust `save` writes native transfer text and C transfer files
-  include topography/weather byte sections. Remaining save/open drift is in the
-  later populated runtime transcript values, not the default file format.
+  include topography/weather byte sections. Rust now preserves those land bytes
+  semantically across load and re-emit, and Rust internal populated
+  before-save/after-open state continuity is exact. Remaining save/open drift is
+  in C/Rust runtime transcript speed, post-load advancement, and artifact byte
+  continuity promotion.
 
 - Promote direct C state trace emitters for deeper terrain, braincode, social,
   lifecycle, immune, movement, and save/load categories. The startup,
   first-cycle baseline, invariant, and runtime-core engine trace value subset is
   now promoted by `scripts/run_engine_trace_value_gate.sh`; first-cycle terrain
   and selected-being native initialization/body values are also exact. After-day
-  selected-being movement, body, honor, brain, social, episodic, and immune
-  runtime values remain open.
-- Promote broader raw native binary artifacts after C oracle targets generate
-  additional reachable command-line byte fixtures. The direct `tranfer_out()`
-  raw oracle is now byte-exact for empty, reset, and after-one-cycle artifacts;
-  social-heavy, immune-heavy, terrain-heavy, and save/open-derived raw fixtures
-  still need exact promotion.
+  selected-being drift is now bucketed: selection and body are exact, while
+  movement, energy, honor/drives, brain/probe, social, episodic, and immune
+  runtime values remain open. The day-one slice inventory narrows the earliest
+  selected divergence to honor/drives at minute 120, and movement, energy, and
+  body state at minute 180.
+- Promote broader raw native binary artifact bytes. The direct `tranfer_out()`
+  raw oracle now includes after-one-cycle, social-heavy, immune-heavy,
+  terrain-heavy, and save/open-derived populated fixtures, and their value
+  summaries load exactly in Rust. Populated byte-exact promotion remains open
+  for the broader fixture set.
 - Promote the cycle 341-350 long seeded, multi-day, multi-month, save/open, and
   exhaustive command-surface scripts after direct trace value drift is closed.
   `scripts/run_pending_corpus_inventory.sh` records their current blockers:
   long runtime values, save/open continuity, selected-being detail values, and
   file-producing command ordering.
-- Promote the broader populated raw fixture set: social-heavy, immune-heavy,
-  terrain-heavy, and save/open-derived direct raw artifacts.
+- Promote brain/social/episodic/immune runtime buckets from inventory to exact.
+  The runtime inventory now marks brain/probe and social as first diverging at
+  minute 60, immune at minute 180, and episodic at minute 660.
+- Promote the broader populated raw fixture set from value-exact to byte-exact:
+  after-one-cycle, social-heavy, immune-heavy, terrain-heavy, and
+  save/open-derived direct raw artifacts are present and value-gated, but still
+  report populated byte promotion pending.
 - Final signoff readiness: `scripts/run_final_signoff_readiness.sh` currently
-  reports blocked categories for selected runtime inventory, selected-minute
-  inventory, save/open continuity, populated raw fixture coverage, and exact
-  corpus promotion. Strict mode remains intentionally non-zero until those
-  categories are exact.
+  reports blocked categories for selected/after-day runtime inventory,
+  day-one movement/energy/honor runtime, brain/social/episodic/immune runtime,
+  save/open continuity, broader populated raw byte promotion, and exact corpus
+  promotion. Strict mode remains intentionally non-zero until those categories
+  are exact.
 - Replace the remaining fuzz triage markers with exact C/Rust diffs after
   seeded population trace values and the broader raw fixture set are available.
 - Promote the remaining malformed-loader inventory cases after their exact

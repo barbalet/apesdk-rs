@@ -5,7 +5,8 @@ by `tranfer_out()` regardless of filename extension. The C command-line
 `open` path reads that same transfer text through `tranfer_in()`, so startup and
 populated command-line saves reopen on the C side. Rust command-line `save` is
 retargeted to the same native text format, and Rust `open` accepts the C land
-topography/weather byte sections.
+topography/weather byte sections, applies them to `LandState`, and re-emits
+them on native save.
 
 The older Rust `NAB1` framed transfer reader/writer remains as library-level
 compatibility machinery for regression fixtures. It is not the default native C
@@ -64,3 +65,33 @@ Cycle 511-540 adds fixture coverage inventory:
   raw artifacts are present and records the remaining required populated raw
   byte fixtures: social-heavy, immune-heavy, terrain-heavy, and
   save/open-derived.
+
+Cycles 581-600 add the first broader populated raw fixture and close the raw
+land-payload writer gap:
+
+- `scripts/generate_native_raw_binary_oracle.sh` now emits
+  `raw_social_heavy.native` after additional native cycles and writes oracle
+  summaries from direct C struct fields rather than fragile hard-coded raw
+  byte offsets.
+- `scripts/run_populated_raw_fixture_inventory.sh` reports four current direct
+  raw fixtures and three remaining fixture families: immune-heavy,
+  terrain-heavy, and save/open-derived.
+- Rust raw native output now emits `landd`, `topog`, and `weath` sections after
+  `simul{}`, matching the C `tranfer_out()` stream shape for loaded land
+  payloads.
+- `scripts/run_native_raw_binary_value_gate.sh` now reports empty startup and
+  reset startup as byte-exact, with populated raw values exact and populated
+  territory/artifact byte promotion still pending for the broader fixture set.
+
+Cycles 601-630 expand that fixture set and make the remaining raw blocker more
+precise:
+
+- `scripts/generate_native_raw_binary_oracle.sh` now also emits
+  `raw_immune_heavy.native`, `raw_terrain_heavy.native`, and
+  `raw_save_open_derived.native`, giving the direct oracle seven artifacts.
+- `scripts/run_populated_raw_fixture_inventory.sh` reports all seven direct raw
+  artifacts present with no remaining missing fixture families.
+- `scripts/run_native_raw_binary_value_gate.sh` compares every artifact's C
+  value summary against Rust loads. Empty startup and reset startup remain
+  byte-exact; all five populated fixtures are value-exact and explicitly marked
+  as pending byte-exact promotion.

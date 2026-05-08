@@ -582,6 +582,16 @@ const FILE_FORMAT_ENTRIES: &[FileFormatEntry] = &[
         section: false,
     },
     FileFormatEntry {
+        name: "awako",
+        description: "Awake level plus one",
+        section: false,
+    },
+    FileFormatEntry {
+        name: "bname",
+        description: "Being name",
+        section: false,
+    },
+    FileFormatEntry {
         name: "terit",
         description: "Territory information",
         section: false,
@@ -1362,6 +1372,50 @@ pub fn engine_trace_fixture() -> String {
     }
     append_engine_trace_snapshot(&mut output, "after_day", &state);
     output
+}
+
+pub fn save_open_continuity_fixture() -> Result<String, &'static str> {
+    let mut state = SimState::start_up(DEFAULT_RANDOMISE);
+    state.reset_new_simulation_from_land_seed();
+    state.advance_minutes(TIME_DAY_MINUTES as n_uint);
+
+    let saved = state.tranfer_startup_out_native();
+    let saved_bytes = saved.written_data().to_vec();
+    let saved_text = std::str::from_utf8(&saved_bytes).map_err(|_| "native save is not utf8")?;
+
+    let mut continued = state.clone();
+    let mut loaded = SimState::load_native_transfer_bytes(&saved_bytes)?;
+    let mut output = String::new();
+    output.push_str(&format!(
+        "SAVE-OPEN artifact=native bytes={} topog={} weath={} beings={}\n",
+        saved_bytes.len(),
+        usize::from(saved_text.contains("topog{topby=")),
+        usize::from(saved_text.contains("weath{atmby=")),
+        state.population()
+    ));
+    output.push_str(&save_open_trace_line("before_save", &state));
+    output.push('\n');
+    output.push_str(&save_open_trace_line("after_open", &loaded));
+    output.push('\n');
+
+    continued.advance_minutes(1);
+    loaded.advance_minutes(1);
+    output.push_str(&save_open_trace_line("continued_minute", &continued));
+    output.push('\n');
+    output.push_str(&save_open_trace_line("post_open_minute", &loaded));
+    output.push('\n');
+
+    continued.advance_minutes((TIME_DAY_MINUTES - 1) as n_uint);
+    loaded.advance_minutes((TIME_DAY_MINUTES - 1) as n_uint);
+    output.push_str(&save_open_trace_line("continued_day", &continued));
+    output.push('\n');
+    output.push_str(&save_open_trace_line("post_open_day", &loaded));
+    output.push('\n');
+    Ok(output)
+}
+
+fn save_open_trace_line(label: &str, state: &SimState) -> String {
+    engine_trace_line(label, state).replacen("TRACE snapshot=", "SAVE-OPEN snapshot=", 1)
 }
 
 fn append_engine_trace_snapshot(output: &mut String, snapshot: &str, state: &SimState) {
@@ -2534,6 +2588,59 @@ mod tests {
     }
 
     #[test]
+    fn save_open_continuity_fixture_preserves_populated_native_state() {
+        fn without_snapshot(line: &str) -> &str {
+            line.strip_prefix("SAVE-OPEN snapshot=")
+                .and_then(|rest| rest.split_once(' '))
+                .map(|(_, fields)| fields)
+                .expect("trace line should include fields")
+        }
+
+        let trace = save_open_continuity_fixture().unwrap();
+        let lines = trace.lines().collect::<Vec<_>>();
+        let before = lines
+            .iter()
+            .copied()
+            .find(|line| line.starts_with("SAVE-OPEN snapshot=before_save "))
+            .unwrap();
+        let after = lines
+            .iter()
+            .copied()
+            .find(|line| line.starts_with("SAVE-OPEN snapshot=after_open "))
+            .unwrap();
+        let post = lines
+            .iter()
+            .copied()
+            .find(|line| line.starts_with("SAVE-OPEN snapshot=post_open_minute "))
+            .unwrap();
+        let continued_minute = lines
+            .iter()
+            .copied()
+            .find(|line| line.starts_with("SAVE-OPEN snapshot=continued_minute "))
+            .unwrap();
+        let continued_day = lines
+            .iter()
+            .copied()
+            .find(|line| line.starts_with("SAVE-OPEN snapshot=continued_day "))
+            .unwrap();
+        let post_day = lines
+            .iter()
+            .copied()
+            .find(|line| line.starts_with("SAVE-OPEN snapshot=post_open_day "))
+            .unwrap();
+
+        assert!(lines[0].starts_with("SAVE-OPEN artifact=native bytes="));
+        assert!(lines[0].contains("topog=1"));
+        assert!(lines[0].contains("weath=1"));
+        assert_eq!(without_snapshot(before), without_snapshot(after));
+        assert_eq!(without_snapshot(continued_minute), without_snapshot(post));
+        assert_ne!(without_snapshot(after), without_snapshot(post));
+        assert!(post.contains("population=128"));
+        assert!(continued_day.contains("population=128"));
+        assert!(post_day.contains("population=128"));
+    }
+
+    #[test]
     fn trace_diff_reports_first_mismatch() {
         let diff = diff_trace_text("TRACE a\nTRACE b\n", "TRACE a\nTRACE c\n").unwrap_err();
 
@@ -3166,10 +3273,13 @@ mod tests {
                 "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\nstep\nsave {path_string}\nSimulation stopped\nSimulation file {path_string} saved\n\nquit\nSimulation stopped\n"
             )
         );
-        assert_eq!(
-            fs::read(&path).expect("saved native transfer should be readable"),
-            b"simul{signa=20033;verio=708;};\nlandd{dated=0;timed=1;landg=7633,53305;};\n"
-        );
+        let saved = fs::read_to_string(&path).expect("saved native transfer should be readable");
+        assert!(saved.starts_with(
+            "simul{signa=20033;verio=708;};\nlandd{dated=0;timed=1;landg=7633,53305;};\n"
+        ));
+        assert!(saved.contains("topog{topby="));
+        assert!(saved.contains("weath{atmby="));
+        assert!(saved.contains("litby="));
         let _ = fs::remove_file(path);
     }
 
@@ -3186,10 +3296,13 @@ mod tests {
                 "\n *** Simulated Ape 0.708 Console, May  1 2026 ***\n      For a list of commands type 'help'\n\nsave {path_string}\nSimulation stopped\nSimulation file {path_string} saved\n\nquit\nSimulation stopped\n"
             )
         );
-        assert_eq!(
-            fs::read(&path).expect("saved native transfer should be readable"),
-            b"simul{signa=20033;verio=708;};\nlandd{dated=0;timed=0;landg=7633,53305;};\n"
-        );
+        let saved = fs::read_to_string(&path).expect("saved native transfer should be readable");
+        assert!(saved.starts_with(
+            "simul{signa=20033;verio=708;};\nlandd{dated=0;timed=0;landg=7633,53305;};\n"
+        ));
+        assert!(saved.contains("topog{topby="));
+        assert!(saved.contains("weath{atmby="));
+        assert!(saved.contains("litby="));
         let _ = fs::remove_file(path);
     }
 

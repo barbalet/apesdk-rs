@@ -40,14 +40,24 @@ Absolute parity coverage map:
   detail value drift, and file-producing command ordering.
 - Save/open promotion inventory:
   `scripts/run_save_open_continuity_inventory.sh` records the populated
-  save/open/run session and can run the raw C/Rust transcript diff as an
-  inventory artifact. The optional diff remains blocked until populated runtime
-  continuity and failed-open output ordering are exact.
+  save/open/run session, compares Rust before-save/after-open state, and now
+  compares continued Rust state against post-open one-minute and one-day
+  advancement. One post-load minute is exact; one post-load day remains
+  inventory-only. The optional raw C/Rust transcript diff remains blocked until
+  populated runtime continuity and failed-open output ordering are exact.
+- Runtime bucket inventories:
+  `scripts/run_after_day_slice_inventory.sh` and
+  `scripts/run_brain_social_runtime_inventory.sh` record first selected-minute
+  mismatch points for day-one movement/energy/body/honor and
+  brain/social/episodic/immune fields, keeping the long seeded and multi-day
+  corpus blockers tied to concrete native trace rows.
 - Populated raw fixture inventory:
   `scripts/run_populated_raw_fixture_inventory.sh` verifies the current direct
-  raw oracle artifacts and tracks the missing social-heavy, immune-heavy,
-  terrain-heavy, and save/open-derived populated raw fixtures needed before
-  broader raw corpus promotion.
+  raw oracle artifacts. The expanded set now includes empty startup, reset
+  startup, after-one-cycle, social-heavy, immune-heavy, terrain-heavy, and
+  save/open-derived artifacts, so there are no missing fixture families left.
+  Broader raw corpus promotion now waits on byte-exact populated roundtrips for
+  the five populated artifacts.
 - Exact corpus promotion gate:
   `scripts/run_exact_corpus_promotion_gate.sh` is the strict counterpart to the
   inventory. It exits non-zero unless every promoted corpus session is ready and

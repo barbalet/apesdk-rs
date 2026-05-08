@@ -18,14 +18,13 @@ current=(
     raw_empty_startup
     raw_reset_startup
     raw_after_one_cycle
-)
-
-required_future=(
     raw_social_heavy
     raw_immune_heavy
     raw_terrain_heavy
     raw_save_open_derived
 )
+
+required_future_count=0
 
 {
     printf 'full_date=%s\n' "$FULL_DATE"
@@ -39,11 +38,8 @@ required_future=(
         printf 'fixture.%s.status=present\n' "$scenario"
         printf 'fixture.%s.bytes=%s\n' "$scenario" "$(wc -c < "$artifact" | tr -d ' ')"
     done
-    for scenario in "${required_future[@]}"; do
-        printf 'fixture.%s.status=needed\n' "$scenario"
-    done
-    printf 'covered=current-direct-raw-oracle-artifact-presence\n'
-    printf 'open=social-heavy immune-heavy terrain-heavy save-open-derived populated raw byte fixtures\n'
+    printf 'covered=expanded-direct-raw-oracle-artifact-presence\n'
+    printf 'open=expanded-populated-raw-byte-exact-promotion\n'
 } > "$OUT_DIR/populated_raw_fixture_inventory_manifest.txt"
 
-echo "populated-raw-fixture-inventory=pass out=$OUT_DIR current=${#current[@]} needed=${#required_future[@]}"
+echo "populated-raw-fixture-inventory=pass out=$OUT_DIR current=${#current[@]} needed=$required_future_count"

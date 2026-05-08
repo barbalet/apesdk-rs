@@ -2,7 +2,7 @@
 
 Consolidated cycle reports. Each section begins with the original numbered filename so cycle numbering remains visible without keeping one file per cycle.
 
-Included files: 157.
+Included files: 161.
 
 ## Index
 
@@ -163,6 +163,10 @@ Included files: 157.
 - [RUST_PORT_CYCLE_481_510.md](#rust-port-cycle-481-510md)
 - [RUST_PORT_CYCLE_511_540.md](#rust-port-cycle-511-540md)
 - [RUST_PORT_CYCLE_541_550.md](#rust-port-cycle-541-550md)
+- [RUST_PORT_CYCLE_551_580.md](#rust-port-cycle-551-580md)
+- [RUST_PORT_CYCLE_581_600.md](#rust-port-cycle-581-600md)
+- [RUST_PORT_CYCLE_601_630.md](#rust-port-cycle-601-630md)
+- [RUST_PORT_CYCLE_631_660.md](#rust-port-cycle-631-660md)
 
 ---
 
@@ -8823,3 +8827,263 @@ Original file: `RUST_PORT_CYCLE_541_550.md`
 - Final signoff remains blocked until inventory categories are eliminated and
   the strict readiness mode passes.
 
+---
+
+<a id="rust-port-cycle-551-580md"></a>
+
+## RUST_PORT_CYCLE_551_580.md
+
+Original file: `RUST_PORT_CYCLE_551_580.md`
+
+# Rust Port Cycle 551-580 Report
+
+## Completed
+
+- Cycles 551-562 completed the Rust side of native land transfer semantics.
+  Rust now parses exact-length C `topog{}` and `weath{}` payloads, applies
+  topography, raw atmosphere, and lightning bytes to `LandState`, and re-emits
+  those sections from default CLI saves.
+- Cycles 563-577 made the first concrete braincode-runtime narrowing pass.
+  Native-created beings now materialize the C-shaped initial external
+  braincode byte block in the self/external social slot while preserving the
+  same random-state progression used before register and probe initialization.
+- Cycles 578-580 reassessed after-day blockers after land byte preservation.
+  Land transfer loss is no longer the save/open blocker; remaining selected
+  after-day drift is concentrated in movement/body/energy/honor behavior and
+  brain/social/episodic/immune runtime ordering.
+
+## Code Changes
+
+- Added `NativeLandPayload` with exact topography, atmosphere, and lightning
+  byte-length validation.
+- Extended `LandTile`/`LandState` to store lightning bytes, expose native land
+  payloads, and apply loaded native land payloads before runtime advancement.
+- Updated the native transfer parser/writer so `topog{topby=...}` and
+  `weath{atmby=...;litby=...}` round-trip through Rust native saves.
+- Updated CLI save tests to assert the native land payload sections instead of
+  the older small JSON/startup shape.
+- Added `NativeInitialBraincode` generation and seeded native beings with the
+  generated external braincode bytes.
+
+## Gate Results
+
+- `cargo fmt` passes.
+- `git diff --check` passes.
+- `cargo test -p apesdk-sim --lib` passes: 88 tests.
+- `cargo test -p simape --lib` passes: 57 tests.
+
+## Carryover
+
+- Full internal/external braincode execution remains open; this tranche only
+  materializes the initial C-shaped byte data and keeps the random stream
+  aligned.
+- Probe mutation, social braincode hooks, selected after-day runtime values,
+  populated save/open post-load advancement, broader populated raw fixtures,
+  and exact corpus promotion remain future work.
+
+---
+
+<a id="rust-port-cycle-581-600md"></a>
+
+## RUST_PORT_CYCLE_581_600.md
+
+Original file: `RUST_PORT_CYCLE_581_600.md`
+
+# Rust Port Cycle 581-600 Report
+
+## Completed
+
+- Cycles 581-589 re-ran the selected after-day inventories after the land
+  transfer work. The remaining after-day drift is still real and now clearly
+  sits in movement/body/energy/honor plus brain/social/episodic/immune runtime
+  ordering rather than save/load land byte loss.
+- Cycles 590-599 added a Rust populated native save/open continuity fixture and
+  `simape --save-open-trace`. It saves a populated day-one native transfer,
+  reloads it, and proves the Rust `before_save` and `after_open` selected
+  snapshots are exact.
+- Cycle 600 added the first broader populated raw fixture,
+  `raw_social_heavy.native`, to the native raw oracle and fixture inventory.
+- The native transfer format now preserves selected being name and awake state
+  through C/Rust transfer sections with `bname=` and `awako=`.
+- Rust native text save/open now writes every social and episodic slot, keeping
+  C slot ordering stable instead of compacting empty entries.
+- Rust raw native output now emits the `landd`, `topog`, and `weath` sections,
+  closing the missing-land-payload gap in the raw value gate.
+
+## Code Changes
+
+- Added C transfer offsets and format entries for awake-plus-one and being name
+  preservation.
+- Added Rust parser/writer support for `awako=` and `bname=` in compact and raw
+  native transfer text.
+- Added `save_open_continuity_fixture()` and the `--save-open-trace` CLI flag.
+- Extended `scripts/run_save_open_continuity_inventory.sh` with Rust internal
+  before/after-open state diffing.
+- Extended `scripts/generate_native_raw_binary_oracle.sh` and
+  `scripts/run_populated_raw_fixture_inventory.sh` for the social-heavy raw
+  fixture.
+
+## Gate Results
+
+- `cargo fmt` passes.
+- `cargo test -p apesdk-sim native_ --lib` passes: 24 tests.
+- `cargo test -p apesdk-sim --lib` passes: 88 tests.
+- `cargo test -p simape save_open_continuity_fixture_preserves_populated_native_state --lib`
+  passes.
+- `cargo test -p simape runtime_parity_transcript_matches_rust_golden --lib`
+  passes.
+- `cargo test -p simape --lib` passes: 58 tests.
+- `scripts/build_native_simape.sh /private/tmp/apesdk_native_build_581_600_recheck`
+  passes.
+- `git diff --check` passes.
+- `scripts/run_save_open_continuity_inventory.sh /private/tmp/apesdk_save_open_581_600_recheck`
+  passes with `rust_state_status=exact`.
+- `scripts/run_native_raw_binary_value_gate.sh /private/tmp/apesdk_raw_value_581_600_recheck`
+  passes with empty startup and reset startup byte-exact, populated values
+  exact, and populated territory raw bytes still pending.
+- `scripts/run_populated_raw_fixture_inventory.sh /private/tmp/apesdk_pop_raw_581_600_recheck`
+  passes with `current=4 needed=3`.
+- `scripts/run_selected_minute_trace_inventory.sh /private/tmp/apesdk_minute_probe_581_600_recheck`
+  passes as inventory with `samples=39 mismatches=78`.
+
+## Carryover
+
+- Cycle 601 should add the immune-heavy populated raw fixture.
+- After-day selected movement/body/energy/honor and brain/social/episodic/
+  immune runtime value closure remain open.
+- Populated save/open still needs C/Rust post-open advancement and transcript
+  parity, plus artifact byte continuity promotion.
+- Broader raw fixture byte promotion remains open for social-heavy,
+  immune-heavy, terrain-heavy, and save/open-derived populated artifacts.
+
+---
+
+<a id="rust-port-cycle-601-630md"></a>
+
+## RUST_PORT_CYCLE_601_630.md
+
+Original file: `RUST_PORT_CYCLE_601_630.md`
+
+# Rust Port Cycle 601-630 Report
+
+## Completed
+
+- Cycles 601-607 expanded the direct native raw oracle from four artifacts to
+  seven. The generated set now includes empty startup, reset startup,
+  after-one-cycle, social-heavy, immune-heavy, terrain-heavy, and
+  save/open-derived raw transfer streams.
+- The native raw value gate now compares all seven C value summaries against
+  Rust loads. Empty startup and reset startup stay byte-exact; all five
+  populated scenarios are value-exact and explicitly marked
+  value-exact-byte-pending until broader populated byte promotion is closed.
+- The populated raw fixture inventory now reports `current=7 needed=0`, moving
+  the remaining raw work from missing-fixture generation to exact byte
+  promotion.
+- Cycles 621-630 added `scripts/run_after_day_drift_inventory.sh`, a focused
+  selected-being after-day classifier that splits the remaining day-one drift
+  into selection, movement, energy, body, honor/drives, brain/probe, social,
+  episodic, and immune buckets.
+- Final signoff readiness now includes both the after-day bucket status and the
+  broader populated raw byte-pending count, so strict signoff cannot pass while
+  these categories are still inventory-only.
+
+## Code Changes
+
+- Extended `scripts/generate_native_raw_binary_oracle.sh` with immune-heavy,
+  terrain-heavy, and save/open-derived native raw scenarios and added their C
+  value summaries.
+- Extended `scripts/run_native_raw_binary_value_gate.sh` so all broader raw
+  scenarios participate in C/Rust value comparison and populated roundtrip
+  summary checks.
+- Updated `scripts/run_populated_raw_fixture_inventory.sh` from a missing
+  fixture tracker into an expanded direct raw artifact-presence gate.
+- Added `scripts/run_after_day_drift_inventory.sh` and wired it into
+  `scripts/run_absolute_parity_ci.sh` and
+  `scripts/run_final_signoff_readiness.sh`.
+
+## Gate Results
+
+- `scripts/run_native_raw_binary_value_gate.sh /private/tmp/apesdk_raw_value_601_630_final`
+  passes with empty/reset byte-exact and populated
+  `value-exact-byte-pending` status for all five populated scenarios.
+- `scripts/run_populated_raw_fixture_inventory.sh /private/tmp/apesdk_pop_raw_601_630_final`
+  passes with `current=7 needed=0`.
+- `scripts/run_after_day_drift_inventory.sh /private/tmp/apesdk_after_day_601_630_final`
+  passes as inventory with `open_buckets=7`.
+- `scripts/run_final_signoff_readiness.sh /private/tmp/apesdk_final_signoff_601_630_final`
+  passes execution and reports `status=blocked blockers=5`, which is expected
+  while after-day runtime, selected-minute later values, save/open raw diff,
+  broader populated raw byte promotion, and exact corpus promotion remain open.
+
+## Carryover
+
+- Cycle 631 should continue from the after-day classifier by closing the first
+  open movement/body/energy/honor bucket rather than adding more inventory.
+- Broader populated raw byte promotion remains open for after-one-cycle,
+  social-heavy, immune-heavy, terrain-heavy, and save/open-derived artifacts.
+- Brain/probe, social, episodic, and immune runtime buckets remain open after
+  the after-day trace and should be handled by cycles 633-648.
+
+---
+
+<a id="rust-port-cycle-631-660md"></a>
+
+## RUST_PORT_CYCLE_631_660.md
+
+Original file: `RUST_PORT_CYCLE_631_660.md`
+
+# Rust Port Cycle 631-660 Report
+
+## Completed
+
+- Cycles 631-632 added a day-one selected slice inventory. It finds first
+  mismatch points for movement, energy, body, and honor/drives before the final
+  after-day row, keeping the after-day blocker actionable.
+- Cycles 633-648 added a brain/social/episodic/immune runtime inventory. It
+  classifies minute-level and after-day drift for brain/probe, social,
+  episodic, and immune fields.
+- Cycles 649-657 tightened save/open continuity. Rust now compares a continued
+  populated state against the same state after native save/open and post-load
+  advancement for one minute and one day.
+- Cycles 658-660 are represented by the already expanded direct raw oracle:
+  immune-heavy, terrain-heavy, and save/open-derived populated raw fixtures are
+  generated and inventoried.
+- Final signoff readiness now records day-one slice status,
+  brain/social/runtime status, and save/open post-load minute/day status.
+
+## Code Changes
+
+- Added `scripts/run_after_day_slice_inventory.sh`.
+- Added `scripts/run_brain_social_runtime_inventory.sh`.
+- Extended `save_open_continuity_fixture()` with `continued_minute`,
+  `post_open_minute`, `continued_day`, and `post_open_day` rows.
+- Extended `scripts/run_save_open_continuity_inventory.sh` with post-load
+  minute and day comparisons.
+- Wired the new inventories into `scripts/run_absolute_parity_ci.sh` and
+  `scripts/run_final_signoff_readiness.sh`.
+
+## Gate Results
+
+- `scripts/run_after_day_slice_inventory.sh /private/tmp/apesdk_after_day_slice_631_660_fixed`
+  passes as inventory with `open_buckets=4`. Movement and energy first diverge
+  at minute 180, body state at minute 180, and honor/drives at minute 120.
+- `scripts/run_brain_social_runtime_inventory.sh /private/tmp/apesdk_brain_social_631_660_fixed`
+  passes as inventory with `open_buckets=4`. Brain/probe and social first
+  diverge at minute 60, immune at minute 180, and episodic at minute 660.
+- `scripts/run_save_open_continuity_inventory.sh /private/tmp/apesdk_save_open_631_660`
+  passes with `rust_state_status=exact`, `post_load_minute_status=exact`,
+  `post_load_day_status=inventory`, and `raw_diff_status=not-run`.
+- `scripts/run_populated_raw_fixture_inventory.sh /private/tmp/apesdk_pop_raw_631_660`
+  passes with `current=7 needed=0`.
+- `scripts/run_final_signoff_readiness.sh /private/tmp/apesdk_final_signoff_631_660`
+  was attempted, but the host ran out of `/private/tmp` space during the raw
+  artifact segment before it could write the final readiness manifest.
+
+## Carryover
+
+- Cycle 661 should begin populated raw byte promotion for the five populated
+  direct raw artifacts.
+- The first runtime parity implementation target is minute-60 brain/social
+  drift, because it is now the earliest brain/social/runtime mismatch.
+- Save/open still needs loaded one-day advancement parity and C/Rust transcript
+  promotion before corpus blockers can be removed.

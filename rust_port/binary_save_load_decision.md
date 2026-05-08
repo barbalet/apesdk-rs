@@ -28,8 +28,16 @@ fields are still reduced.
 ## Current Behavior
 
 Rust `save` writes native transfer text on the default command-line path. Rust
-`open` reads native transfer text and accepts the C topography/weather sections;
-JSON remains available for library regression fixtures, not CLI parity.
+`open` reads native transfer text and preserves the C topography/weather
+sections through semantic land state; JSON remains available for library
+regression fixtures, not CLI parity.
+
+Cycles 581-600 add populated native continuity coverage: Rust preserves
+selected being name, awake state, social/episodic slot order, land payload,
+immune, brain/probe, random state, and population count across a populated
+native save/open trace. The raw native writer also emits `landd`, `topog`, and
+`weath`, so the direct raw startup/reset oracle can compare byte streams rather
+than only semantic values.
 
 ## Later Work
 
@@ -42,5 +50,7 @@ FIL_LAN
 FIL_BEI
 FIL_SOE
 FIL_EPI
+FIL_TOP
+FIL_WEA
 FILE_EOF
 ```
