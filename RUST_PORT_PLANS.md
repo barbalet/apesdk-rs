@@ -2,7 +2,7 @@
 
 Consolidated numbered Rust port plans. Each section begins with the original numbered filename so plan ranges remain visible without keeping one file per range.
 
-Included files: 8.
+Included files: 9.
 
 ## Index
 
@@ -14,6 +14,7 @@ Included files: 8.
 - [RUST_PORT_CYCLE_411_500_PLAN.md](#rust-port-cycle-411-500-planmd)
 - [RUST_PORT_CYCLE_551_620_PLAN.md](#rust-port-cycle-551-620-planmd)
 - [RUST_PORT_CYCLE_621_680_PLAN.md](#rust-port-cycle-621-680-planmd)
+- [RUST_PORT_CYCLE_681_740_PLAN.md](#rust-port-cycle-681-740-planmd)
 
 ---
 
@@ -4230,3 +4231,172 @@ so it reaches a manifest under the current host storage limit. It reports
 `status=blocked blockers=5`: selected/after-day runtime, brain/social/runtime,
 save/open continuity, broader populated raw byte promotion, and exact corpus
 promotion remain open.
+
+---
+
+<a id="rust-port-cycle-681-740-planmd"></a>
+
+## RUST_PORT_CYCLE_681_740_PLAN.md
+
+Original file: `RUST_PORT_CYCLE_681_740_PLAN.md`
+
+# Rust Port Cycle 681-740 Final Native Parity Implementation Plan
+
+## Scope
+
+This 60-cycle plan covers the remaining implementation work after the
+cycle 621-680 readiness pass. The objective is to move from inventory-level
+native C parity toward exact command-line parity by closing the currently
+blocked runtime, save/open, raw byte, corpus, and final readiness categories.
+
+The planned cycle budget is:
+
+- 15 cycles: minute-60 brain/social drift.
+- 12 cycles: day-one movement/energy/body/honor drift.
+- 10 cycles: immune and episodic runtime drift.
+- 8 cycles: save/open one-day post-load advancement.
+- 7 cycles: populated `being{}` raw byte closure.
+- 5 cycles: exact corpus promotion.
+- 3 cycles: final readiness/signoff stabilization.
+
+## Minute-60 Brain/Social Drift: Cycles 681-695
+
+- Cycle 681: Capture refreshed C/Rust minute-60 brain/social trace rows with
+  selected attention, brain registers, brain probes, shout/listen state, and
+  first social slot fields.
+- Cycle 682: Add native C probe fields for internal braincode execution order,
+  external/social braincode execution order, and per-being social update order.
+- Cycle 683: Compare Rust braincode instruction stepping against C for the
+  minute-60 fixture and isolate the first instruction or sensor/action mismatch.
+- Cycle 684: Align internal braincode register and brain-state mutation order
+  without regressing startup and first-cycle trace gates.
+- Cycle 685: Align external/social braincode hook execution for the selected
+  being and first social-memory slot.
+- Cycle 686: Align listen/shout/speech side effects and refractory counter
+  behavior at the first minute-60 divergence.
+- Cycle 687: Align brain probe type, address, position, frequency, offset, and
+  state update order at minute 60.
+- Cycle 688: Align social self-slot maintenance so social slot 0 matches C
+  through minute 60.
+- Cycle 689: Align social familiarity, attraction, friend/foe, relationship,
+  entity type, and belief updates for the selected being.
+- Cycle 690: Add mutation checks for minute-60 brain register, social slot, and
+  probe fields.
+- Cycle 691: Promote minute-60 brain/probe fields from inventory to exact value
+  gates.
+- Cycle 692: Promote minute-60 social fields from inventory to exact value
+  gates.
+- Cycle 693: Re-run selected-minute trace inventory to confirm brain/social no
+  longer diverges at minute 60.
+- Cycle 694: Update final drift and corpus blockers to remove minute-60
+  brain/social once exact.
+- Cycle 695: Run final readiness and document any remaining selected-minute
+  brain/social fallout as a narrower blocker.
+
+## Day-One Movement, Energy, Body, Honor: Cycles 696-707
+
+- Cycle 696: Capture movement/energy/honor first-mismatch traces around minutes
+  120 and 180 with terrain, target speed, water-ahead, state, and energy-cost
+  sidecar fields.
+- Cycle 697: Align drive update order for hunger, social, fatigue, and sex so
+  honor/drives no longer diverge at minute 120.
+- Cycle 698: Align temporary speed, water avoidance, swim speed, and genetic
+  wandering order through minute 180.
+- Cycle 699: Align movement vector, facing, velocity history, and map wrapping
+  at the first movement divergence.
+- Cycle 700: Align awake/state transitions that currently produce the minute-180
+  body-state mismatch.
+- Cycle 701: Align resting, movement, swimming, eating, and insulation energy
+  costs at the selected native locations.
+- Cycle 702: Align body mass, body fat, posture, parasite, grooming, and
+  inventory side effects through the day-one row.
+- Cycle 703: Align honor recalibration and social honor side effects after the
+  movement/drive corrections.
+- Cycle 704: Add mutation checks for day-one movement, energy, body, and
+  honor/drive promoted fields.
+- Cycle 705: Promote day-one movement and energy buckets from inventory to
+  exact value gates.
+- Cycle 706: Promote day-one body and honor/drive buckets from inventory to
+  exact value gates.
+- Cycle 707: Re-run after-day drift and day-one slice inventories and remove
+  closed movement/energy/body/honor blockers from readiness.
+
+## Immune And Episodic Runtime Drift: Cycles 708-717
+
+- Cycle 708: Capture refreshed immune divergence rows around minute 180 with
+  antigen, antibody, shape, random seed, infection, and energy-coupling fields.
+- Cycle 709: Align immune response random draw order, antibody depletion,
+  antigen mutation, and best-match antibody selection.
+- Cycle 710: Align immune ingestion and transmission paths for food, touch,
+  social, maternal, and sex transmission hooks.
+- Cycle 711: Add immune mutation checks and promote the minute-180 immune bucket
+  once exact.
+- Cycle 712: Capture refreshed episodic divergence rows around minute 660 with
+  event, affect, food, argument, replacement index, and attention fields.
+- Cycle 713: Align episodic fade/affect cycling order for awake/asleep states.
+- Cycle 714: Align episodic insert, replace, intention, anecdote, food, and
+  social event payloads.
+- Cycle 715: Add episodic mutation checks and promote the minute-660 episodic
+  bucket once exact.
+- Cycle 716: Re-run selected-minute, brain/social runtime, and after-day
+  inventories to confirm immune/episodic closure does not re-open earlier
+  buckets.
+- Cycle 717: Remove immune and episodic runtime blockers from final readiness
+  and corpus promotion manifests.
+
+## Save/Open One-Day Advancement: Cycles 718-725
+
+- Cycle 718: Capture continued-vs-post-open one-day sidecar traces for selected
+  state, random state, land state, social/episodic/immune state, and raw bytes.
+- Cycle 719: Align loaded random-state continuity and selected-being identity
+  continuity across native save/open.
+- Cycle 720: Align post-open one-day movement/body/energy advancement using the
+  now-promoted day-one runtime gates.
+- Cycle 721: Align post-open one-day brain/social/episodic/immune advancement
+  using the promoted runtime buckets.
+- Cycle 722: Align post-open land, terrain, weather, tide, and food continuity
+  through one day.
+- Cycle 723: Promote one-day post-load advancement from inventory to exact in
+  `scripts/run_save_open_continuity_inventory.sh`.
+- Cycle 724: Run optional C/Rust save/open raw transcript diff and classify any
+  remaining command transcript drift.
+- Cycle 725: Remove save/open post-load advancement blockers from exact corpus
+  and final readiness manifests.
+
+## Populated `being{}` Raw Byte Closure: Cycles 726-732
+
+- Cycle 726: Add byte-map labels for the first populated `being{}` byte
+  differences identified by the raw byte-diff inventory.
+- Cycle 727: Compare C and Rust packed being fields around the first offset for
+  after-one-cycle and social-heavy fixtures.
+- Cycle 728: Compare C and Rust packed being fields around the first offset for
+  immune-heavy, terrain-heavy, and save/open-derived fixtures.
+- Cycle 729: Close packed being byte ordering, formatting, padding, or
+  field-preservation drift responsible for the first `being{}` byte mismatch.
+- Cycle 730: Extend raw byte mutation checks to populated `being{}` fields.
+- Cycle 731: Promote all five populated raw artifacts from value-exact to
+  byte-exact in the byte-diff inventory.
+- Cycle 732: Remove populated raw byte blockers from final readiness, raw
+  oracle notes, and exact corpus promotion manifests.
+
+## Exact Corpus Promotion: Cycles 733-737
+
+- Cycle 733: Promote `long_seeded_command_corpus` after runtime and save/open
+  blockers are exact.
+- Cycle 734: Promote `multi_day_runtime_matrix` and `multi_month_runtime_matrix`
+  after day-one and long-runtime state traces are exact.
+- Cycle 735: Promote `save_open_runtime_continuity` after post-load advancement
+  and raw transcript behavior are exact.
+- Cycle 736: Promote `exhaustive_command_surface`, including file-producing
+  command ordering.
+- Cycle 737: Run `scripts/run_exact_corpus_promotion_gate.sh` and require
+  `total=5 ready=5 blocked=0`.
+
+## Final Readiness And Signoff: Cycles 738-740
+
+- Cycle 738: Run full absolute parity CI and final readiness repeatedly to
+  catch nondeterminism in traces, save/open artifacts, raw bytes, and corpora.
+- Cycle 739: Remove remaining accepted-difference, documented-difference,
+  pending, inventory-only, and triage-only markers from completion paths.
+- Cycle 740: Final command-line Rust `simape` native C parity signoff with
+  final readiness `status=exact blockers=0`.
