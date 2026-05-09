@@ -101,3 +101,8 @@ brain/social runtime inventories. Final readiness records first-mismatch bucket
 counts for movement/energy/body/honor and brain/social/episodic/immune runtime
 fields, plus save/open post-load minute/day continuity. Save/open is exact
 through one post-load minute and inventory-only by one post-load day.
+
+Cycle 661-680 update: the absolute pipeline now includes populated raw
+byte-diff inventory. Final readiness reuses the native raw value gate for byte
+diffing instead of generating duplicate raw artifacts, reaches a manifest under
+the current host storage limit, and reports `status=blocked blockers=5`.

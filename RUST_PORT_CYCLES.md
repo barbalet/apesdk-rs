@@ -2,7 +2,7 @@
 
 Consolidated cycle reports. Each section begins with the original numbered filename so cycle numbering remains visible without keeping one file per cycle.
 
-Included files: 161.
+Included files: 162.
 
 ## Index
 
@@ -167,6 +167,7 @@ Included files: 161.
 - [RUST_PORT_CYCLE_581_600.md](#rust-port-cycle-581-600md)
 - [RUST_PORT_CYCLE_601_630.md](#rust-port-cycle-601-630md)
 - [RUST_PORT_CYCLE_631_660.md](#rust-port-cycle-631-660md)
+- [RUST_PORT_CYCLE_661_680.md](#rust-port-cycle-661-680md)
 
 ---
 
@@ -9087,3 +9088,63 @@ Original file: `RUST_PORT_CYCLE_631_660.md`
   drift, because it is now the earliest brain/social/runtime mismatch.
 - Save/open still needs loaded one-day advancement parity and C/Rust transcript
   promotion before corpus blockers can be removed.
+
+---
+
+<a id="rust-port-cycle-661-680md"></a>
+
+## RUST_PORT_CYCLE_661_680.md
+
+Original file: `RUST_PORT_CYCLE_661_680.md`
+
+# Rust Port Cycle 661-680 Report
+
+## Completed
+
+- Cycles 661-665 added populated raw byte-diff inventory. The new gate reuses
+  native raw value output, compares each populated native artifact with the Rust
+  roundtrip, records first byte-diff offsets, and proves byte comparisons fail
+  on a deliberate mutation.
+- Cycles 666-675 hardened exact corpus promotion. The pending corpus inventory
+  now reports concrete blocker families instead of generic long-runtime and
+  save/open labels.
+- Cycles 676-680 stabilized final readiness. Final readiness now reuses the raw
+  value gate for byte-diff inventory, avoiding duplicate raw oracle generation
+  and allowing the combined readiness run to complete under the current storage
+  limit.
+
+## Code Changes
+
+- Added `scripts/run_populated_raw_byte_diff_inventory.sh`.
+- Wired populated raw byte-diff inventory into
+  `scripts/run_absolute_parity_ci.sh`.
+- Updated `scripts/run_final_signoff_readiness.sh` to reuse
+  `native-raw-binary-values` for byte-diff inventory and report
+  `populated_raw_byte_status`.
+- Tightened `scripts/run_pending_corpus_inventory.sh` blocker labels around
+  day-one runtime, brain/social/episodic/immune runtime, save/open post-load,
+  save/open raw transcript, selected-detail, and file-producing command order.
+
+## Gate Results
+
+- `scripts/run_populated_raw_byte_diff_inventory.sh /private/tmp/apesdk_raw_byte_diff_661_680`
+  passes as inventory with `exact=0 pending=5`; all five populated artifacts
+  are value-exact but byte-pending.
+- First byte diffs are in `being{` sections for all five populated raw
+  scenarios:
+  `raw_after_one_cycle`, `raw_social_heavy`, `raw_immune_heavy`,
+  `raw_terrain_heavy`, and `raw_save_open_derived`.
+- `scripts/run_corpus_promotion_inventory.sh /private/tmp/apesdk_corpus_661_680`
+  passes with `total=5 ready=0 blocked=5`.
+- `scripts/run_exact_corpus_promotion_gate.sh /private/tmp/apesdk_exact_corpus_661_680`
+  correctly exits blocked with `total=5 ready=0 blocked=5`.
+- `scripts/run_final_signoff_readiness.sh /private/tmp/apesdk_final_signoff_661_680`
+  now completes and reports `status=blocked blockers=5`.
+
+## Carryover
+
+- There are no planned cycles left in the current 621-680 plan.
+- The next work needs a new plan around the remaining implementation blockers:
+  minute-60 brain/social runtime drift, day-one movement/energy/honor drift,
+  loaded one-day save/open advancement, populated `being{}` raw byte diffs, and
+  exact promotion of the five long/runtime/save-open/exhaustive corpora.

@@ -16,6 +16,7 @@ APESDK_FULL_DATE="$FULL_DATE" "$ROOT/scripts/run_raw_transcript_diff.sh" "$OUT_D
 "$ROOT/scripts/run_absolute_parity_failure_smoke.sh" "$OUT_DIR/failure-smoke"
 "$ROOT/scripts/run_native_raw_binary_oracle_gate.sh" "$OUT_DIR/native-raw-binary"
 "$ROOT/scripts/run_native_raw_binary_value_gate.sh" "$OUT_DIR/native-raw-binary-values"
+APESDK_RAW_VALUE_GATE_DIR="$OUT_DIR/native-raw-binary-values" "$ROOT/scripts/run_populated_raw_byte_diff_inventory.sh" "$OUT_DIR/populated-raw-byte-diff"
 "$ROOT/scripts/run_populated_raw_fixture_inventory.sh" "$OUT_DIR/populated-raw-fixtures"
 "$ROOT/scripts/trace_diff.sh" "$ROOT/golden/traces/final_gate_summary.trace" "$ROOT/golden/traces/final_gate_summary.trace"
 "$ROOT/scripts/run_engine_trace_schema_gate.sh" "$OUT_DIR/engine-trace-schema"

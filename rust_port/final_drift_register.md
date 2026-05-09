@@ -78,11 +78,14 @@ category is now one of:
   raw oracle now includes after-one-cycle, social-heavy, immune-heavy,
   terrain-heavy, and save/open-derived populated fixtures, and their value
   summaries load exactly in Rust. Populated byte-exact promotion remains open
-  for the broader fixture set.
+  for the broader fixture set; byte-diff inventory now places the first
+  difference for all five populated scenarios in `being{` sections.
 - Promote the cycle 341-350 long seeded, multi-day, multi-month, save/open, and
   exhaustive command-surface scripts after direct trace value drift is closed.
-  `scripts/run_pending_corpus_inventory.sh` records their current blockers:
-  long runtime values, save/open continuity, selected-being detail values, and
+  `scripts/run_pending_corpus_inventory.sh` records their current blockers as
+  concrete categories: day-one movement/energy/honor runtime,
+  brain/social/episodic/immune runtime, save/open post-load day continuity,
+  save/open raw transcript, selected-minute brain/social/detail values, and
   file-producing command ordering.
 - Promote brain/social/episodic/immune runtime buckets from inventory to exact.
   The runtime inventory now marks brain/probe and social as first diverging at

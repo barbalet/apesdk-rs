@@ -24,13 +24,15 @@ classify_blockers() {
     local commands="$1"
     local blockers=()
     if grep -Eq '^[[:space:]]*run[[:space:]]+[0-9]+[[:space:]]+(day|days|month|months)' "$commands"; then
-        blockers+=("long-runtime-engine-values")
+        blockers+=("day-one-movement-energy-honor-runtime")
+        blockers+=("brain-social-episodic-immune-runtime")
     fi
     if grep -Eq '^[[:space:]]*(save|open)([[:space:]]|$)' "$commands"; then
-        blockers+=("save-open-continuity")
+        blockers+=("save-open-post-load-day-continuity")
+        blockers+=("save-open-raw-transcript")
     fi
     if grep -Eq '^[[:space:]]*(stats|appearance|genome|friends|pathogen|graph|braincode|speech|episodic|probes)([[:space:]]|$)' "$commands"; then
-        blockers+=("selected-being-detail-values")
+        blockers+=("selected-minute-brain-social-and-detail-values")
     fi
     if grep -Eq '^[[:space:]]*(speak|alpha)[[:space:]]+' "$commands"; then
         blockers+=("file-producing-command-order")

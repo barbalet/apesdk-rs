@@ -47,6 +47,12 @@ brain/probe and social at minute 60, immune at minute 180, and episodic at
 minute 660. Rust save/open internal continuity is exact through one post-load
 minute but still diverges after one post-load day.
 
+Cycle 661-680 update: populated raw byte diffs are now classified. All five
+populated artifacts are value-exact but byte-pending, with first differences in
+`being{` sections. Final readiness now completes under the current storage
+limit and reports `status=blocked blockers=5`; exact corpus promotion remains
+`total=5 ready=0 blocked=5`.
+
 ## Signoff Rule
 
 The project no longer accepts documented drift as a completion condition.

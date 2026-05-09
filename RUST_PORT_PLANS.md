@@ -4172,6 +4172,14 @@ direct raw oracle. The immune-heavy, terrain-heavy, and save/open-derived
 fixtures are generated and inventoried with the seven-artifact raw oracle set.
 Exact populated byte promotion remains for cycles 661-665.
 
+Run status for cycles 661-665: completed as byte-diff classification and
+strict readiness integration, not exact byte closure. `scripts/run_populated_raw_byte_diff_inventory.sh`
+now reuses the native raw value gate output, compares every populated native
+raw artifact against the Rust roundtrip, records first byte-diff offsets and
+nearest transfer sections, and includes a mutation check. All five populated
+raw artifacts remain `value-exact-byte-pending`; the first byte difference in
+each is inside a `being{` section.
+
 ## Exact Corpus Promotion: Cycles 666-675
 
 - Cycle 666: Promote `long_seeded_command_corpus` to exact raw transcript,
@@ -4194,6 +4202,14 @@ Exact populated byte promotion remains for cycles 661-665.
 - Cycle 675: Remove long seeded, multi-day/month, save/open, and exhaustive
   corpus blockers from the final drift register.
 
+Run status for cycles 666-675: completed as exact-promotion hardening, with all
+five corpora still blocked. The corpus inventory now reports concrete blocker
+families: day-one movement/energy/honor runtime, brain/social/episodic/immune
+runtime, save/open post-load day continuity, save/open raw transcript,
+selected-minute brain/social/detail values, and file-producing command order.
+`scripts/run_exact_corpus_promotion_gate.sh` correctly exits blocked with
+`total=5 ready=0 blocked=5`.
+
 ## Stabilization And Strict Readiness: Cycles 676-680
 
 - Cycle 676: Run repeated clean-checkout absolute parity to detect
@@ -4206,3 +4222,11 @@ Exact populated byte promotion remains for cycles 661-665.
   documentation mismatch.
 - Cycle 680: Final native C parity signoff for the command-line Rust `simape`
   path with no accepted/documented differences left.
+
+Run status for cycles 676-680: completed as stabilization and strict readiness
+cleanup, not final parity signoff. Final readiness now reuses the raw value gate
+for raw byte-diff inventory instead of generating duplicate raw oracle outputs,
+so it reaches a manifest under the current host storage limit. It reports
+`status=blocked blockers=5`: selected/after-day runtime, brain/social/runtime,
+save/open continuity, broader populated raw byte promotion, and exact corpus
+promotion remain open.

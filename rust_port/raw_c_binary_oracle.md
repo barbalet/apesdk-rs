@@ -95,3 +95,13 @@ precise:
   value summary against Rust loads. Empty startup and reset startup remain
   byte-exact; all five populated fixtures are value-exact and explicitly marked
   as pending byte-exact promotion.
+
+Cycles 661-680 add populated raw byte-diff classification:
+
+- `scripts/run_populated_raw_byte_diff_inventory.sh` reuses the native raw
+  value gate artifacts and roundtrips, records first byte-diff offsets for each
+  populated scenario, and includes a mutation check proving byte comparison
+  failures are detected.
+- All five populated raw fixtures remain value-exact but byte-pending. The
+  first byte difference in each broader fixture currently falls in a `being{`
+  section rather than the land/topography/weather sections.

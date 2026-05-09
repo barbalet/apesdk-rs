@@ -18,8 +18,8 @@ mkdir -p "$OUT_DIR"
 "$ROOT/scripts/run_brain_social_runtime_inventory.sh" "$OUT_DIR/brain-social-runtime" >/dev/null
 "$ROOT/scripts/run_selected_minute_trace_inventory.sh" "$OUT_DIR/selected-minute-trace" >/dev/null
 "$ROOT/scripts/run_save_open_continuity_inventory.sh" "$OUT_DIR/save-open-continuity" >/dev/null
-"$ROOT/scripts/run_populated_raw_fixture_inventory.sh" "$OUT_DIR/populated-raw-fixtures" >/dev/null
 "$ROOT/scripts/run_native_raw_binary_value_gate.sh" "$OUT_DIR/native-raw-binary-values" >/dev/null
+APESDK_RAW_VALUE_GATE_DIR="$OUT_DIR/native-raw-binary-values" "$ROOT/scripts/run_populated_raw_byte_diff_inventory.sh" "$OUT_DIR/populated-raw-byte-diff" >/dev/null
 "$ROOT/scripts/run_corpus_promotion_inventory.sh" "$OUT_DIR/corpus-promotion" >/dev/null
 
 selected_manifest="$OUT_DIR/selected-being-values/selected_being_value_inventory_manifest.txt"
@@ -28,8 +28,8 @@ after_day_slice_manifest="$OUT_DIR/after-day-slices/after_day_slice_inventory_ma
 brain_social_manifest="$OUT_DIR/brain-social-runtime/brain_social_runtime_inventory_manifest.txt"
 minute_trace_manifest="$OUT_DIR/selected-minute-trace/selected_minute_trace_inventory_manifest.txt"
 save_open_manifest="$OUT_DIR/save-open-continuity/save_open_continuity_inventory_manifest.txt"
-raw_fixture_manifest="$OUT_DIR/populated-raw-fixtures/populated_raw_fixture_inventory_manifest.txt"
 raw_value_manifest="$OUT_DIR/native-raw-binary-values/native_raw_binary_value_gate_manifest.txt"
+raw_byte_diff_manifest="$OUT_DIR/populated-raw-byte-diff/populated_raw_byte_diff_inventory_manifest.txt"
 corpus_manifest="$OUT_DIR/corpus-promotion/corpus_promotion_inventory_manifest.txt"
 
 selected_status="$(awk -F= '$1 == "selected_status" { print $2 }' "$selected_manifest")"
@@ -43,8 +43,9 @@ minute_status="$(awk -F= '$1 == "minute_status" { print $2 }' "$minute_trace_man
 raw_diff_status="$(awk -F= '$1 == "raw_diff_status" { print $2 }' "$save_open_manifest")"
 post_load_minute_status="$(awk -F= '$1 == "post_load_minute_status" { print $2 }' "$save_open_manifest")"
 post_load_day_status="$(awk -F= '$1 == "post_load_day_status" { print $2 }' "$save_open_manifest")"
-needed_raw_fixtures="$(awk -F= '$1 ~ /^fixture[.].*[.]status$/ && $2 == "needed" { count++ } END { print count + 0 }' "$raw_fixture_manifest")"
-pending_raw_byte_scenarios="$(awk -F= '$1 == "populated_byte_modes" { print gsub(/value-exact-byte-pending/, "&") }' "$raw_value_manifest")"
+needed_raw_fixtures="$(awk -F= '$1 == "missing_populated_scenarios" { if ($2 == "") print 0; else { split($2, values, " "); print length(values) } }' "$raw_byte_diff_manifest")"
+pending_raw_byte_scenarios="$(awk -F= '$1 == "pending_populated_raw_byte_scenarios" { print $2 }' "$raw_byte_diff_manifest")"
+populated_raw_byte_status="$(awk -F= '$1 == "populated_raw_byte_status" { print $2 }' "$raw_byte_diff_manifest")"
 blocked_corpora="$(awk -F= '$1 == "blocked_sessions" { print $2 }' "$corpus_manifest")"
 ready_corpora="$(awk -F= '$1 == "ready_sessions" { print $2 }' "$corpus_manifest")"
 total_corpora="$(awk -F= '$1 == "total_sessions" { print $2 }' "$corpus_manifest")"
@@ -82,7 +83,8 @@ fi
     printf 'save_open_post_load_day_status=%s\n' "$post_load_day_status"
     printf 'save_open_manifest=%s\n' "$save_open_manifest"
     printf 'needed_populated_raw_fixtures=%s\n' "$needed_raw_fixtures"
-    printf 'populated_raw_fixture_manifest=%s\n' "$raw_fixture_manifest"
+    printf 'populated_raw_byte_status=%s\n' "$populated_raw_byte_status"
+    printf 'populated_raw_byte_manifest=%s\n' "$raw_byte_diff_manifest"
     printf 'pending_populated_raw_byte_scenarios=%s\n' "$pending_raw_byte_scenarios"
     printf 'native_raw_value_manifest=%s\n' "$raw_value_manifest"
     printf 'total_corpora=%s\n' "$total_corpora"

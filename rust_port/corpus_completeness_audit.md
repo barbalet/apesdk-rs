@@ -36,8 +36,10 @@ Absolute parity coverage map:
   absolute pipeline, fails on missing session files, and optionally records raw
   diff blockers. Reset/startup population timing and direct raw populated
   territory bytes are no longer classified as blockers. The active blockers are
-  long runtime engine value drift, save/open continuity drift, selected-being
-  detail value drift, and file-producing command ordering.
+  now day-one movement/energy/honor runtime, brain/social/episodic/immune
+  runtime, save/open post-load day continuity, save/open raw transcript,
+  selected-minute brain/social/detail values, and file-producing command
+  ordering.
 - Save/open promotion inventory:
   `scripts/run_save_open_continuity_inventory.sh` records the populated
   save/open/run session, compares Rust before-save/after-open state, and now
@@ -58,6 +60,11 @@ Absolute parity coverage map:
   save/open-derived artifacts, so there are no missing fixture families left.
   Broader raw corpus promotion now waits on byte-exact populated roundtrips for
   the five populated artifacts.
+- Populated raw byte-diff inventory:
+  `scripts/run_populated_raw_byte_diff_inventory.sh` reuses the native raw
+  value gate output, records first byte-diff offsets and nearest sections for
+  all five populated artifacts, and includes a mutation check. All populated
+  raw byte diffs currently start in `being{` sections.
 - Exact corpus promotion gate:
   `scripts/run_exact_corpus_promotion_gate.sh` is the strict counterpart to the
   inventory. It exits non-zero unless every promoted corpus session is ready and
