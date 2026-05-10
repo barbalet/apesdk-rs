@@ -9,3 +9,5 @@ xcschememanagement.plist
 *.xcbkptlist
 .vscode/*
 /target/
+/rust/target/
+/simape
